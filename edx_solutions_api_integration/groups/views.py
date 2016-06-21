@@ -14,7 +14,7 @@ from edx_solutions_api_integration.models import GroupRelationship, CourseGroupR
     APIUser as User
 from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView
 from edx_solutions_api_integration.utils import str2bool, generate_base_uri
-from organizations import serializers
+from edx_solutions_organizations import serializers
 from projects.serializers import BasicWorkgroupSerializer, GroupSerializer
 
 

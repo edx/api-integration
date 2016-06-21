@@ -5,7 +5,7 @@ from rest_framework import serializers
 from django.core.exceptions import ObjectDoesNotExist
 
 from edx_solutions_api_integration.models import APIUser
-from organizations.serializers import BasicOrganizationSerializer
+from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from student.roles import CourseAccessRole
 from gradebook.models import StudentGradebook
 
