@@ -54,7 +54,7 @@ from edx_solutions_api_integration.courseware_access import get_course, get_cour
 from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView, IdsInFilterBackend, \
     HasOrgsFilterBackend
 from edx_solutions_api_integration.models import GroupProfile, APIUser as User
-from organizations.serializers import BasicOrganizationSerializer
+from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from edx_solutions_api_integration.utils import generate_base_uri, dict_has_items, extract_data_params
 from projects.serializers import BasicWorkgroupSerializer
 from .serializers import UserSerializer, UserCountByCitySerializer, UserRolesSerializer
