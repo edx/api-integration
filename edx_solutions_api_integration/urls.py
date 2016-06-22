@@ -15,7 +15,7 @@ from rest_framework.routers import SimpleRouter
 
 from edx_solutions_organizations.views import OrganizationsViewSet
 from edx_solutions_api_integration.system import views as system_views
-from projects import views as project_views
+from edx_solutions_projects import views as project_views
 
 urlpatterns = patterns(
     '',

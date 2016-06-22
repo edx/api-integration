@@ -31,8 +31,8 @@ from lms.lib.comment_client.thread import get_course_thread_stats
 from lms.lib.comment_client.utils import CommentClientRequestError
 from opaque_keys import InvalidKeyError
 from progress.models import StudentProgress
-from projects.models import Project, Workgroup
-from projects.serializers import ProjectSerializer, BasicWorkgroupSerializer
+from edx_solutions_projects.models import Project, Workgroup
+from edx_solutions_projects.serializers import ProjectSerializer, BasicWorkgroupSerializer
 from student.models import CourseEnrollment, CourseEnrollmentAllowed
 from student.roles import CourseAccessRole, CourseInstructorRole, CourseStaffRole, CourseObserverRole, \
     CourseAssistantRole, UserBasedRole, get_aggregate_exclusion_user_ids

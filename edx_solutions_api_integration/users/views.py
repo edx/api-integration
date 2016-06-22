@@ -56,7 +56,7 @@ from edx_solutions_api_integration.permissions import SecureAPIView, SecureListA
 from edx_solutions_api_integration.models import GroupProfile, APIUser as User
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from edx_solutions_api_integration.utils import generate_base_uri, dict_has_items, extract_data_params
-from projects.serializers import BasicWorkgroupSerializer
+from edx_solutions_projects.serializers import BasicWorkgroupSerializer
 from .serializers import UserSerializer, UserCountByCitySerializer, UserRolesSerializer
 
 
