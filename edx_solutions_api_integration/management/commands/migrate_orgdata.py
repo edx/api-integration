@@ -7,7 +7,7 @@ from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
 
 from edx_solutions_api_integration.models import GroupProfile
-from organizations.models import Organization
+from edx_solutions_organizations.models import Organization
 
 
 class Command(BaseCommand):
