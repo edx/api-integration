@@ -31,7 +31,7 @@ from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR
 from instructor.access import allow_access
 from edx_solutions_organizations.models import Organization
-from projects.models import Project, Workgroup
+from edx_solutions_projects.models import Project, Workgroup
 from student.tests.factories import UserFactory, CourseEnrollmentFactory
 from student.models import anonymous_id_for_user
 

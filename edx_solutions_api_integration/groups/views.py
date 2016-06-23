@@ -15,7 +15,7 @@ from edx_solutions_api_integration.models import GroupRelationship, CourseGroupR
 from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView
 from edx_solutions_api_integration.utils import str2bool, generate_base_uri
 from edx_solutions_organizations import serializers
-from projects.serializers import BasicWorkgroupSerializer, GroupSerializer
+from edx_solutions_projects.serializers import BasicWorkgroupSerializer, GroupSerializer
 
 
 RELATIONSHIP_TYPES = {'hierarchical': 'h', 'graph': 'g'}
