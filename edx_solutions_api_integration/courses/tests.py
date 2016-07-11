@@ -490,7 +490,8 @@ class CoursesApiTests(ModuleStoreTestCase):
             'users': users,
             'contents': contents,
             'completion_uri': completion_uri,
-            'groups': groups
+            'groups': groups,
+            'course': course,
         }
 
     def test_courses_list_get(self):
@@ -2357,6 +2358,44 @@ class CoursesApiTests(ModuleStoreTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['leaders']), 2)
         self.assertEqual('{0:.3f}'.format(response.data['course_avg']), expected_course_avg)
+
+    def test_courses_completions_leaders_exclude_roles(self):
+        """
+        Tests courses completions leaders with `exclude_roles` filter
+        """
+        setup_data = self._setup_courses_completions_leaders()
+        local_content = setup_data['contents'][0]
+        completion_uri = setup_data['completion_uri']
+        course = setup_data['course']
+        content_id = unicode(local_content.scope_ids.usage_id)
+
+        # create couple of users, assign them observer and assistant roles and add content completion for them
+        users = UserFactory.create_batch(2)
+        for idx, user in enumerate(users):
+            CourseEnrollmentFactory.create(user=user, course_id=unicode(course.id))
+            roles = ['observer', 'assistant']
+            allow_access(course, user, roles[idx])
+            completions_data = {'content_id': content_id, 'user_id': user.id}
+            response = self.do_post(completion_uri, completions_data)
+            self.assertEqual(response.status_code, 201)
+
+        # test both users are excluded from progress calculations
+        test_uri = '{}?exclude_roles=observer,assistant'.format(setup_data['leaders_uri'])
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['leaders']), 4)
+
+        # test only observer is excluded from progress calculations
+        test_uri = '{}?exclude_roles=observer,'.format(setup_data['leaders_uri'])
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['leaders']), 5)
+
+        # test when none is passed
+        test_uri = '{}?exclude_roles=none'.format(setup_data['leaders_uri'])
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['leaders']), 7)
 
     def test_courses_completions_leaders_list_get_filter_users_by_multiple_groups(self):
         """

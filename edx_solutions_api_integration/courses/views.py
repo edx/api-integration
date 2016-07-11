@@ -1805,6 +1805,8 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
     To get data for one or more orgnaizations organizations filter can be applied
     * organizations filter can be a single id or multiple ids separated by comma
     ```/api/courses/{course_id}/metrics/completions/leaders/?organizations={organization_id1},{organization_id2}```
+    To exclude users with certain roles from progress/completions calculations
+    ```/api/courses/{course_id}/metrics/completions/leaders/?exclude_roles=observer,assistant```
 
     ### Use Cases/Notes:
     * Example: Display leaders in terms of completions in a given course
@@ -1817,6 +1819,10 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
         """
         user_id = self.request.QUERY_PARAMS.get('user_id', None)
         count = self.request.QUERY_PARAMS.get('count', None)
+        exclude_roles = self.request.QUERY_PARAMS.get('exclude_roles', None)
+        if exclude_roles:
+            exclude_roles = [role for role in filter(None, exclude_roles.split(','))]
+
         skipleaders = str2bool(self.request.QUERY_PARAMS.get('skipleaders', 'false'))
         data = {}
         course_avg = 0
@@ -1825,7 +1831,7 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
         course_key = get_course_key(course_id)
         course_metadata = CourseAggregatedMetaData.get_from_id(course_key)
         total_possible_completions = float(course_metadata.total_assessments)
-        exclude_users = get_aggregate_exclusion_user_ids(course_key)
+        exclude_users = get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles)
         orgs_filter = get_ids_from_list_param(self.request, 'organizations')
         group_ids = get_ids_from_list_param(self.request, 'groups')
 
