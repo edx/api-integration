@@ -1753,6 +1753,8 @@ class CoursesMetricsGradesLeadersList(SecureListAPIView):
     - GET: Returns a JSON representation (array) of the users with grades
     To get more than 3 users use count parameter
     ``` /api/courses/{course_id}/metrics/grades/leaders/?count=3```
+    To exclude users with certain roles from leaders
+    ```/api/courses/{course_id}/metrics/grades/leaders/?exclude_roles=observer,assistant```
     ### Use Cases/Notes:
     * Example: Display grades leaderboard of a given course
     * Example: Display position of a users in a course in terms of grade and course avg
@@ -1765,13 +1767,17 @@ class CoursesMetricsGradesLeadersList(SecureListAPIView):
         user_id = self.request.QUERY_PARAMS.get('user_id', None)
         group_ids = get_ids_from_list_param(self.request, 'groups')
         count = self.request.QUERY_PARAMS.get('count', 3)
+        exclude_roles = self.request.QUERY_PARAMS.get('exclude_roles', None)
+        if exclude_roles:
+            exclude_roles = [role for role in filter(None, exclude_roles.split(','))]
+
         data = {}
         course_avg = 0  # pylint: disable=W0612
         if not course_exists(request, request.user, course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         course_key = get_course_key(course_id)
         # Users having certain roles (such as an Observer) are excluded from aggregations
-        exclude_users = get_aggregate_exclusion_user_ids(course_key)
+        exclude_users = get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles)
         leaderboard_data = StudentGradebook.generate_leaderboard(course_key,
                                                                  user_id=user_id,
                                                                  group_ids=group_ids,

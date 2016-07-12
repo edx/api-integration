@@ -2279,6 +2279,38 @@ class CoursesApiTests(ModuleStoreTestCase):
         self.assertEqual(response.data['course_avg'], 0)
         self.assertEqual(len(response.data['leaders']), 0)
 
+    def test_courses_metrics_grades_leaders_exclude_roles(self):
+        """
+        Tests courses metrics grades leaders with `exclude_roles` filter
+        """
+        setup_data = self._setup_courses_metrics_grades_leaders()
+        course = setup_data['course']
+        item = setup_data['item']
+
+        # create a user, assign assistant role and add grade
+        user = UserFactory.create()
+        CourseEnrollmentFactory.create(user=user, course_id=unicode(course.id))
+        allow_access(course, user, 'assistant')
+        points_scored = 100
+        points_possible = 100
+        module = self.get_module_for_user(user, course, item)
+        grade_dict = {'value': points_scored, 'max_value': points_possible, 'user_id': user.id}
+        module.system.publish(module, 'grade', grade_dict)
+
+        # test user with role assistant not excluded
+        test_uri = '{}/{}/metrics/grades/leaders?count=6'.format(self.base_courses_uri, unicode(course.id))
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(filter(lambda leaders: leaders['username'] == user.username, response.data['leaders'])), 1)
+        self.assertEqual(len(response.data['leaders']), 6)
+
+        # test user with role assistant excluded
+        test_uri = '{}&exclude_roles=assistant'.format(test_uri, unicode(course.id))
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(filter(lambda leaders: leaders['username'] == user.username, response.data['leaders'])), 0)
+        self.assertEqual(len(response.data['leaders']), 6)
+
     def test_courses_completions_leaders_list_get(self):
         setup_data = self._setup_courses_completions_leaders()
         expected_course_avg = '25.000'
