@@ -20,6 +20,7 @@ from edx_solutions_organizations.models import Organization
 from edx_solutions_projects.models import Project
 from edx_solutions_api_integration.test_utils import APIClientMixin
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
+from student.tests.factories import GroupFactory
 
 MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 
@@ -998,3 +999,50 @@ class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
         # test with invalid group id
         response = self.do_get('{}/4356340/workgroups/'.format(self.base_groups_uri))
         self.assertEqual(response.status_code, 404)
+
+    def test_groups_users_list_missing_user_id(self):
+        # Create a test group
+        group = GroupFactory.create()
+
+        # Test with user_id missing in request data
+        test_uri = '{}/{}/users/'.format(self.base_groups_uri, group.id)
+        response = self.do_post(test_uri, {})
+        self.assertEqual(response.status_code, 400)
+
+    def test_groups_groups_list_missing_group_id(self):
+        # Create test group
+        from_group = GroupFactory.create()
+
+        # Test with missing group_id in the request data
+        test_uri = '{}/{}/groups/'.format(self.base_groups_uri, from_group.id)
+        response = self.do_post(test_uri, {})
+        self.assertEqual(response.status_code, 400)
+
+    def test_groups_groups_list_missing_relationship_type(self):
+        # Create test groups
+        from_group = GroupFactory.create()
+        to_group = GroupFactory.create()
+
+        # Test with missing relationship_type in the request data
+        test_uri = '{}/{}/groups/'.format(self.base_groups_uri, from_group.id)
+        response = self.do_post(test_uri, {"group_id": to_group.id})
+        self.assertEqual(response.status_code, 400)
+
+    def test_groups_groups_detail_invalid_group_id(self):
+        related_group = GroupFactory.create()
+
+        # Test with invalid from_group
+        test_uri = '{}/{}/groups/{}'.format(self.base_groups_uri, '1234567', related_group.id)
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 404)
+
+    def test_groups_courses_list_missing_course_id(self):
+
+        # Create test group
+        test_group = GroupFactory.create()
+
+        # Test with missing course_id in the request data
+        test_uri = '{}/{}/courses/'.format(self.base_groups_uri, test_group.id)
+        data = {"course_id": ""}
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 400)

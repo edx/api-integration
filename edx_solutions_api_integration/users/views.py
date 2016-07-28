@@ -101,8 +101,8 @@ def _save_content_position(request, user, course_key, position):
     Records the indicated position for the specified course
     Really no reason to generalize this out of user_courses_detail aside from pylint complaining
     """
-    parent_content_id = position['parent_content_id']
-    child_content_id = position['child_content_id']
+    parent_content_id = position.get('parent_content_id')
+    child_content_id = position.get('child_content_id')
     if unicode(course_key) == parent_content_id:
         parent_descriptor, parent_key, parent_content = get_course(request, user, parent_content_id, load_content=True)  # pylint: disable=W0612,C0301
     else:
@@ -327,9 +327,16 @@ class UsersList(SecureListAPIView):
         """
         response_data = {}
         base_uri = generate_base_uri(request)
-        email = request.data['email']
-        username = request.data['username']
-        password = request.data['password']
+
+        email = request.data.get('email')
+        username = request.data.get('username')
+        if username is None:
+            return Response({'message': _('username is missing')}, status.HTTP_400_BAD_REQUEST)
+
+        password = request.data.get('password')
+        if settings.FEATURES.get('ENFORCE_PASSWORD_POLICY', True) and password is None:
+            return Response({'message': _('password is missing')}, status.HTTP_400_BAD_REQUEST)
+
         first_name = request.data.get('first_name', '')
         last_name = request.data.get('last_name', '')
         is_active = request.data.get('is_active', None)
@@ -683,7 +690,10 @@ class UsersGroupsList(SecureAPIView):
         POST /api/users/{user_id}/groups
         """
         response_data = {}
-        group_id = request.data['group_id']
+        group_id = request.data.get('group_id')
+        if not group_id:
+            return Response({'message': _('group_id is missing')}, status.HTTP_400_BAD_REQUEST)
+
         base_uri = generate_base_uri(request)
         response_data['uri'] = '{}/{}'.format(base_uri, str(group_id))
         try:
@@ -766,7 +776,11 @@ class UsersGroupsDetail(SecureAPIView):
         """
         DELETE /api/users/{user_id}/groups/{group_id}
         """
-        existing_user = User.objects.get(id=user_id)
+        try:
+            existing_user = User.objects.get(id=user_id)
+        except ObjectDoesNotExist:
+            return Response({}, status.HTTP_404_NOT_FOUND)
+
         existing_user.groups.remove(group_id)
         existing_user.save()
         return Response({}, status=status.HTTP_204_NO_CONTENT)
@@ -795,7 +809,10 @@ class UsersCoursesList(SecureAPIView):
         """
         response_data = {}
         user_id = user_id
-        course_id = request.data['course_id']
+        course_id = request.data.get('course_id')
+        if not course_id:
+            return Response({'message': _('course_id is missing')}, status.HTTP_400_BAD_REQUEST)
+
         try:
             user = User.objects.get(id=user_id)
             course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612,C0301
@@ -928,19 +945,22 @@ class UsersCoursesDetail(SecureAPIView):
         response_data['user_id'] = user.id
         response_data['course_id'] = course_id
 
-        if request.data['positions']:
-            course_key = get_course_key(course_id)
-            response_data['positions'] = []
-            for position in request.data['positions']:
-                content_position = _save_content_position(
-                    request,
-                    user,
-                    course_key,
-                    position
-                )
-                if not content_position:
-                    return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
-                response_data['positions'].append(content_position)
+        positions = request.data.get('positions')
+        if not positions:
+            return Response({}, status=status.HTTP_400_BAD_REQUEST)
+
+        course_key = get_course_key(course_id)
+        response_data['positions'] = []
+        for position in positions:
+            content_position = _save_content_position(
+                request,
+                user,
+                course_key,
+                position
+            )
+            if not content_position:
+                return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+            response_data['positions'].append(content_position)
         return Response(response_data, status=status.HTTP_200_OK)
 
     def get(self, request, user_id, course_id):
@@ -970,7 +990,7 @@ class UsersCoursesDetail(SecureAPIView):
             course_descriptor,
             field_data_cache,
             course_key)
-        response_data['position'] = course_module.position
+        response_data['position'] = getattr(course_module, 'position', None)
         response_data['position_tree'] = {}
         parent_module = course_module
         while parent_module is not None:
@@ -1439,7 +1459,8 @@ class UsersRolesList(SecureListAPIView):
         except ObjectDoesNotExist:
             raise Http404
 
-        if not len(request.data['roles']):
+        roles = request.data.get('roles', [])
+        if not roles:
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
         ignore_roles = request.data.get('ignore_roles', [])
         current_roles = self.get_queryset()
@@ -1448,14 +1469,18 @@ class UsersRolesList(SecureListAPIView):
                 course_descriptor, course_key, course_content = get_course(request, user, unicode(current_role.course_id))  # pylint: disable=W0612,C0301
                 if course_descriptor:
                     _manage_role(course_descriptor, user, current_role.role, 'revoke')
-        for role in request.data['roles']:
-            if role['role'] not in ignore_roles:
+        for role in roles:
+            role_value = role.get('role')
+            if not role_value:
+                return Response({}, status=status.HTTP_400_BAD_REQUEST)
+
+            if role_value not in ignore_roles:
                 try:
-                    course_id = role['course_id']
+                    course_id = role.get('course_id')
                     course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612,C0301
                     if not course_descriptor:
                         raise ValueError  # ValueError is also thrown by the following role setters
-                    _manage_role(course_descriptor, user, role['role'], 'allow')
+                    _manage_role(course_descriptor, user, role_value, 'allow')
                 except ValueError:
                     # Restore the current roleset to the User
                     for current_role in current_roles:
@@ -1511,8 +1536,10 @@ class UsersNotificationsDetail(SecureAPIView):
             }
         """
 
-        read = bool(request.data['read'])
+        read = request.data.get('read')
+        if not read:
+            return Response({'message': _('read field is missing')}, status.HTTP_400_BAD_REQUEST)
 
-        mark_notification_read(int(user_id), int(msg_id), read=read)
+        mark_notification_read(int(user_id), int(msg_id), read=bool(read))
 
         return Response({}, status=status.HTTP_201_CREATED)
