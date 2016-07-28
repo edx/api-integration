@@ -64,13 +64,13 @@ class GroupsList(SecureListAPIView):
         """
         POST /api/groups
         """
-        group_type = request.DATA.get('type', None)
+        group_type = request.data.get('type', None)
         if group_type is None:
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
         response_data = {}
         # Group name must be unique, but we need to support dupes
         group = Group.objects.create(name=str(uuid.uuid4()))
-        original_group_name = request.DATA.get('name', None)
+        original_group_name = request.data.get('name', None)
         if original_group_name is None or len(original_group_name) == 0:
             return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
         group.name = '{:04d}: {}'.format(group.id, original_group_name)
@@ -81,7 +81,7 @@ class GroupsList(SecureListAPIView):
         GroupRelationship.objects.create(group_id=group.id, parent_group=None)
 
         # Create a corresponding profile record (for extra meta info)
-        data = request.DATA.get('data', {})
+        data = request.data.get('data', {})
         profile, _ = GroupProfile.objects.get_or_create(
             group_id=group.id,
             group_type=group_type,
@@ -99,7 +99,7 @@ class GroupsList(SecureListAPIView):
         """
         if checks if get request has `type` filter
         """
-        group_type = request.QUERY_PARAMS.get('type', None)
+        group_type = request.query_params.get('type', None)
         if group_type is None:
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
         else:
@@ -109,8 +109,8 @@ class GroupsList(SecureListAPIView):
         """
         returns queryset filter by group type
         """
-        group_type = self.request.QUERY_PARAMS.get('type', None)
-        groups = Group.objects.filter(groupprofile__group_type=group_type).select_related('group')
+        group_type = self.request.query_params.get('type', None)
+        groups = Group.objects.filter(groupprofile__group_type=group_type)
         return groups
 
 
@@ -152,15 +152,15 @@ class GroupsDetail(SecureAPIView):
         except ObjectDoesNotExist:
             return Response({}, status.HTTP_404_NOT_FOUND)
         profile, _ = GroupProfile.objects.get_or_create(group_id=group_id)
-        group_name = request.DATA.get('name', None)
+        group_name = request.data.get('name', None)
         if group_name:
             formatted_name = '{:04d}: {}'.format(existing_group.id, group_name)
             existing_group.name = formatted_name
             profile.name = group_name
-        group_type = request.DATA.get('type', None)
+        group_type = request.data.get('type', None)
         if group_type:
             profile.group_type = group_type
-        data = request.DATA.get('data', None)
+        data = request.data.get('data', None)
         if data:
             profile.data = json.dumps(data)
         existing_group.save()
@@ -247,7 +247,7 @@ class GroupsUsersList(SecureAPIView):
             existing_group = Group.objects.get(id=group_id)
         except ObjectDoesNotExist:
             return Response({}, status.HTTP_404_NOT_FOUND)
-        user_id = request.DATA['user_id']
+        user_id = request.data['user_id']
         try:
             existing_user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
@@ -279,7 +279,7 @@ class GroupsUsersList(SecureAPIView):
             return Response({}, status.HTTP_404_NOT_FOUND)
         users = existing_group.user_set.all()
 
-        is_active = request.QUERY_PARAMS.get('is_active', None)
+        is_active = request.query_params.get('is_active', None)
         if is_active:
             users = users.filter(is_active=str2bool(is_active))
 
@@ -380,8 +380,8 @@ class GroupsGroupsList(SecureAPIView):
         POST /api/groups/{group_id}/groups/{related_group_id}
         """
         response_data = {}
-        to_group_id = request.DATA['group_id']
-        relationship_type = request.DATA['relationship_type']
+        to_group_id = request.data['group_id']
+        relationship_type = request.data['relationship_type']
         base_uri = generate_base_uri(request)
         response_data['uri'] = '{}/{}'.format(base_uri, to_group_id)
         response_data['group_id'] = str(to_group_id)
@@ -418,7 +418,7 @@ class GroupsGroupsList(SecureAPIView):
         response_data = []
         if from_group_relationship:
             base_uri = generate_base_uri(request)
-            group_type = request.QUERY_PARAMS.get('type', None)
+            group_type = request.query_params.get('type', None)
             child_groups = GroupRelationship.objects.filter(parent_group_id=group_id)
             linked_groups = from_group_relationship.get_linked_group_relationships()
             if group_type:
@@ -479,9 +479,8 @@ class GroupsGroupsDetail(SecureAPIView):
                 response_data['relationship_type'] = RELATIONSHIP_TYPES['hierarchical']
                 response_status = status.HTTP_200_OK
             else:
-                to_group = Group.objects.get(id=to_group_relationship.group_id)
                 linked_group_exists = from_group_relationship.check_linked_group_relationship(
-                    to_group,
+                    to_group_relationship,
                     symmetrical=True
                 )
                 if linked_group_exists:
@@ -543,7 +542,7 @@ class GroupsCoursesList(SecureAPIView):
             existing_group = Group.objects.get(id=group_id)
         except ObjectDoesNotExist:
             return Response({}, status.HTTP_404_NOT_FOUND)
-        course_id = request.DATA['course_id']
+        course_id = request.data['course_id']
 
         base_uri = generate_base_uri(request)
         response_data['uri'] = '{}/{}'.format(base_uri, course_id)
@@ -659,7 +658,7 @@ class GroupsOrganizationsList(SecureAPIView):
             return Response({}, status.HTTP_404_NOT_FOUND)
         response_data = []
         for org in existing_group.organizations.all():
-            serializer = serializers.OrganizationSerializer(org)
+            serializer = serializers.OrganizationSerializer(org, context={'request': request})
             response_data.append(serializer.data)  # pylint: disable=E1101
         return Response(response_data, status=status.HTTP_200_OK)
 
@@ -677,7 +676,7 @@ class GroupsWorkgroupsList(SecureListAPIView):
 
     def get_queryset(self):
         group_id = self.kwargs['group_id']
-        course_id = self.request.QUERY_PARAMS.get('course_id', None)
+        course_id = self.request.query_params.get('course_id', None)
         try:
             group = Group.objects.get(id=group_id)
         except ObjectDoesNotExist:

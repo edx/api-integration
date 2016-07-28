@@ -10,6 +10,7 @@ from mock import PropertyMock
 from django.conf import settings
 from django.core.management import call_command
 from django.test.utils import override_settings
+from django.core.management.base import CommandError
 
 from edx_solutions_api_integration.models import CourseGroupRelationship
 from gradebook.models import StudentGradebook
@@ -25,7 +26,7 @@ from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 from xmodule.modulestore.django import modulestore
 from xmodule.course_module import CourseDescriptor
 
-MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {}, include_xml=False)
+MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 
 
 @override_settings(MODULESTORE=MODULESTORE_CONFIG)
@@ -178,7 +179,7 @@ class BulkCourseDeleteTests(ModuleStoreTestCase):
         # Set up courses and data to be deleted
         course_ids = self.setup_course_data()
 
-        with self.assertRaises(SystemExit):
+        with self.assertRaises(CommandError):
             call_command('bulk_delete_courses_with_reference_data')
 
         # assert data still exists

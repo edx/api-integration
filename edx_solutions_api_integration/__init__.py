@@ -1,4 +1,4 @@
 """
 Initialization module for gradebook djangoapp
 """
-import edx_solutions_api_integration.receivers
+default_app_config = 'edx_solutions_api_integration.apps.SolutionsAppApiIntegrationConfig'

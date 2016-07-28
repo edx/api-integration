@@ -18,9 +18,11 @@ from rest_framework import filters
 from rest_framework.response import Response
 
 from courseware import grades, module_render
+from course_blocks.api import get_course_blocks
 from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
+from gradebook.utils import generate_user_gradebook
 from instructor.access import revoke_access, update_forum_role
 from lang_pref import LANGUAGE_KEY
 from lms.lib.comment_client.utils import CommentClientRequestError
@@ -35,7 +37,6 @@ from openedx.core.djangoapps.course_groups.cohorts import (
     add_cohort,
     add_user_to_cohort,
     remove_user_from_cohort,
-    AlreadyAddedToCohortException
 )
 from openedx.core.djangoapps.user_api.models import UserPreference
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
@@ -194,25 +195,6 @@ def _manage_role(course_descriptor, user, role, action):
                         pass
 
 
-def _recalculate_grade(request, student, course_id):
-    """
-    Helper method for recalculating gradebook data
-    """
-    course_descriptor, course_key, course_content = get_course(request, student, course_id, depth=None)  # pylint: disable=W0612,C0301
-    progress_summary = grades.progress_summary(student, request, course_descriptor, locators_as_strings=True)  # pylint: disable=unused-variable,C0301
-    grade_summary = grades.grade(student, request, course_descriptor)
-    grading_policy = course_descriptor.grading_policy
-    current_grade = grade_summary['percent']
-    proforma_grade = grades.calculate_proforma_grade(grade_summary, grading_policy)
-    return {
-        "progress_summary": progress_summary,
-        "grade_summary": grade_summary,
-        "grading_policy": grading_policy,
-        "current_grade": current_grade,
-        "proforma_grade": proforma_grade
-    }
-
-
 class UsersList(SecureListAPIView):
     """
     ### The UsersList view allows clients to retrieve/append a list of User entities
@@ -293,12 +275,12 @@ class UsersList(SecureListAPIView):
         """
         queryset = self.queryset
 
-        name = self.request.QUERY_PARAMS.get('name', None)
-        match = self.request.QUERY_PARAMS.get('match', None)
-        email = self.request.QUERY_PARAMS.get('email', None)
-        org_ids = self.request.QUERY_PARAMS.get('organizations', None)
-        courses = self.request.QUERY_PARAMS.get('courses', None)
-        organization_display_name = self.request.QUERY_PARAMS.get('organization_display_name', None)
+        name = self.request.query_params.get('name', None)
+        match = self.request.query_params.get('match', None)
+        email = self.request.query_params.get('email', None)
+        org_ids = self.request.query_params.get('organizations', None)
+        courses = self.request.query_params.get('courses', None)
+        organization_display_name = self.request.query_params.get('organization_display_name', None)
 
         if org_ids is not None:
             org_ids = map(int, org_ids.split(','))
@@ -328,8 +310,7 @@ class UsersList(SecureListAPIView):
                 queryset = queryset.filter(courseenrollment__course_id__in=course_ids).distinct()
 
         if courses is None:
-            queryset = queryset.select_related('courseenrollment_set')\
-                .annotate(courses_enrolled=Count('courseenrollment'))
+            queryset = queryset.annotate(courses_enrolled=Count('courseenrollment'))
         queryset = queryset.prefetch_related('organizations').select_related('profile')
 
         return queryset
@@ -346,20 +327,20 @@ class UsersList(SecureListAPIView):
         """
         response_data = {}
         base_uri = generate_base_uri(request)
-        email = request.DATA['email']
-        username = request.DATA['username']
-        password = request.DATA['password']
-        first_name = request.DATA.get('first_name', '')
-        last_name = request.DATA.get('last_name', '')
-        is_active = request.DATA.get('is_active', None)
-        is_staff = request.DATA.get('is_staff', False)
-        city = request.DATA.get('city', '')
-        country = request.DATA.get('country', '')
-        level_of_education = request.DATA.get('level_of_education', '')
-        year_of_birth = request.DATA.get('year_of_birth', '')
-        gender = request.DATA.get('gender', '')
-        title = request.DATA.get('title', '')
-        avatar_url = request.DATA.get('avatar_url', None)
+        email = request.data['email']
+        username = request.data['username']
+        password = request.data['password']
+        first_name = request.data.get('first_name', '')
+        last_name = request.data.get('last_name', '')
+        is_active = request.data.get('is_active', None)
+        is_staff = request.data.get('is_staff', False)
+        city = request.data.get('city', '')
+        country = request.data.get('country', '')
+        level_of_education = request.data.get('level_of_education', '')
+        year_of_birth = request.data.get('year_of_birth', '')
+        gender = request.data.get('gender', '')
+        title = request.data.get('title', '')
+        avatar_url = request.data.get('avatar_url', None)
         # enforce password complexity as an optional feature
         if settings.FEATURES.get('ENFORCE_PASSWORD_POLICY', False):
             try:
@@ -520,8 +501,8 @@ class UsersDetail(SecureAPIView):
         """
         response_data = {}
         response_data['uri'] = generate_base_uri(request)
-        first_name = request.DATA.get('first_name')  # Used in multiple spots below
-        last_name = request.DATA.get('last_name')  # Used in multiple spots below
+        first_name = request.data.get('first_name')  # Used in multiple spots below
+        last_name = request.data.get('last_name')  # Used in multiple spots below
         # Add some rate limiting here by re-using the RateLimitMixin as a helper class
         limiter = BadRequestRateLimiter()
         if limiter.is_rate_limit_exceeded(request):
@@ -541,15 +522,15 @@ class UsersDetail(SecureAPIView):
             existing_user.first_name = first_name
         if last_name:
             existing_user.last_name = last_name
-        is_active = request.DATA.get('is_active')
+        is_active = request.data.get('is_active')
         if is_active is not None:
             existing_user.is_active = is_active
             response_data['is_active'] = existing_user.is_active
-        is_staff = request.DATA.get('is_staff')
+        is_staff = request.data.get('is_staff')
         if is_staff is not None:
             existing_user.is_staff = is_staff
             response_data['is_staff'] = existing_user.is_staff
-        email = request.DATA.get('email')
+        email = request.data.get('email')
         if email is not None:
             email_fail = False
             try:
@@ -570,7 +551,7 @@ class UsersDetail(SecureAPIView):
             existing_user.email = email
         existing_user.save()
 
-        username = request.DATA.get('username', None)
+        username = request.data.get('username', None)
         if username:
             try:
                 validate_slug(username)
@@ -588,7 +569,7 @@ class UsersDetail(SecureAPIView):
             response_data['username'] = existing_user.username
             existing_user.save()
 
-        password = request.DATA.get('password')
+        password = request.data.get('password')
         if password:
             old_password_hash = existing_user.password
             _serialize_user(response_data, existing_user)
@@ -643,16 +624,16 @@ class UsersDetail(SecureAPIView):
         if existing_user_profile:
             if first_name and last_name:
                 existing_user_profile.name = '{} {}'.format(first_name, last_name)
-            city = request.DATA.get('city')
+            city = request.data.get('city')
             if city:
                 existing_user_profile.city = city
-            country = request.DATA.get('country')
+            country = request.data.get('country')
             if country:
                 existing_user_profile.country = country
-            level_of_education = request.DATA.get('level_of_education')
+            level_of_education = request.data.get('level_of_education')
             if level_of_education:
                 existing_user_profile.level_of_education = level_of_education
-            year_of_birth = request.DATA.get('year_of_birth')
+            year_of_birth = request.data.get('year_of_birth')
             try:
                 year_of_birth = int(year_of_birth)
             except (ValueError, TypeError):
@@ -661,13 +642,13 @@ class UsersDetail(SecureAPIView):
                 year_of_birth = None
             if year_of_birth:
                 existing_user_profile.year_of_birth = year_of_birth
-            gender = request.DATA.get('gender')
+            gender = request.data.get('gender')
             if gender:
                 existing_user_profile.gender = gender
             # Empty title is also allowed
-            title = request.DATA.get('title', existing_user_profile.title)
+            title = request.data.get('title', existing_user_profile.title)
             existing_user_profile.title = title
-            avatar_url = request.DATA.get('avatar_url')
+            avatar_url = request.data.get('avatar_url')
             if avatar_url:
                 existing_user_profile.avatar_url = avatar_url
 
@@ -702,7 +683,7 @@ class UsersGroupsList(SecureAPIView):
         POST /api/users/{user_id}/groups
         """
         response_data = {}
-        group_id = request.DATA['group_id']
+        group_id = request.data['group_id']
         base_uri = generate_base_uri(request)
         response_data['uri'] = '{}/{}'.format(base_uri, str(group_id))
         try:
@@ -730,8 +711,8 @@ class UsersGroupsList(SecureAPIView):
             existing_user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
-        group_type = request.QUERY_PARAMS.get('type', None)
-        course = request.QUERY_PARAMS.get('course', None)
+        group_type = request.query_params.get('type', None)
+        course = request.query_params.get('course', None)
         data_params = extract_data_params(request)
         response_data = {}
         base_uri = generate_base_uri(request)
@@ -808,14 +789,13 @@ class UsersCoursesList(SecureAPIView):
     * POST to the UsersCoursesList view to create a new Course enrollment for the specified User (aka, Student)
     * Perform a GET to generate a list of all active Course enrollments for the specified User
     """
-
     def post(self, request, user_id):
         """
         POST /api/users/{user_id}/courses/
         """
         response_data = {}
         user_id = user_id
-        course_id = request.DATA['course_id']
+        course_id = request.data['course_id']
         try:
             user = User.objects.get(id=user_id)
             course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612,C0301
@@ -832,7 +812,7 @@ class UsersCoursesList(SecureAPIView):
             default_cohort = add_cohort(course_key, CourseUserGroup.default_cohort_name, CourseCohort.RANDOM)
         try:
             add_user_to_cohort(default_cohort, user.username)
-        except AlreadyAddedToCohortException:
+        except ValueError:
             msg_tpl = _('Student {student} already added to cohort {cohort_name} for course {course}')
             # pylint reports msg_tpl to not have `format` member, which is obviously a type resolution issue
             # related - http://stackoverflow.com/questions/10025710/pylint-reports-as-not-callable
@@ -948,10 +928,10 @@ class UsersCoursesDetail(SecureAPIView):
         response_data['user_id'] = user.id
         response_data['course_id'] = course_id
 
-        if request.DATA['positions']:
+        if request.data['positions']:
             course_key = get_course_key(course_id)
             response_data['positions'] = []
-            for position in request.DATA['positions']:
+            for position in request.data['positions']:
                 content_position = _save_content_position(
                     request,
                     user,
@@ -1092,59 +1072,32 @@ class UsersCoursesGradesDetail(SecureAPIView):
                 }, status=status.HTTP_404_NOT_FOUND
             )
 
-        queryset = StudentGradebook.objects.filter(
-            user=student,
-            course_id__exact=course_key,
-        )
+        try:
+            gradebook_entry = StudentGradebook.objects.get(
+                user=student,
+                course_id__exact=course_key,
+            )
+        except ObjectDoesNotExist:
+            gradebook_entry = generate_user_gradebook(course_key, student)
 
-        if len(queryset):
-            gradebook_entry = queryset[0]
-            if (gradebook_entry.progress_summary and
-                    gradebook_entry.grade_summary and
-                    gradebook_entry.grading_policy):
-                current_grade = gradebook_entry.grade
-                proforma_grade = gradebook_entry.proforma_grade
-                progress_summary = json.loads(gradebook_entry.progress_summary)
-                grade_summary = json.loads(gradebook_entry.grade_summary)
-                grading_policy = json.loads(gradebook_entry.grading_policy)
-            else:
-                gradebook_values = _recalculate_grade(request, student, course_id)
-                current_grade = gradebook_values["current_grade"]
-                proforma_grade = gradebook_values["proforma_grade"]
-                progress_summary = gradebook_values["progress_summary"]
-                grade_summary = gradebook_values["grade_summary"]
-                grading_policy = gradebook_values["grading_policy"]
-                gradebook_entry.grade = current_grade
-                gradebook_entry.proforma_grade = proforma_grade
-                gradebook_entry.progress_summary = json.dumps(progress_summary, cls=EdxJSONEncoder)
-                gradebook_entry.grade_summary = json.dumps(grade_summary, cls=EdxJSONEncoder)
-                gradebook_entry.grading_policy = json.dumps(grading_policy, cls=EdxJSONEncoder)
-                gradebook_entry.save()
-        else:
-            gradebook_values = _recalculate_grade(request, student, course_id)
-            current_grade = gradebook_values["current_grade"]
-            proforma_grade = gradebook_values["proforma_grade"]
-            progress_summary = gradebook_values["progress_summary"]
-            grade_summary = gradebook_values["grade_summary"]
-            grading_policy = gradebook_values["grading_policy"]
-
+        progress_summary = None
+        grade_summary = None
+        grading_policy = None
+        current_grade = 0
+        proforma_grade = 0
+        try:
+            current_grade = gradebook_entry.grade
+            proforma_grade = gradebook_entry.proforma_grade
+            progress_summary = json.loads(gradebook_entry.progress_summary)
+            grade_summary = json.loads(gradebook_entry.grade_summary)
+            grading_policy = json.loads(gradebook_entry.grading_policy)
+        except ValueError:
             # add to audit log
             AUDIT_LOG.info(
-                u"API::New gradebook entry created for user-id - %s and course-id - '%s'",
+                u"API:: unable to parse gradebook entry for user-id - %s and course-id - '%s'",
                 user_id,
                 course_key
             )
-
-            StudentGradebook.objects.create(
-                user=student,
-                course_id=course_key,
-                grade=current_grade,
-                proforma_grade=proforma_grade,
-                progress_summary=json.dumps(progress_summary, cls=EdxJSONEncoder),
-                grade_summary=json.dumps(grade_summary, cls=EdxJSONEncoder),
-                grading_policy=json.dumps(grading_policy, cls=EdxJSONEncoder)
-            )
-
         response_data = {
             'courseware_summary': progress_summary,
             'grade_summary': grade_summary,
@@ -1200,18 +1153,18 @@ class UsersPreferences(SecureAPIView):
         except ObjectDoesNotExist:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
 
-        if not len(request.DATA):
+        if not len(request.data):
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
 
         # do a quick inspection to make sure we're only getting strings as values
-        for key in request.DATA.keys():
-            value = request.DATA[key]
+        for key in request.data.keys():
+            value = request.data[key]
             if not isinstance(value, basestring):
                 return Response({}, status=status.HTTP_400_BAD_REQUEST)
 
         status_code = status.HTTP_200_OK
-        for key in request.DATA.keys():
-            value = request.DATA[key]
+        for key in request.data.keys():
+            value = request.data[key]
 
             # see if the key already exists
             found = None
@@ -1304,7 +1257,7 @@ class UsersWorkgroupsList(SecureListAPIView):
 
     def get_queryset(self):
         user_id = self.kwargs['user_id']
-        course_id = self.request.QUERY_PARAMS.get('course_id', None)
+        course_id = self.request.query_params.get('course_id', None)
         try:
             user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
@@ -1332,7 +1285,7 @@ class UsersCoursesCompletionsList(SecureListAPIView):
     def get_queryset(self):
         user_id = self.kwargs['user_id']
         course_id = self.kwargs.get('course_id', None)
-        content_id = self.request.QUERY_PARAMS.get('content_id', None)
+        content_id = self.request.query_params.get('content_id', None)
         try:
             user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
@@ -1403,7 +1356,7 @@ class UsersMetricsCitiesList(SecureListAPIView):
     serializer_class = UserCountByCitySerializer
 
     def get_queryset(self):
-        city = self.request.QUERY_PARAMS.get('city', None)
+        city = self.request.query_params.get('city', None)
         queryset = User.objects.all()
         if city:
             queryset = queryset.filter(profile__city__iexact=city)
@@ -1443,14 +1396,14 @@ class UsersRolesList(SecureListAPIView):
         assistant_courses = UserBasedRole(user, CourseAssistantRole.ROLE).courses_with_role()
         queryset = instructor_courses | staff_courses | observer_courses | assistant_courses
 
-        course_id = self.request.QUERY_PARAMS.get('course_id', None)
+        course_id = self.request.query_params.get('course_id', None)
         if course_id:
             if not course_exists(self.request, user, course_id):
                 raise Http404
             course_key = get_course_key(course_id)
             queryset = queryset.filter(course_id=course_key)
 
-        role = self.request.QUERY_PARAMS.get('role', None)
+        role = self.request.query_params.get('role', None)
         if role:
             queryset = queryset.filter(role=role)
 
@@ -1465,17 +1418,17 @@ class UsersRolesList(SecureListAPIView):
         except ObjectDoesNotExist:
             raise Http404
 
-        course_id = request.DATA.get('course_id', None)
+        course_id = request.data.get('course_id', None)
         course_descriptor, course_key, course_content = get_course(self.request, self.request.user, course_id)  # pylint: disable=W0612,C0301
         if not course_descriptor:
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
 
-        role = request.DATA.get('role', None)
+        role = request.data.get('role', None)
         try:
             _manage_role(course_descriptor, user, role, 'allow')
         except ValueError:
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(request.DATA, status=status.HTTP_201_CREATED)
+        return Response(request.data, status=status.HTTP_201_CREATED)
 
     def put(self, request, user_id):
         """
@@ -1486,16 +1439,16 @@ class UsersRolesList(SecureListAPIView):
         except ObjectDoesNotExist:
             raise Http404
 
-        if not len(request.DATA['roles']):
+        if not len(request.data['roles']):
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
-        ignore_roles = request.DATA.get('ignore_roles', [])
+        ignore_roles = request.data.get('ignore_roles', [])
         current_roles = self.get_queryset()
         for current_role in current_roles:
             if current_role.role not in ignore_roles:
                 course_descriptor, course_key, course_content = get_course(request, user, unicode(current_role.course_id))  # pylint: disable=W0612,C0301
                 if course_descriptor:
                     _manage_role(course_descriptor, user, current_role.role, 'revoke')
-        for role in request.DATA['roles']:
+        for role in request.data['roles']:
             if role['role'] not in ignore_roles:
                 try:
                     course_id = role['course_id']
@@ -1510,7 +1463,7 @@ class UsersRolesList(SecureListAPIView):
                             request, user, unicode(current_role.course_id))  # pylint: disable=W0612
                         _manage_role(course_descriptor, user, current_role.role, 'allow')
                     return Response({}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(request.DATA, status=status.HTTP_200_OK)
+        return Response(request.data, status=status.HTTP_200_OK)
 
 
 class UsersRolesCoursesDetail(SecureAPIView):
@@ -1558,7 +1511,7 @@ class UsersNotificationsDetail(SecureAPIView):
             }
         """
 
-        read = bool(request.DATA['read'])
+        read = bool(request.data['read'])
 
         mark_notification_read(int(user_id), int(msg_id), read=read)
 

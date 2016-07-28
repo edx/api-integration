@@ -6,6 +6,7 @@ from django.conf import settings
 from edx_solutions_api_integration.utils import get_client_ip_address, address_exists_in_network
 from rest_framework import permissions, generics, filters, pagination, serializers, viewsets
 from rest_framework.views import APIView
+from rest_framework.response import Response
 
 from edx_solutions_api_integration.utils import str2bool
 from edx_solutions_api_integration.models import APIUser as User
@@ -92,7 +93,7 @@ class IdsInFilterBackend(filters.BaseFilterBackend):
         (800 satisfies a specific client integration use case)
         """
         upper_bound = getattr(settings, 'API_LOOKUP_UPPER_BOUND', 800)
-        ids = request.QUERY_PARAMS.get('ids')
+        ids = request.query_params.get('ids')
         if ids:
             ids = ids.split(",")[:upper_bound]
             return queryset.filter(id__in=ids)
@@ -107,7 +108,7 @@ class HasOrgsFilterBackend(filters.BaseFilterBackend):
         """
         Parse querystring base on has_organizations query param
         """
-        has_orgs = request.QUERY_PARAMS.get('has_organizations', None)
+        has_orgs = request.query_params.get('has_organizations', None)
         if has_orgs:
             if str2bool(has_orgs):
                 queryset = queryset.filter(organizations__id__gt=0)
@@ -115,13 +116,6 @@ class HasOrgsFilterBackend(filters.BaseFilterBackend):
                 queryset = queryset.exclude(id__in=User.objects.filter(organizations__id__gt=0).
                                             values_list('id', flat=True))
         return queryset.distinct()
-
-
-class CustomPaginationSerializer(pagination.PaginationSerializer):
-    """
-    Custom PaginationSerializer to include num_pages field
-    """
-    num_pages = serializers.Field(source='paginator.num_pages')
 
 
 class SecureAPIView(APIView):
@@ -145,14 +139,43 @@ class FilterBackendMixin(object):
     filter_backends = (filters.DjangoFilterBackend, IdsInFilterBackend,)
 
 
+class CustomPagination(pagination.PageNumberPagination):
+    """
+    Class having custom pagination overrides
+    """
+
+    def get_paginated_response(self, data):
+        """
+        creates custom pagination response
+        """
+        return Response({
+            'next': self.get_next_link(),
+            'previous': self.get_previous_link(),
+            'num_pages': self.page.paginator.num_pages,
+            'count': self.page.paginator.count,
+            'results': data
+        })
+
+    def get_page_size(self, request):
+        """
+        override to return None if page_size parameter in request is zero.
+        We should not paginate results in that case.
+        """
+        default_page_size = getattr(settings, 'API_PAGE_SIZE', 20)
+        page_size = int(request.query_params.get('page_size', default_page_size))
+        if page_size == 0:
+            return None
+        elif page_size > 100:
+            return default_page_size
+        else:
+            return page_size
+
+
 class PaginationMixin(object):
     """
     Mixin to set custom pagination support
     """
-    pagination_serializer_class = CustomPaginationSerializer
-    paginate_by = getattr(settings, 'API_PAGE_SIZE', 20)
-    paginate_by_param = 'page_size'
-    max_paginate_by = 100
+    pagination_class = CustomPagination
 
 
 class SecureListAPIView(PermissionMixin,
@@ -160,15 +183,9 @@ class SecureListAPIView(PermissionMixin,
                         PaginationMixin,
                         generics.ListAPIView):
     """
-        Inherited from ListAPIView
+    Inherited from ListAPIView
     """
-    # if page_size parameter in request is zero don't paginate results
-    def get_paginate_by(self):  # pylint: disable=W0221
-        page_size = self.request.QUERY_PARAMS.get('page_size')
-        if page_size and int(page_size) == 0:
-            return None
-        else:
-            return super(SecureListAPIView, self).get_paginate_by()
+    pass
 
 
 class SecureModelViewSet(PermissionMixin, viewsets.ModelViewSet):
@@ -182,12 +199,4 @@ class SecurePaginatedModelViewSet(PaginationMixin, SecureModelViewSet):
     """
     ModelViewSet used for pagination and protecting access to specific workflows
     """
-    def get_paginate_by(self):  # pylint: disable=W0221
-        """
-        Override to return size of pages, if page_size parameter in request is zero don't paginate
-        """
-        page_size = self.request.QUERY_PARAMS.get('page_size')
-        if page_size and int(page_size) == 0:
-            return None
-        else:
-            return super(SecurePaginatedModelViewSet, self).get_paginate_by()
+    pass

@@ -74,7 +74,7 @@ class Command(BaseCommand):
             log.info('Removing course %s from modulestore', unicode(course_key))
             self.module_store.delete_course(course_key, user_id)
 
-    @transaction.commit_on_success
+    @transaction.atomic
     def delete_course_and_data(self, course_key):
         """
         Delete course from modulestore and it reference data
