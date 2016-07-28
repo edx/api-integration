@@ -4,14 +4,16 @@ Tests for session api with advance security features
 import json
 import uuid
 from mock import patch
-from django.test import TestCase
+from datetime import datetime, timedelta
+from freezegun import freeze_time
+from pytz import UTC
+
 from django.test.utils import override_settings
 from django.utils import timezone
 from django.utils.translation import ugettext as _
 from django.core.cache import cache
-from datetime import datetime, timedelta
-from freezegun import freeze_time
-from pytz import UTC
+
+from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
 
 TEST_API_KEY = str(uuid.uuid4())
 
@@ -21,10 +23,11 @@ TEST_API_KEY = str(uuid.uuid4())
 @patch.dict("django.conf.settings.FEATURES", {'ADVANCED_SECURITY': True})
 @override_settings(PASSWORD_MIN_LENGTH=4, PASSWORD_MAX_LENGTH=12,
                    PASSWORD_COMPLEXITY={'UPPER': 2, 'LOWER': 2, 'PUNCTUATION': 2, 'DIGITS': 2})
-class UserPasswordResetTest(TestCase):
+class UserPasswordResetTest(CacheIsolationTestCase):
     """
     Test edx_solutions_api_integration.session.session_list view
     """
+    ENABLED_CACHES = ['default']
 
     def setUp(self):  # pylint: disable=E7601
         """
@@ -186,7 +189,7 @@ class UserPasswordResetTest(TestCase):
     @override_settings(ADVANCED_SECURITY_CONFIG={'MIN_TIME_IN_DAYS_BETWEEN_ALLOWED_RESETS': 0})
     def test_password_reset_rate_limiting_unblock(self):
         """
-        Try (and fail) login user 30 times on invalid password
+        Try (and fail) login user 40 times on invalid password
         and then unblock it after 5 minutes
          """
         response = self._do_post_request(
@@ -208,7 +211,7 @@ class UserPasswordResetTest(TestCase):
             self._assert_response(response, status=404)
 
         response = self._do_post_pass_reset_request(
-            '{}/{}'.format(self.user_url, '31'), password='Test.Me64@', secure=True
+            '{}/{}'.format(self.user_url, 31), password='Test.Me64@', secure=True
         )
         message = _('Rate limit exceeded in password_reset.')
         self._assert_response(response, status=403, message=message)

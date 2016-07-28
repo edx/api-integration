@@ -16,7 +16,7 @@ from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 from util.signals import course_deleted
 
 from edx_solutions_api_integration.models import GroupProfile, CourseGroupRelationship, CourseContentGroupRelationship
-MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {}, include_xml=False)
+MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 
 
 @override_settings(MODULESTORE=MODULESTORE_CONFIG)

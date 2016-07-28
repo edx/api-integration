@@ -20,7 +20,7 @@ from django.template import RequestContext
 from util.bad_request_rate_limiter import BadRequestRateLimiter
 from edx_solutions_api_integration.utils import generate_base_uri
 
-from edx_solutions_api_integration.users.serializers import UserSerializer
+from edx_solutions_api_integration.users.serializers import SimpleUserSerializer
 from student.models import (
     LoginFailures, PasswordHistory
 )
@@ -73,7 +73,7 @@ class SessionsList(SecureAPIView):
 
         base_uri = generate_base_uri(request)
         try:
-            existing_user = User.objects.get(username=request.DATA['username'])
+            existing_user = User.objects.get(username=request.data['username'])
         except ObjectDoesNotExist:
             existing_user = None
 
@@ -95,7 +95,7 @@ class SessionsList(SecureAPIView):
             return Response(response_data, status=response_status)
 
         if existing_user:
-            user = authenticate(username=existing_user.username, password=request.DATA['password'])
+            user = authenticate(username=existing_user.username, password=request.data['password'])
             if user is not None:
 
                 # successful login, clear failed login attempts counters, if applicable
@@ -138,7 +138,7 @@ class SessionsList(SecureAPIView):
 
                     response_data['token'] = session.session_key
                     response_data['expires'] = session.get_expiry_age()
-                    user_dto = UserSerializer(user)
+                    user_dto = SimpleUserSerializer(user)
                     response_data['user'] = user_dto.data
                     response_data['uri'] = '{}/{}'.format(base_uri, session.session_key)
                     response_status = success_status
@@ -157,6 +157,7 @@ class SessionsList(SecureAPIView):
                     response_status = status.HTTP_403_FORBIDDEN
             else:
                 limiter.tick_bad_request_counter(request)
+
                 # tick the failed login counters if the user exists in the database
                 if LoginFailures.is_feature_enabled():
                     LoginFailures.increment_lockout_counter(existing_user)

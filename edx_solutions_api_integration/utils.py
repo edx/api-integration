@@ -91,7 +91,7 @@ def extract_data_params(request):
     extracts all query params which starts with data__
     """
     data_params = []
-    for key, val in request.QUERY_PARAMS.iteritems():
+    for key, val in request.query_params.iteritems():
         if key.startswith('data__'):
             data_params.append({key[6:]: val})
     return data_params
@@ -202,7 +202,7 @@ def get_ids_from_list_param(request, param_name):
     """
     Returns list of ids extracted from query param
     """
-    ids = request.QUERY_PARAMS.get(param_name, None)
+    ids = request.query_params.get(param_name, None)
     if ids:
         upper_bound = getattr(settings, 'API_LOOKUP_UPPER_BOUND', 100)
         try:

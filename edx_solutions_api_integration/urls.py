@@ -11,7 +11,7 @@
 
 from django.conf.urls import include, patterns, url
 
-from rest_framework.routers import SimpleRouter
+from rest_framework.routers import DefaultRouter
 
 from edx_solutions_organizations.views import OrganizationsViewSet
 from edx_solutions_api_integration.system import views as system_views
@@ -28,7 +28,7 @@ urlpatterns = patterns(
     url(r'^organizations/*', include('edx_solutions_organizations.urls')),
 )
 
-server_api_router = SimpleRouter()
+server_api_router = DefaultRouter()
 server_api_router.register(r'organizations', OrganizationsViewSet)
 
 # Project-related ViewSets
