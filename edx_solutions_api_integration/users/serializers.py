@@ -73,8 +73,12 @@ class UserSerializer(DynamicFieldsModelSerializer):
                 gradebook = StudentGradebook.objects.get(user=user, course_id=course_id)
                 grade = gradebook.grade
                 proforma_grade = gradebook.proforma_grade
-                section_breakdown = json.loads(gradebook.grade_summary)["section_breakdown"]
+                grade_summary = json.loads(gradebook.grade_summary)
+                if "section_breakdown" in grade_summary:
+                    section_breakdown = grade_summary["section_breakdown"]
             except ObjectDoesNotExist:
+                pass
+            except ValueError:
                 pass
 
         return {'grade': grade, 'proforma_grade': proforma_grade, 'section_breakdown': section_breakdown}
