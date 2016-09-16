@@ -4,7 +4,7 @@
 import logging
 
 from django.conf import settings
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, login
 from django.contrib.auth import SESSION_KEY, BACKEND_SESSION_KEY, load_backend
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ObjectDoesNotExist
@@ -103,53 +103,54 @@ class SessionsList(SecureAPIView):
                     LoginFailures.clear_lockout_counter(user)
 
                 if user.is_active:
+                    # #
+                    # # Create a new session directly with the SESSION_ENGINE
+                    # # We don't call the django.contrib.auth login() method
+                    # # because it is bound with the HTTP request.
+                    # #
+                    # # Since we are a server-to-server API, we shouldn't
+                    # # be stateful with respect to the HTTP request
+                    # # and anything that might come with it, as it could
+                    # # violate our RESTfulness
+                    # #
+                    # engine = import_module(settings.SESSION_ENGINE)
+                    # if session_id is None:
+                    #     session = engine.SessionStore()
+                    #     session.create()
+                    #     success_status = status.HTTP_201_CREATED
+                    # else:
+                    #     session = engine.SessionStore(session_id)
+                    #     success_status = status.HTTP_200_OK
+                    #     if SESSION_KEY in session:
+                    #         # Someone is already logged in. The user ID of whoever is logged in
+                    #         # now might be different than the user ID we've been asked to login,
+                    #         # which would be bad. But even if it is the same user, we should not
+                    #         # be asked to login a user who is already logged in. This likely
+                    #         # indicates some sort of programming/validation error and possibly
+                    #         # even a potential security issue - so return 403.
+                    #         return Response({}, status=status.HTTP_403_FORBIDDEN)
                     #
-                    # Create a new session directly with the SESSION_ENGINE
-                    # We don't call the django.contrib.auth login() method
-                    # because it is bound with the HTTP request.
+                    # # These values are expected to be set in any new session
+                    # session[SESSION_KEY] = user.id
+                    # session[BACKEND_SESSION_KEY] = user.backend
                     #
-                    # Since we are a server-to-server API, we shouldn't
-                    # be stateful with respect to the HTTP request
-                    # and anything that might come with it, as it could
-                    # violate our RESTfulness
+                    # session.save()
                     #
-                    engine = import_module(settings.SESSION_ENGINE)
-                    if session_id is None:
-                        session = engine.SessionStore()
-                        session.create()
-                        success_status = status.HTTP_201_CREATED
-                    else:
-                        session = engine.SessionStore(session_id)
-                        success_status = status.HTTP_200_OK
-                        if SESSION_KEY in session:
-                            # Someone is already logged in. The user ID of whoever is logged in
-                            # now might be different than the user ID we've been asked to login,
-                            # which would be bad. But even if it is the same user, we should not
-                            # be asked to login a user who is already logged in. This likely
-                            # indicates some sort of programming/validation error and possibly
-                            # even a potential security issue - so return 403.
-                            return Response({}, status=status.HTTP_403_FORBIDDEN)
-
-                    # These values are expected to be set in any new session
-                    session[SESSION_KEY] = user.id
-                    session[BACKEND_SESSION_KEY] = user.backend
-
-                    session.save()
-
-                    response_data['token'] = session.session_key
-                    response_data['expires'] = session.get_expiry_age()
+                    login(request, user)
+                    response_data['token'] = request.session.session_key
+                    response_data['expires'] = request.session.get_expiry_age()
                     user_dto = SimpleUserSerializer(user)
                     response_data['user'] = user_dto.data
-                    response_data['uri'] = '{}/{}'.format(base_uri, session.session_key)
-                    response_status = success_status
+                    response_data['uri'] = '{}/{}'.format(base_uri, request.session.session_key)
+                    response_status = status.HTTP_200_OK
 
                     # generate a CSRF tokens for any web clients that may need to
                     # call into the LMS via Ajax (for example Notifications)
                     response_data['csrftoken'] = RequestContext(request, {}).get('csrf_token')
 
                     # update the last_login fields in the auth_user table for this user
-                    user.last_login = timezone.now()
-                    user.save()
+                    # user.last_login = timezone.now()
+                    # user.save()
 
                     # add to audit log
                     AUDIT_LOG.info(u"API::User logged in successfully with user-id - {0}".format(user.id))  # pylint: disable=W1202
