@@ -51,8 +51,14 @@ from edx_solutions_api_integration.models import (
 from progress.models import CourseModuleCompletion
 from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView
 from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer
-from edx_solutions_api_integration.utils import generate_base_uri, str2bool, get_time_series_data, parse_datetime, \
-    get_ids_from_list_param
+from edx_solutions_api_integration.utils import (
+    generate_base_uri,
+    str2bool,
+    get_time_series_data,
+    parse_datetime,
+    get_ids_from_list_param,
+    strip_xblock_wrapper_div,
+)
 from .serializers import CourseSerializer
 from .serializers import GradeSerializer, CourseLeadersSerializer, CourseCompletionsLeadersSerializer
 from progress.serializers import CourseModuleCompletionSerializer
@@ -380,7 +386,7 @@ def _get_course_data(request, course_key, course_descriptor, depth=0):
     return data
 
 
-def _get_static_tab_contents(request, course, tab):
+def _get_static_tab_contents(request, course, tab, strip_wrapper_div=True):
     """
     Wrapper around get_static_tab_contents to cache contents for the given static tab
     """
@@ -391,6 +397,8 @@ def _get_static_tab_contents(request, course, tab):
         contents = get_static_tab_contents(request, course, tab)
         _cache_static_tab_contents(cache_key, contents)
 
+    if strip_wrapper_div:
+        contents = strip_xblock_wrapper_div(contents)
     return contents
 
 
@@ -942,6 +950,7 @@ class CoursesStaticTabsList(SecureAPIView):
         course_descriptor, course_key, course_content = get_course(request, request.user, course_id)  # pylint: disable=W0612
         if not course_descriptor:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
+        strip_wrapper_div = str2bool(self.request.query_params.get('strip_wrapper_div', 'true'))
         response_data = OrderedDict()
         tabs = []
         for tab in course_descriptor.tabs:
@@ -953,7 +962,8 @@ class CoursesStaticTabsList(SecureAPIView):
                     tab_data['content'] = _get_static_tab_contents(
                         request,
                         course_descriptor,
-                        tab
+                        tab,
+                        strip_wrapper_div
                     )
                 tabs.append(tab_data)
         response_data['tabs'] = tabs
@@ -990,6 +1000,7 @@ class CoursesStaticTabsDetail(SecureAPIView):
         course_descriptor, course_key, course_content = get_course(request, request.user, course_id)  # pylint: disable=W0612
         if not course_descriptor:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
+        strip_wrapper_div = str2bool(self.request.query_params.get('strip_wrapper_div', 'true'))
         response_data = OrderedDict()
         for tab in course_descriptor.tabs:
             if tab.type == 'static_tab' and (tab.url_slug == tab_id or tab.name == tab_id):
@@ -998,7 +1009,8 @@ class CoursesStaticTabsDetail(SecureAPIView):
                 response_data['content'] = _get_static_tab_contents(
                     request,
                     course_descriptor,
-                    tab
+                    tab,
+                    strip_wrapper_div
                 )
                 return Response(response_data, status=status.HTTP_200_OK)
 

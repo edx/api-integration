@@ -3,6 +3,7 @@
 import socket
 import struct
 import json
+import re
 import datetime
 
 from django.utils.timezone import now
@@ -211,3 +212,14 @@ def get_ids_from_list_param(request, param_name):
             raise ParseError("Invalid {} parameter value".format(param_name))
 
     return ids
+
+
+def strip_xblock_wrapper_div(html):
+    """
+    Removes xblock wrapper div from given html
+    """
+    match = re.search('^<div class=\"xblock xblock-student_view(.+?)</script>(.+?)</div>$', html, re.DOTALL)
+    if match:
+        return match.group(2).strip()
+    else:
+        return html

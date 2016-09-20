@@ -884,7 +884,7 @@ class CoursesApiTests(
         self.assertEqual(tabs[1]['id'], u'readings')
 
         # now try when we get the details on the tabs
-        test_uri = self.base_courses_uri + '/' + self.test_course_id + '/static_tabs?detail=true'
+        test_uri = self.base_courses_uri + '/' + self.test_course_id + '/static_tabs?detail=true&strip_wrapper_div=false'
         response = self.do_get(test_uri)
 
         self.assertEqual(response.status_code, 200)
@@ -895,6 +895,14 @@ class CoursesApiTests(
         self.assertIn(self.static_tab1.data, tabs[0]['content'])
         self.assertEqual(tabs[1]['id'], u'readings')
         self.assertIn(self.static_tab2.data, tabs[1]['content'])
+
+        # get tabs without strip wrapper div
+        test_uri = self.base_courses_uri + '/' + self.test_course_id + '/static_tabs?detail=true'
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+        tabs = response.data['tabs']
+        self.assertEqual(self.static_tab1.data.strip('\n'), tabs[0]['content'])
+        self.assertEqual(self.static_tab2.data.strip('\n'), tabs[1]['content'])
 
         # get syllabus tab contents from cache
         cache_key = u'course.{course_id}.static.tab.{url_slug}.contents'.format(
