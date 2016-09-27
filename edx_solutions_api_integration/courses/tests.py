@@ -901,8 +901,8 @@ class CoursesApiTests(
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         tabs = response.data['tabs']
-        self.assertEqual(self.static_tab1.data.strip('\n'), tabs[0]['content'])
-        self.assertEqual(self.static_tab2.data.strip('\n'), tabs[1]['content'])
+        self.assertEqual(self.static_tab1.data, tabs[0]['content'])
+        self.assertEqual(self.static_tab2.data, tabs[1]['content'])
 
         # get syllabus tab contents from cache
         cache_key = u'course.{course_id}.static.tab.{url_slug}.contents'.format(
