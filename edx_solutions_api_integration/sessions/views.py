@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth import SESSION_KEY, BACKEND_SESSION_KEY, HASH_SESSION_KEY, load_backend
 from django.contrib.auth.models import AnonymousUser, User
+from django.core.context_processors import csrf
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.importlib import import_module
 from django.utils.translation import ugettext as _
@@ -150,7 +151,7 @@ class SessionsList(SecureAPIView):
 
                     # generate a CSRF tokens for any web clients that may need to
                     # call into the LMS via Ajax (for example Notifications)
-                    response_data['csrftoken'] = RequestContext(request, {}).get('csrf_token')
+                    response_data['csrftoken'] = unicode(csrf(request)['csrf_token'])
 
                     # update the last_login fields in the auth_user table for this user
                     user.last_login = timezone.now()

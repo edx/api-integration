@@ -9,8 +9,6 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
 from django.db.models import Count, Q
-from django.db import transaction
-from django.utils.decorators import method_decorator
 from django.core.validators import validate_email, validate_slug, ValidationError
 from django.conf import settings
 from django.http import Http404
@@ -791,7 +789,6 @@ class UsersCoursesList(SecureAPIView):
     * POST to the UsersCoursesList view to create a new Course enrollment for the specified User (aka, Student)
     * Perform a GET to generate a list of all active Course enrollments for the specified User
     """
-    @method_decorator(transaction.non_atomic_requests)
     def post(self, request, user_id):
         """
         POST /api/users/{user_id}/courses/
