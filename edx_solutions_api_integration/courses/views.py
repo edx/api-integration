@@ -1440,7 +1440,7 @@ class CourseModuleCompletionList(SecureListAPIView):
         if not course_exists(self.request, self.request.user, course_id):
             raise Http404
         course_key = get_course_key(course_id)
-        queryset = CourseModuleCompletion.objects.filter(course_id=course_key)
+        queryset = CourseModuleCompletion.objects.filter(course_id=course_key).select_related('user')
         user_ids = get_ids_from_list_param(self.request, 'user_id')
         if user_ids:
             queryset = queryset.filter(user__in=user_ids)
