@@ -10,6 +10,7 @@
 """
 
 from django.conf.urls import include, patterns, url
+from django.db import transaction
 
 from rest_framework.routers import DefaultRouter
 
@@ -26,6 +27,17 @@ urlpatterns = patterns(
     url(r'^sessions/*', include('edx_solutions_api_integration.sessions.urls')),
     url(r'^courses/*', include('edx_solutions_api_integration.courses.urls')),
     url(r'^organizations/*', include('edx_solutions_organizations.urls')),
+    # we have to explicitly define url for workgroup users detail view
+    # to wrap it around non_atomic_requests decorator
+    url(
+        r'^workgroups/(?P<pk>\d+)/users/?$',
+        transaction.non_atomic_requests(project_views.WorkgroupsViewSet.as_view({
+            'get': 'users',
+            'post': 'users',
+            'delete': 'users',
+        })),
+        name='workgroup-users-detail'
+    ),
 )
 
 server_api_router = DefaultRouter()
