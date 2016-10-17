@@ -2189,3 +2189,25 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         # then verify unread count, which should be 0
         self.assertEqual(get_notifications_count_for_user(user_id, filters={'read': False}), 0)
+
+    @mock.patch("edx_solutions_api_integration.users.views.module_render.get_module_for_descriptor")
+    def test_user_courses_detail_get_undefined_course_module(self, mock_get_module_for_descriptor):
+        course_id = unicode(self.course.id)
+
+        # Enroll test user in test course
+        test_uri = '{}/{}/courses'.format(self.users_base_uri, self.user.id)
+        data = {'course_id': course_id}
+
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 201)
+
+        # Get user course details when course_module is None
+        mock_get_module_for_descriptor.return_value = None
+
+        test_uri = test_uri + '/' + course_id
+        response = self.do_get(test_uri)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['position'], None)
+
+
