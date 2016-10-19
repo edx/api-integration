@@ -1008,3 +1008,22 @@ class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
         test_uri = '{}/{}/users/'.format(self.base_groups_uri, group.id)
         response = self.do_post(test_uri, {})
         self.assertEqual(response.status_code, 400)
+
+    def test_groups_groups_list_missing_group_id(self):
+        # Create test group
+        from_group = GroupFactory.create()
+
+        # Test with missing group_id in the request data
+        test_uri = '{}/{}/groups/'.format(self.base_groups_uri, from_group.id)
+        response = self.do_post(test_uri, {})
+        self.assertEqual(response.status_code, 400)
+
+    def test_groups_groups_list_missing_relationship_type(self):
+        # Create test groups
+        from_group = GroupFactory.create()
+        to_group = GroupFactory.create()
+
+        # Test with missing relationship_type in the request data
+        test_uri = '{}/{}/groups/'.format(self.base_groups_uri, from_group.id)
+        response = self.do_post(test_uri, {"group_id": to_group.id})
+        self.assertEqual(response.status_code, 400)

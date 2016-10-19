@@ -385,8 +385,14 @@ class GroupsGroupsList(SecureAPIView):
         POST /api/groups/{group_id}/groups/{related_group_id}
         """
         response_data = {}
-        to_group_id = request.data['group_id']
-        relationship_type = request.data['relationship_type']
+        to_group_id = request.data.get('group_id', None)
+        if not to_group_id:
+            return Response({'message': _('group_id is missing')}, status=status.HTTP_400_BAD_REQUEST)
+
+        relationship_type = request.data.get('relationship_type', None)
+        if not relationship_type:
+            return Response({'message': _('relationship_type is missing')}, status=status.HTTP_400_BAD_REQUEST)
+
         base_uri = generate_base_uri(request)
         response_data['uri'] = '{}/{}'.format(base_uri, to_group_id)
         response_data['group_id'] = str(to_group_id)
