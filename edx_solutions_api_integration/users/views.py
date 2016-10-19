@@ -970,10 +970,7 @@ class UsersCoursesDetail(SecureAPIView):
             course_descriptor,
             field_data_cache,
             course_key)
-        if course_module is not None:
-            response_data['position'] = course_module.position
-        else:
-            response_data['position'] = None
+        response_data['position'] = getattr(course_module, 'position', None)
         response_data['position_tree'] = {}
         parent_module = course_module
         while parent_module is not None:
