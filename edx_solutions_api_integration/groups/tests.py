@@ -20,6 +20,7 @@ from edx_solutions_organizations.models import Organization
 from edx_solutions_projects.models import Project
 from edx_solutions_api_integration.test_utils import APIClientMixin
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
+from student.tests.factories import GroupFactory
 
 MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 
@@ -998,3 +999,12 @@ class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
         # test with invalid group id
         response = self.do_get('{}/4356340/workgroups/'.format(self.base_groups_uri))
         self.assertEqual(response.status_code, 404)
+
+    def test_groups_users_list_missing_user_id(self):
+        # Create a test group
+        group = GroupFactory.create()
+
+        # Test with user_id missing in request data
+        test_uri = '{}/{}/users/'.format(self.base_groups_uri, group.id)
+        response = self.do_post(test_uri, {})
+        self.assertEqual(response.status_code, 400)
