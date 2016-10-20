@@ -73,8 +73,17 @@ class SessionsList(SecureAPIView):
             return Response(response_data, status=status.HTTP_403_FORBIDDEN)
 
         base_uri = generate_base_uri(request)
+
+        username = request.data.get('username', None)
+        if username is None:
+            return Response({'message': _('username is missing')}, status=status.HTTP_400_BAD_REQUEST)
+
+        password = request.data.get('password', None)
+        if password is None:
+            return Response({'message': _('password is missing')}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            existing_user = User.objects.get(username=request.data['username'])
+            existing_user = User.objects.get(username=username)
         except ObjectDoesNotExist:
             existing_user = None
 
@@ -96,7 +105,7 @@ class SessionsList(SecureAPIView):
             return Response(response_data, status=response_status)
 
         if existing_user:
-            user = authenticate(username=existing_user.username, password=request.data['password'])
+            user = authenticate(username=existing_user.username, password=password)
             if user is not None:
 
                 # successful login, clear failed login attempts counters, if applicable

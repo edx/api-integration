@@ -180,3 +180,14 @@ class SessionsApiTests(TestCase, APIClientMixin):
         test_uri = self.base_sessions_uri + "214viouadblah124324blahblah"
         response = self.do_delete(test_uri)
         self.assertEqual(response.status_code, 204)
+
+    def test_sessions_list_missing_username(self):
+        # Test with missing username in request data
+        response = self.do_post(self.base_sessions_uri, {})
+        self.assertEqual(response.status_code, 400)
+
+    def test_sessions_list_missing_password(self):
+        # Test with missing password in request data
+        response = self.do_post(self.base_sessions_uri, {'username': self.test_username})
+        self.assertEqual(response.status_code, 400)
+
