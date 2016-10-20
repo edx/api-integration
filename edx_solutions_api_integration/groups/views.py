@@ -5,6 +5,7 @@ import json
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import Http404
+from django.utils.translation import ugettext_lazy as _
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -247,7 +248,11 @@ class GroupsUsersList(SecureAPIView):
             existing_group = Group.objects.get(id=group_id)
         except ObjectDoesNotExist:
             return Response({}, status.HTTP_404_NOT_FOUND)
-        user_id = request.data['user_id']
+
+        user_id = request.data.get('user_id', None)
+        if not user_id:
+            return Response({'message': _('user_id is missing')}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             existing_user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
@@ -380,8 +385,14 @@ class GroupsGroupsList(SecureAPIView):
         POST /api/groups/{group_id}/groups/{related_group_id}
         """
         response_data = {}
-        to_group_id = request.data['group_id']
-        relationship_type = request.data['relationship_type']
+        to_group_id = request.data.get('group_id', None)
+        if not to_group_id:
+            return Response({'message': _('group_id is missing')}, status=status.HTTP_400_BAD_REQUEST)
+
+        relationship_type = request.data.get('relationship_type', None)
+        if not relationship_type:
+            return Response({'message': _('relationship_type is missing')}, status=status.HTTP_400_BAD_REQUEST)
+
         base_uri = generate_base_uri(request)
         response_data['uri'] = '{}/{}'.format(base_uri, to_group_id)
         response_data['group_id'] = str(to_group_id)
