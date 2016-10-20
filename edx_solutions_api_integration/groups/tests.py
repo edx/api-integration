@@ -1027,3 +1027,12 @@ class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
         test_uri = '{}/{}/groups/'.format(self.base_groups_uri, from_group.id)
         response = self.do_post(test_uri, {"group_id": to_group.id})
         self.assertEqual(response.status_code, 400)
+
+    def test_groups_groups_detail_invalid_group_id(self):
+        related_group = GroupFactory.create()
+
+        # Test with invalid from_group
+        test_uri = '{}/{}/groups/{}'.format(self.base_groups_uri, '123', related_group.id)
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 404)
+
