@@ -554,7 +554,10 @@ class GroupsCoursesList(SecureAPIView):
             existing_group = Group.objects.get(id=group_id)
         except ObjectDoesNotExist:
             return Response({}, status.HTTP_404_NOT_FOUND)
-        course_id = request.data['course_id']
+
+        course_id = request.data.get('course_id', None)
+        if course_id is None:
+            return Response({'message': _('course_id is missing')}, status=status.HTTP_400_BAD_REQUEST)
 
         base_uri = generate_base_uri(request)
         response_data['uri'] = '{}/{}'.format(base_uri, course_id)
