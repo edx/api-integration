@@ -2525,11 +2525,11 @@ class CoursesApiTests(
             response.data
         )
 
-    def test_courses_users_list_valid_email_no_content_response(self):
-        # Test with valid email in request data, it should return response status HTTP_204_NO_CONTENT
+    def test_courses_users_list_valid_email_enroll_user(self):
+        # Test with valid email in request data, it should return response status HTTP_201_CREATED
         test_uri = '{}/{}/users'.format(self.base_courses_uri, self.course.id)
         response = self.do_post(test_uri, {'email': self.users[0].email})
-        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response.status_code, 201)
 
 
 @override_settings(MODULESTORE=MODULESTORE_CONFIG)
