@@ -1093,6 +1093,8 @@ class CoursesUsersList(SecureListAPIView):
         else:
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
 
+        return Response({}, status=status.HTTP_204_NO_CONTENT)
+
     def get(self, request, course_id):  # pylint: disable=W0221
         """
         GET /api/courses/{course_id}/users
