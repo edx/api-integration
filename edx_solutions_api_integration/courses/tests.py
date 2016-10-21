@@ -2525,6 +2525,12 @@ class CoursesApiTests(
             response.data
         )
 
+    def test_courses_groups_list_missing_group_id(self):
+        # Test with missing group_id in request data
+        test_uri = '{}/{}/groups'.format(self.base_courses_uri, self.test_course_id)
+        response = self.do_post(test_uri, {})
+        self.assertEqual(response.status_code, 400)
+
 
 @override_settings(MODULESTORE=MODULESTORE_CONFIG)
 @mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': False,

@@ -729,7 +729,10 @@ class CoursesGroupsList(SecureAPIView):
         POST /api/courses/{course_id}/groups
         """
         response_data = {}
-        group_id = request.data['group_id']
+        group_id = request.data.get('group_id', None)
+        if not group_id:
+            return Response({'message': _('group_id is missing')}, status.HTTP_400_BAD_REQUEST)
+
         base_uri = generate_base_uri(request)
         if not course_exists(request, request.user, course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
