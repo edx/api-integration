@@ -1661,8 +1661,12 @@ class CoursesTimeSeriesMetrics(SecureAPIView):
         if interval not in ['days', 'weeks', 'months']:
             return Response({"message": _("Interval parameter is not valid. It should be one of these "
                                           "'days', 'weeks', 'months'")}, status=status.HTTP_400_BAD_REQUEST)
-        start_dt = parse_datetime(start)
-        end_dt = parse_datetime(end)
+        try:
+            start_dt = parse_datetime(start)
+            end_dt = parse_datetime(end)
+        except ValueError:
+            return Response({'message': _('date format is invalid')}, status=status.HTTP_400_BAD_REQUEST)
+
         course_key = get_course_key(course_id)
         exclude_users = get_aggregate_exclusion_user_ids(course_key)
         grade_complete_match_range = getattr(settings, 'GRADEBOOK_GRADE_COMPLETE_PROFORMA_MATCH_RANGE', 0.01)
