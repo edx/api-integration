@@ -683,7 +683,10 @@ class UsersGroupsList(SecureAPIView):
         POST /api/users/{user_id}/groups
         """
         response_data = {}
-        group_id = request.data['group_id']
+        group_id = request.data.get('group_id')
+        if not group_id:
+            return Response({'message': _('group_id is missing')}, status.HTTP_400_BAD_REQUEST)
+
         base_uri = generate_base_uri(request)
         response_data['uri'] = '{}/{}'.format(base_uri, str(group_id))
         try:
