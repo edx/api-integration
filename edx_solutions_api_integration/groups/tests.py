@@ -1043,5 +1043,6 @@ class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
 
         # Test with missing course_id in the request data
         test_uri = '{}/{}/courses/'.format(self.base_groups_uri, test_group.id)
-        response = self.do_post(test_uri, {})
+        data = {"course_id": ""}
+        response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 400)
