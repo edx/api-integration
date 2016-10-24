@@ -2531,6 +2531,12 @@ class CoursesApiTests(
         response = self.do_post(test_uri, {})
         self.assertEqual(response.status_code, 400)
 
+    def test_courses_users_list_valid_email_enroll_user(self):
+        # Test with valid email in request data, it should return response status HTTP_201_CREATED
+        test_uri = '{}/{}/users'.format(self.base_courses_uri, self.course.id)
+        response = self.do_post(test_uri, {'email': self.users[0].email})
+        self.assertEqual(response.status_code, 201)
+
 
 @override_settings(MODULESTORE=MODULESTORE_CONFIG)
 @mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': False,
