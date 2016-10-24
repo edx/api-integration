@@ -480,23 +480,24 @@ class GroupsGroupsDetail(SecureAPIView):
         response_data['from_group_id'] = group_id
         response_data['to_group_id'] = related_group_id
         response_status = status.HTTP_404_NOT_FOUND
-        from_group_relationship = GroupRelationship.objects.get(group__id=group_id)
-        if from_group_relationship:
-            try:
-                to_group_relationship = GroupRelationship.objects.get(group__id=related_group_id)
-            except ObjectDoesNotExist:
-                return Response(response_data, status=status.HTTP_404_NOT_FOUND)
-            if to_group_relationship and str(to_group_relationship.parent_group_id) == str(group_id):
-                response_data['relationship_type'] = RELATIONSHIP_TYPES['hierarchical']
+
+        try:
+            from_group_relationship = GroupRelationship.objects.get(group__id=group_id)
+            to_group_relationship = GroupRelationship.objects.get(group__id=related_group_id)
+        except ObjectDoesNotExist:
+            return Response(response_data, response_status)
+
+        if to_group_relationship and str(to_group_relationship.parent_group_id) == str(group_id):
+            response_data['relationship_type'] = RELATIONSHIP_TYPES['hierarchical']
+            response_status = status.HTTP_200_OK
+        else:
+            linked_group_exists = from_group_relationship.check_linked_group_relationship(
+                to_group_relationship,
+                symmetrical=True
+            )
+            if linked_group_exists:
+                response_data['relationship_type'] = RELATIONSHIP_TYPES['graph']
                 response_status = status.HTTP_200_OK
-            else:
-                linked_group_exists = from_group_relationship.check_linked_group_relationship(
-                    to_group_relationship,
-                    symmetrical=True
-                )
-                if linked_group_exists:
-                    response_data['relationship_type'] = RELATIONSHIP_TYPES['graph']
-                    response_status = status.HTTP_200_OK
         return Response(response_data, response_status)
 
     def delete(self, request, group_id, related_group_id):  # pylint: disable=W0613
