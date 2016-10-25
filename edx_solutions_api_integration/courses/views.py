@@ -1200,7 +1200,7 @@ class CoursesUsersDetail(SecureAPIView):
         if not course_descriptor:
             return Response(response_data, status=status.HTTP_404_NOT_FOUND)
         if CourseEnrollment.is_enrolled(user, course_key):
-            response_data['position'] = course_content.position
+            response_data['position'] = getattr(course_content, 'position', None)
             response_status = status.HTTP_200_OK
         else:
             response_status = status.HTTP_404_NOT_FOUND
