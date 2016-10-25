@@ -2204,4 +2204,11 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['position'], None)
 
+    def test_users_courses_list_post_missing_course_id(self):
+        # Test with missing course_id in request data
+        test_uri = '{}/{}/courses/'.format(self.users_base_uri, self.user.id)
+        data = {'course_id': ''}
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 400)
+
 
