@@ -802,7 +802,10 @@ class UsersCoursesList(SecureAPIView):
         """
         response_data = {}
         user_id = user_id
-        course_id = request.data['course_id']
+        course_id = request.data.get('course_id')
+        if not course_id:
+            return Response({'message': _('course_id is missing')}, status.HTTP_400_BAD_REQUEST)
+
         try:
             user = User.objects.get(id=user_id)
             course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612,C0301
