@@ -2225,3 +2225,21 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 400)
 
+    def test_users_roles_list_put_missing_roles(self):
+        # Test with missing roles in request data
+        test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
+        response = self.do_put(test_uri, {})
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_roles_list_put_missing_role_value(self):
+        test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
+        data = {'roles': [{'course_id': unicode(self.course.id)}]}
+        response = self.do_put(test_uri, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_roles_list_put_missing_course_id(self):
+        test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
+        data = {'roles': [{'role': 'instructor'}]}
+        response = self.do_put(test_uri, data)
+        self.assertEqual(response.status_code, 400)
+
