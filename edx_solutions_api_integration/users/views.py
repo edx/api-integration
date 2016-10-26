@@ -769,7 +769,11 @@ class UsersGroupsDetail(SecureAPIView):
         """
         DELETE /api/users/{user_id}/groups/{group_id}
         """
-        existing_user = User.objects.get(id=user_id)
+        try:
+            existing_user = User.objects.get(id=user_id)
+        except ObjectDoesNotExist:
+            return Response({}, status.HTTP_404_NOT_FOUND)
+
         existing_user.groups.remove(group_id)
         existing_user.save()
         return Response({}, status=status.HTTP_204_NO_CONTENT)
