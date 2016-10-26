@@ -2210,13 +2210,6 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         data = {'group_id': ''}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 400)
-    def test_users_courses_list_post_missing_course_id(self):
-        # Test with missing course_id in request data
-        test_uri = '{}/{}/courses/'.format(self.users_base_uri, self.user.id)
-        data = {'course_id': ''}
-        response = self.do_post(test_uri, data)
-        self.assertEqual(response.status_code, 400)
-
 
     def test_users_groups_detail_delete_invalid_user_id(self):
         # Test with invalid user_id
@@ -2224,3 +2217,11 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         test_uri = '{}/{}/groups/{}'.format(self.users_base_uri, '1234567', test_group.id)
         response = self.do_delete(test_uri)
         self.assertEqual(response.status_code, 404)
+
+    def test_users_courses_list_post_missing_course_id(self):
+        # Test with missing course_id in request data
+        test_uri = '{}/{}/courses/'.format(self.users_base_uri, self.user.id)
+        data = {'course_id': ''}
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 400)
+
