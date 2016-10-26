@@ -2224,3 +2224,4 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         data = {'course_id': ''}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 400)
+
