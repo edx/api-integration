@@ -36,7 +36,7 @@ from edx_solutions_api_integration.test_utils import (
     APIClientMixin,
     SignalDisconnectTestMixin,
 )
-from student.tests.factories import UserFactory, CourseEnrollmentFactory
+from student.tests.factories import UserFactory, CourseEnrollmentFactory, GroupFactory
 from student.models import anonymous_id_for_user
 
 from openedx.core.djangoapps.user_api.models import UserPreference
@@ -2204,6 +2204,12 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['position'], None)
 
+    def test_users_groups_list_missing_group_id(self):
+        # Test with missing group_id in request data
+        test_uri = '{}/{}/groups/'.format(self.users_base_uri, self.user.id)
+        data = {'group_id': ''}
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 400)
     def test_users_courses_list_post_missing_course_id(self):
         # Test with missing course_id in request data
         test_uri = '{}/{}/courses/'.format(self.users_base_uri, self.user.id)
@@ -2212,3 +2218,9 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 400)
 
 
+    def test_users_groups_detail_delete_invalid_user_id(self):
+        # Test with invalid user_id
+        test_group = GroupFactory.create()
+        test_uri = '{}/{}/groups/{}'.format(self.users_base_uri, '1234567', test_group.id)
+        response = self.do_delete(test_uri)
+        self.assertEqual(response.status_code, 404)
