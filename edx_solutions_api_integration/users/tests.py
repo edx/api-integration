@@ -2225,3 +2225,21 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 400)
 
+    def test_users_courses_detail_post_missing_positions(self):
+        test_uri = '{}/{}/courses/{}'.format(self.users_base_uri, self.user.id, self.course.id)
+        response = self.do_post(test_uri, data={})
+        self.assertEqual(response.status_code, 200)
+
+    def test_users_courses_detail_post_missing_parent_content_id(self):
+        position_data = {'positions': [{'child_content_id': str(self.course.location)}]}
+        test_uri = '{}/{}/courses/{}'.format(self.users_base_uri, self.user.id, self.course.id)
+
+        response = self.do_post(test_uri, data=position_data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_courses_detail_post_missing_child_content_id(self):
+        position_data = {'positions': [{'parent_content_id': str(self.course.id)}]}
+        test_uri = '{}/{}/courses/{}'.format(self.users_base_uri, self.user.id, self.course.id)
+
+        response = self.do_post(test_uri, data=position_data)
+        self.assertEqual(response.status_code, 400)
