@@ -1521,8 +1521,10 @@ class UsersNotificationsDetail(SecureAPIView):
             }
         """
 
-        read = bool(request.data['read'])
+        read = request.data.get('read')
+        if not read:
+            return Response({'message': _('read field is missing')}, status.HTTP_400_BAD_REQUEST)
 
-        mark_notification_read(int(user_id), int(msg_id), read=read)
+        mark_notification_read(int(user_id), int(msg_id), read=bool(read))
 
         return Response({}, status=status.HTTP_201_CREATED)

@@ -2225,3 +2225,8 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 400)
 
+    def test_users_notifications_detail_missing_read_value(self):
+        test_uri = '{}/{}/notifications/{}/'.format(self.users_base_uri, self.user.id, '1')
+        response = self.do_post(test_uri, {})
+        self.assertEqual(response.status_code, 400)
+
