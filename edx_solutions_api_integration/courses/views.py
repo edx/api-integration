@@ -729,7 +729,10 @@ class CoursesGroupsList(SecureAPIView):
         POST /api/courses/{course_id}/groups
         """
         response_data = {}
-        group_id = request.data['group_id']
+        group_id = request.data.get('group_id', None)
+        if not group_id:
+            return Response({'message': _('group_id is missing')}, status.HTTP_400_BAD_REQUEST)
+
         base_uri = generate_base_uri(request)
         if not course_exists(request, request.user, course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
@@ -1066,14 +1069,13 @@ class CoursesUsersList(SecureListAPIView):
         if not course_exists(request, request.user, course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         course_key = get_course_key(course_id)
+        existing_user = None
         if 'user_id' in request.data:
             user_id = request.data['user_id']
             try:
                 existing_user = User.objects.get(id=user_id)
             except ObjectDoesNotExist:
                 return Response({}, status=status.HTTP_404_NOT_FOUND)
-            CourseEnrollment.enroll(existing_user, course_key)
-            return Response({}, status=status.HTTP_201_CREATED)
         elif 'email' in request.data:
             try:
                 email = request.data['email']
@@ -1092,6 +1094,9 @@ class CoursesUsersList(SecureListAPIView):
                     return Response({}, status.HTTP_400_BAD_REQUEST)
         else:
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
+
+        CourseEnrollment.enroll(existing_user, course_key)
+        return Response({}, status=status.HTTP_201_CREATED)
 
     def get(self, request, course_id):  # pylint: disable=W0221
         """
@@ -1661,8 +1666,12 @@ class CoursesTimeSeriesMetrics(SecureAPIView):
         if interval not in ['days', 'weeks', 'months']:
             return Response({"message": _("Interval parameter is not valid. It should be one of these "
                                           "'days', 'weeks', 'months'")}, status=status.HTTP_400_BAD_REQUEST)
-        start_dt = parse_datetime(start)
-        end_dt = parse_datetime(end)
+        try:
+            start_dt = parse_datetime(start)
+            end_dt = parse_datetime(end)
+        except ValueError:
+            return Response({'message': _('date format is invalid')}, status=status.HTTP_400_BAD_REQUEST)
+
         course_key = get_course_key(course_id)
         exclude_users = get_aggregate_exclusion_user_ids(course_key)
         grade_complete_match_range = getattr(settings, 'GRADEBOOK_GRADE_COMPLETE_PROFORMA_MATCH_RANGE', 0.01)

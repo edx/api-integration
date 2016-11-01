@@ -36,7 +36,7 @@ from edx_solutions_api_integration.test_utils import (
     APIClientMixin,
     SignalDisconnectTestMixin,
 )
-from student.tests.factories import UserFactory, CourseEnrollmentFactory
+from student.tests.factories import UserFactory, CourseEnrollmentFactory, GroupFactory
 from student.models import anonymous_id_for_user
 
 from openedx.core.djangoapps.user_api.models import UserPreference
@@ -2189,3 +2189,39 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         # then verify unread count, which should be 0
         self.assertEqual(get_notifications_count_for_user(user_id, filters={'read': False}), 0)
+
+    @mock.patch("edx_solutions_api_integration.users.views.module_render.get_module_for_descriptor")
+    def test_user_courses_detail_get_undefined_course_module(self, mock_get_module_for_descriptor):
+        # Enroll test user in test course
+        CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
+
+        # Get user course details when course_module is None
+        mock_get_module_for_descriptor.return_value = None
+
+        test_uri = '{}/{}/courses/{}'.format(self.users_base_uri, self.user.id, self.course.id)
+        response = self.do_get(test_uri)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['position'], None)
+
+    def test_users_groups_list_missing_group_id(self):
+        # Test with missing group_id in request data
+        test_uri = '{}/{}/groups/'.format(self.users_base_uri, self.user.id)
+        data = {'group_id': ''}
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_groups_detail_delete_invalid_user_id(self):
+        # Test with invalid user_id
+        test_group = GroupFactory.create()
+        test_uri = '{}/{}/groups/{}'.format(self.users_base_uri, '1234567', test_group.id)
+        response = self.do_delete(test_uri)
+        self.assertEqual(response.status_code, 404)
+
+    def test_users_courses_list_post_missing_course_id(self):
+        # Test with missing course_id in request data
+        test_uri = '{}/{}/courses/'.format(self.users_base_uri, self.user.id)
+        data = {'course_id': ''}
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 400)
+

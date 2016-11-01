@@ -683,7 +683,10 @@ class UsersGroupsList(SecureAPIView):
         POST /api/users/{user_id}/groups
         """
         response_data = {}
-        group_id = request.data['group_id']
+        group_id = request.data.get('group_id')
+        if not group_id:
+            return Response({'message': _('group_id is missing')}, status.HTTP_400_BAD_REQUEST)
+
         base_uri = generate_base_uri(request)
         response_data['uri'] = '{}/{}'.format(base_uri, str(group_id))
         try:
@@ -766,7 +769,11 @@ class UsersGroupsDetail(SecureAPIView):
         """
         DELETE /api/users/{user_id}/groups/{group_id}
         """
-        existing_user = User.objects.get(id=user_id)
+        try:
+            existing_user = User.objects.get(id=user_id)
+        except ObjectDoesNotExist:
+            return Response({}, status.HTTP_404_NOT_FOUND)
+
         existing_user.groups.remove(group_id)
         existing_user.save()
         return Response({}, status=status.HTTP_204_NO_CONTENT)
@@ -795,7 +802,10 @@ class UsersCoursesList(SecureAPIView):
         """
         response_data = {}
         user_id = user_id
-        course_id = request.data['course_id']
+        course_id = request.data.get('course_id')
+        if not course_id:
+            return Response({'message': _('course_id is missing')}, status.HTTP_400_BAD_REQUEST)
+
         try:
             user = User.objects.get(id=user_id)
             course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612,C0301
@@ -970,7 +980,7 @@ class UsersCoursesDetail(SecureAPIView):
             course_descriptor,
             field_data_cache,
             course_key)
-        response_data['position'] = course_module.position
+        response_data['position'] = getattr(course_module, 'position', None)
         response_data['position_tree'] = {}
         parent_module = course_module
         while parent_module is not None:

@@ -2525,6 +2525,18 @@ class CoursesApiTests(
             response.data
         )
 
+    def test_courses_groups_list_missing_group_id(self):
+        # Test with missing group_id in request data
+        test_uri = '{}/{}/groups'.format(self.base_courses_uri, self.test_course_id)
+        response = self.do_post(test_uri, {})
+        self.assertEqual(response.status_code, 400)
+
+    def test_courses_users_list_valid_email_enroll_user(self):
+        # Test with valid email in request data, it should return response status HTTP_201_CREATED
+        test_uri = '{}/{}/users'.format(self.base_courses_uri, self.course.id)
+        response = self.do_post(test_uri, {'email': self.users[0].email})
+        self.assertEqual(response.status_code, 201)
+
 
 @override_settings(MODULESTORE=MODULESTORE_CONFIG)
 @mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': False,
@@ -3001,6 +3013,29 @@ class CoursesTimeSeriesMetricsApiTests(SignalDisconnectTestMixin, SharedModuleSt
             end_date
         )
         response = self.do_get(course_metrics_uri)
+        self.assertEqual(response.status_code, 400)
+
+    def test_courses_time_series_invalid_start_date(self):
+         # Test with an invalid format of start_date
+         test_uri = '{}/{}/time-series-metrics/?start_date={}&end_date={}'.format(
+             self.base_courses_uri,
+             self.course.id,
+             '21102016',
+             self.reference_date
+         )
+         response = self.do_get(test_uri)
+         self.assertEqual(response.status_code, 400)
+
+    def test_courses_time_series_invalid_end_date(self):
+        # Test with an invalid format of end_date
+        start_date = self.reference_date - relativedelta(days=10)
+        test_uri = '{}/{}/time-series-metrics/?start_date={}&end_date={}'.format(
+         self.base_courses_uri,
+         self.course.id,
+         start_date,
+         '21102016'
+        )
+        response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 400)
 
 
