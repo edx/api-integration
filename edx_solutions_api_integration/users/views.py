@@ -327,9 +327,16 @@ class UsersList(SecureListAPIView):
         """
         response_data = {}
         base_uri = generate_base_uri(request)
-        email = request.data['email']
-        username = request.data['username']
-        password = request.data['password']
+
+        email = request.data.get('email')
+        username = request.data.get('username')
+        if username is None:
+            return Response({'message': _('username is missing')}, status.HTTP_400_BAD_REQUEST)
+
+        password = request.data.get('password')
+        if settings.FEATURES.get('ENFORCE_PASSWORD_POLICY', True) and password is None:
+            return Response({'message': _('password is missing')}, status.HTTP_400_BAD_REQUEST)
+
         first_name = request.data.get('first_name', '')
         last_name = request.data.get('last_name', '')
         is_active = request.data.get('is_active', None)

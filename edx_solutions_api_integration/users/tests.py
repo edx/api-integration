@@ -2204,6 +2204,26 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['position'], None)
 
+    def test_users_list_post_missing_email(self):
+        # Test with missing email in the request data
+        data = {'username': self.test_username, 'password': self.test_password}
+        response = self.do_post(self.users_base_uri, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_list_post_missing_username(self):
+        # Test with missing username in the request data
+        data = {'email': self.test_email, 'password': self.test_password}
+        response = self.do_post(self.users_base_uri, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_list_post_missing_password(self):
+        # Test with missing password in the request data
+        data = {'email': self.test_email, 'username': self.test_username}
+        response = self.do_post(self.users_base_uri, data)
+        self.assertEqual(response.status_code, 400)
+
+
+
     def test_users_groups_list_missing_group_id(self):
         # Test with missing group_id in request data
         test_uri = '{}/{}/groups/'.format(self.users_base_uri, self.user.id)
