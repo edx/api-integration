@@ -690,7 +690,10 @@ class UsersGroupsList(SecureAPIView):
         POST /api/users/{user_id}/groups
         """
         response_data = {}
-        group_id = request.data['group_id']
+        group_id = request.data.get('group_id')
+        if not group_id:
+            return Response({'message': _('group_id is missing')}, status.HTTP_400_BAD_REQUEST)
+
         base_uri = generate_base_uri(request)
         response_data['uri'] = '{}/{}'.format(base_uri, str(group_id))
         try:
@@ -773,7 +776,11 @@ class UsersGroupsDetail(SecureAPIView):
         """
         DELETE /api/users/{user_id}/groups/{group_id}
         """
-        existing_user = User.objects.get(id=user_id)
+        try:
+            existing_user = User.objects.get(id=user_id)
+        except ObjectDoesNotExist:
+            return Response({}, status.HTTP_404_NOT_FOUND)
+
         existing_user.groups.remove(group_id)
         existing_user.save()
         return Response({}, status=status.HTTP_204_NO_CONTENT)
@@ -802,7 +809,10 @@ class UsersCoursesList(SecureAPIView):
         """
         response_data = {}
         user_id = user_id
-        course_id = request.data['course_id']
+        course_id = request.data.get('course_id')
+        if not course_id:
+            return Response({'message': _('course_id is missing')}, status.HTTP_400_BAD_REQUEST)
+
         try:
             user = User.objects.get(id=user_id)
             course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612,C0301
@@ -1446,7 +1456,8 @@ class UsersRolesList(SecureListAPIView):
         except ObjectDoesNotExist:
             raise Http404
 
-        if not len(request.data['roles']):
+        roles = request.data.get('roles', [])
+        if not roles:
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
         ignore_roles = request.data.get('ignore_roles', [])
         current_roles = self.get_queryset()
@@ -1455,14 +1466,18 @@ class UsersRolesList(SecureListAPIView):
                 course_descriptor, course_key, course_content = get_course(request, user, unicode(current_role.course_id))  # pylint: disable=W0612,C0301
                 if course_descriptor:
                     _manage_role(course_descriptor, user, current_role.role, 'revoke')
-        for role in request.data['roles']:
-            if role['role'] not in ignore_roles:
+        for role in roles:
+            role_value = role.get('role')
+            if not role_value:
+                return Response({}, status=status.HTTP_400_BAD_REQUEST)
+
+            if role_value not in ignore_roles:
                 try:
-                    course_id = role['course_id']
+                    course_id = role.get('course_id')
                     course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612,C0301
                     if not course_descriptor:
                         raise ValueError  # ValueError is also thrown by the following role setters
-                    _manage_role(course_descriptor, user, role['role'], 'allow')
+                    _manage_role(course_descriptor, user, role_value, 'allow')
                 except ValueError:
                     # Restore the current roleset to the User
                     for current_role in current_roles:
@@ -1518,8 +1533,10 @@ class UsersNotificationsDetail(SecureAPIView):
             }
         """
 
-        read = bool(request.data['read'])
+        read = request.data.get('read')
+        if not read:
+            return Response({'message': _('read field is missing')}, status.HTTP_400_BAD_REQUEST)
 
-        mark_notification_read(int(user_id), int(msg_id), read=read)
+        mark_notification_read(int(user_id), int(msg_id), read=bool(read))
 
         return Response({}, status=status.HTTP_201_CREATED)

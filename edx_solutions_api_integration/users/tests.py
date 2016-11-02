@@ -36,7 +36,7 @@ from edx_solutions_api_integration.test_utils import (
     APIClientMixin,
     SignalDisconnectTestMixin,
 )
-from student.tests.factories import UserFactory, CourseEnrollmentFactory
+from student.tests.factories import UserFactory, CourseEnrollmentFactory, GroupFactory
 from student.models import anonymous_id_for_user
 
 from openedx.core.djangoapps.user_api.models import UserPreference
@@ -2224,4 +2224,47 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
 
 
+    def test_users_groups_list_missing_group_id(self):
+        # Test with missing group_id in request data
+        test_uri = '{}/{}/groups/'.format(self.users_base_uri, self.user.id)
+        data = {'group_id': ''}
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_groups_detail_delete_invalid_user_id(self):
+        # Test with invalid user_id
+        test_group = GroupFactory.create()
+        test_uri = '{}/{}/groups/{}'.format(self.users_base_uri, '1234567', test_group.id)
+        response = self.do_delete(test_uri)
+        self.assertEqual(response.status_code, 404)
+
+    def test_users_courses_list_post_missing_course_id(self):
+        # Test with missing course_id in request data
+        test_uri = '{}/{}/courses/'.format(self.users_base_uri, self.user.id)
+        data = {'course_id': ''}
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_roles_list_put_missing_roles(self):
+        # Test with missing roles in request data
+        test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
+        response = self.do_put(test_uri, {})
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_roles_list_put_missing_role_value(self):
+        test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
+        data = {'roles': [{'course_id': unicode(self.course.id)}]}
+        response = self.do_put(test_uri, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_roles_list_put_missing_course_id(self):
+        test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
+        data = {'roles': [{'role': 'instructor'}]}
+        response = self.do_put(test_uri, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_notifications_detail_missing_read_value(self):
+        test_uri = '{}/{}/notifications/{}/'.format(self.users_base_uri, self.user.id, '1')
+        response = self.do_post(test_uri, {})
+        self.assertEqual(response.status_code, 400)
 
