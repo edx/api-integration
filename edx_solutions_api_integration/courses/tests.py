@@ -3015,6 +3015,29 @@ class CoursesTimeSeriesMetricsApiTests(SignalDisconnectTestMixin, SharedModuleSt
         response = self.do_get(course_metrics_uri)
         self.assertEqual(response.status_code, 400)
 
+    def test_courses_time_series_invalid_start_date(self):
+         # Test with an invalid format of start_date
+         test_uri = '{}/{}/time-series-metrics/?start_date={}&end_date={}'.format(
+             self.base_courses_uri,
+             self.course.id,
+             '21102016',
+             self.reference_date
+         )
+         response = self.do_get(test_uri)
+         self.assertEqual(response.status_code, 400)
+
+    def test_courses_time_series_invalid_end_date(self):
+        # Test with an invalid format of end_date
+        start_date = self.reference_date - relativedelta(days=10)
+        test_uri = '{}/{}/time-series-metrics/?start_date={}&end_date={}'.format(
+         self.base_courses_uri,
+         self.course.id,
+         start_date,
+         '21102016'
+        )
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 400)
+
 
 @override_settings(MODULESTORE=MODULESTORE_CONFIG)
 class CoursesGradingMetricsTests(
