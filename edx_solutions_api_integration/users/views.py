@@ -939,19 +939,21 @@ class UsersCoursesDetail(SecureAPIView):
         response_data['course_id'] = course_id
 
         positions = request.data.get('positions')
-        if positions:
-            course_key = get_course_key(course_id)
-            response_data['positions'] = []
-            for position in positions:
-                content_position = _save_content_position(
-                    request,
-                    user,
-                    course_key,
-                    position
-                )
-                if not content_position:
-                    return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
-                response_data['positions'].append(content_position)
+        if not positions:
+            return Response({}, status=status.HTTP_400_BAD_REQUEST)
+
+        course_key = get_course_key(course_id)
+        response_data['positions'] = []
+        for position in positions:
+            content_position = _save_content_position(
+                request,
+                user,
+                course_key,
+                position
+            )
+            if not content_position:
+                return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+            response_data['positions'].append(content_position)
         return Response(response_data, status=status.HTTP_200_OK)
 
     def get(self, request, user_id, course_id):
