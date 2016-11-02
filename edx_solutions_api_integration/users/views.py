@@ -1450,7 +1450,7 @@ class UsersRolesList(SecureListAPIView):
             raise Http404
 
         roles = request.data.get('roles', [])
-        if not len(roles):
+        if not roles:
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
         ignore_roles = request.data.get('ignore_roles', [])
         current_roles = self.get_queryset()
