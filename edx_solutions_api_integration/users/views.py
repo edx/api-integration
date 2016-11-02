@@ -101,8 +101,8 @@ def _save_content_position(request, user, course_key, position):
     Records the indicated position for the specified course
     Really no reason to generalize this out of user_courses_detail aside from pylint complaining
     """
-    parent_content_id = position['parent_content_id']
-    child_content_id = position['child_content_id']
+    parent_content_id = position.get('parent_content_id')
+    child_content_id = position.get('child_content_id')
     if unicode(course_key) == parent_content_id:
         parent_descriptor, parent_key, parent_content = get_course(request, user, parent_content_id, load_content=True)  # pylint: disable=W0612,C0301
     else:
@@ -945,19 +945,22 @@ class UsersCoursesDetail(SecureAPIView):
         response_data['user_id'] = user.id
         response_data['course_id'] = course_id
 
-        if request.data['positions']:
-            course_key = get_course_key(course_id)
-            response_data['positions'] = []
-            for position in request.data['positions']:
-                content_position = _save_content_position(
-                    request,
-                    user,
-                    course_key,
-                    position
-                )
-                if not content_position:
-                    return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
-                response_data['positions'].append(content_position)
+        positions = request.data.get('positions')
+        if not positions:
+            return Response({}, status=status.HTTP_400_BAD_REQUEST)
+
+        course_key = get_course_key(course_id)
+        response_data['positions'] = []
+        for position in positions:
+            content_position = _save_content_position(
+                request,
+                user,
+                course_key,
+                position
+            )
+            if not content_position:
+                return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+            response_data['positions'].append(content_position)
         return Response(response_data, status=status.HTTP_200_OK)
 
     def get(self, request, user_id, course_id):
