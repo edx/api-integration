@@ -1449,7 +1449,8 @@ class UsersRolesList(SecureListAPIView):
         except ObjectDoesNotExist:
             raise Http404
 
-        if not len(request.data['roles']):
+        roles = request.data.get('roles', [])
+        if not roles:
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
         ignore_roles = request.data.get('ignore_roles', [])
         current_roles = self.get_queryset()
@@ -1458,14 +1459,18 @@ class UsersRolesList(SecureListAPIView):
                 course_descriptor, course_key, course_content = get_course(request, user, unicode(current_role.course_id))  # pylint: disable=W0612,C0301
                 if course_descriptor:
                     _manage_role(course_descriptor, user, current_role.role, 'revoke')
-        for role in request.data['roles']:
-            if role['role'] not in ignore_roles:
+        for role in roles:
+            role_value = role.get('role')
+            if not role_value:
+                return Response({}, status=status.HTTP_400_BAD_REQUEST)
+
+            if role_value not in ignore_roles:
                 try:
-                    course_id = role['course_id']
+                    course_id = role.get('course_id')
                     course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612,C0301
                     if not course_descriptor:
                         raise ValueError  # ValueError is also thrown by the following role setters
-                    _manage_role(course_descriptor, user, role['role'], 'allow')
+                    _manage_role(course_descriptor, user, role_value, 'allow')
                 except ValueError:
                     # Restore the current roleset to the User
                     for current_role in current_roles:
