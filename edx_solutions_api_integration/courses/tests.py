@@ -34,7 +34,7 @@ from student.models import CourseEnrollment
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase, mixed_store_config
 from xmodule.modulestore import ModuleStoreEnum
-from edx_solutions_api_integration.courseware_access import get_course_key
+from edx_solutions_api_integration.courseware_access import get_course_key, get_course_descriptor
 from edx_solutions_api_integration.test_utils import (
     APIClientMixin,
     SignalDisconnectTestMixin,
@@ -76,6 +76,15 @@ def _fake_get_course_thread_stats(course_id):  # pylint: disable=W0613
         'num_threads': 5,
         'num_active_threads': 3
     }
+
+
+def _fake_get_course(request, user, course_id, depth=0, load_content=False):
+    course_descriptor = None
+    course_content = None
+    course_key = get_course_key(course_id)
+    if course_key:
+        course_descriptor = get_course_descriptor(course_key, depth)
+    return course_descriptor, course_key, course_content
 
 
 @mock.patch("edx_solutions_api_integration.courses.views.get_course_thread_stats", _fake_get_course_thread_stats)
@@ -2536,6 +2545,14 @@ class CoursesApiTests(
         test_uri = '{}/{}/users'.format(self.base_courses_uri, self.course.id)
         response = self.do_post(test_uri, {'email': self.users[0].email})
         self.assertEqual(response.status_code, 201)
+
+    @mock.patch("edx_solutions_api_integration.courses.views.get_course", _fake_get_course)
+    def test_courses_users_detail_get_undefined_course_content(self):
+        # Get course user details when course_content is None
+        test_uri = '{}/{}/users/{}'.format(self.base_courses_uri, self.course.id, self.users[0].id)
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['position'], None)
 
 
 @override_settings(MODULESTORE=MODULESTORE_CONFIG)
