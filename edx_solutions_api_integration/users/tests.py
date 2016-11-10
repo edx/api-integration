@@ -47,6 +47,8 @@ from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_st
 from django.contrib.auth.models import User
 from notification_prefs import NOTIFICATION_PREF_KEY
 
+import before_after
+
 MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 
 
@@ -2286,3 +2288,14 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         response = self.do_post(test_uri, data=position_data)
         self.assertEqual(response.status_code, 400)
+
+    def test_users_courses_grades_detail_race_condition(self):
+        CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
+
+        def get_users_courses_grades_detail(*a, **k):
+            test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, unicode(self.course.id))
+            response = self.do_get(test_uri)
+            self.assertEqual(response.status_code, 200)
+
+        with before_after.before('gradebook.utils.generate_user_gradebook', get_users_courses_grades_detail):
+            get_users_courses_grades_detail()
