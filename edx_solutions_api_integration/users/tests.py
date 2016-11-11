@@ -15,6 +15,7 @@ from edx_notifications.data import NotificationType, NotificationMessage
 from edx_notifications.lib.consumer import get_notifications_count_for_user
 from edx_notifications.lib.publisher import register_notification_type, publish_notification_to_user
 import mock
+import before_after
 
 from django.conf import settings
 from django.core.cache import cache
@@ -47,7 +48,6 @@ from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_st
 from django.contrib.auth.models import User
 from notification_prefs import NOTIFICATION_PREF_KEY
 
-import before_after
 
 MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 
