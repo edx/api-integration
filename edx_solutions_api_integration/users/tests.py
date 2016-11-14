@@ -2301,7 +2301,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         """
         CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
 
-        def get_users_courses_grades_detail(*a, **k):
+        def get_users_courses_grades_detail(*args):
             test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, unicode(self.course.id))
             response = self.do_get(test_uri)
             self.assertEqual(response.status_code, 200)
