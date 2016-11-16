@@ -15,6 +15,7 @@ from edx_notifications.data import NotificationType, NotificationMessage
 from edx_notifications.lib.consumer import get_notifications_count_for_user
 from edx_notifications.lib.publisher import register_notification_type, publish_notification_to_user
 import mock
+import before_after
 
 from django.conf import settings
 from django.core.cache import cache
@@ -46,6 +47,7 @@ from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_st
 
 from django.contrib.auth.models import User
 from notification_prefs import NOTIFICATION_PREF_KEY
+
 
 MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 
@@ -2286,3 +2288,23 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         response = self.do_post(test_uri, data=position_data)
         self.assertEqual(response.status_code, 400)
+
+    def test_users_courses_grades_detail_race_condition(self):
+        """
+        This unit test is written to create the race condition which caused IntegrityError in UsersCoursesGradesDetail
+        api when two threads try ko execute the generate_user_gradebook function at the same time. One thread
+        creates a new record in database and when other tries to create the record, error occurs.
+
+        Here we halt thread 1 execution at the point before it calls generate_user_gradebook method, the
+        thread 2 executes. Thread 2 will create new record and when thread 1 resume, it will find the new
+        record in the database which is handled with the get_or_create method in the api.
+        """
+        CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
+
+        def get_users_courses_grades_detail(*args):
+            test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, unicode(self.course.id))
+            response = self.do_get(test_uri)
+            self.assertEqual(response.status_code, 200)
+
+        with before_after.before('gradebook.utils.generate_user_gradebook', get_users_courses_grades_detail):
+            get_users_courses_grades_detail()
