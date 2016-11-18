@@ -20,9 +20,11 @@ from django.db.models import Q, F
 from rest_framework import status
 from rest_framework.response import Response
 
-from courseware.courses import get_course_about_section, get_course_info_section
+from courseware.courses import get_course_about_section, get_course_info_section, get_course_info_section_module
 from courseware.models import StudentModule
 from courseware.views.views import get_static_tab_contents
+from mobile_api.course_info.views import apply_wrappers_to_content
+from openedx.core.lib.xblock_utils import get_course_update_items
 from openedx.core.lib.courses import course_image_url
 from django_comment_common.models import FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
@@ -257,52 +259,6 @@ def _parse_overview_html(html):
                 section_data['body'] = _inner_content(section)
 
             result.append(section_data)
-
-    return result
-
-
-def _parse_updates_html(html):
-    """
-    Helper method to extract updates contained within the course info HTML into components
-    Updates content is stored in MongoDB (aka, the module store) with the following naming convention
-
-            {
-                "_id.org":"i4x",
-                "_id.course":<course_num>,
-                "_id.category":"course_info",
-                "_id.name":"updates"
-            }
-    """
-    result = {}
-
-    parser = etree.HTMLParser()  # pylint: disable=E1101
-    tree = etree.parse(StringIO(html), parser)  # pylint: disable=E1101
-
-    # get all of the individual postings
-    postings = tree.findall('/body/section/article')
-
-    # be backwards compatible
-    if not postings:
-        postings = tree.findall('/body/ol/li')
-
-    result = []
-    for posting in postings:
-        posting_data = {}
-        posting_date_element = posting.find('h2')
-        if posting_date_element is not None:
-            posting_data['date'] = posting_date_element.text
-
-        content = u''
-        for current_element in posting:
-            # note, we can't delete or skip over the date element in
-            # the HTML tree because there might be some tailing content
-            if current_element != posting_date_element:
-                content += etree.tostring(current_element)  # pylint: disable=E1101
-            else:
-                content += current_element.tail if current_element.tail else u''
-
-        posting_data['content'] = content.strip()
-        result.append(posting_data)
 
     return result
 
@@ -907,12 +863,22 @@ class CoursesUpdates(SecureAPIView):
         if not course_descriptor:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         response_data = OrderedDict()
-        content = get_course_info_section(request, request.user, course_descriptor, 'updates')
-        if not content:
-            return Response({}, status=status.HTTP_404_NOT_FOUND)
         if request.GET.get('parse') and request.GET.get('parse') in ['True', 'true']:
-            response_data['postings'] = _parse_updates_html(content)
+            course_updates_module = get_course_info_section_module(request, request.user, course_descriptor, 'updates')
+            update_items = get_course_update_items(course_updates_module)
+
+            updates_to_show = [
+                update for update in update_items
+                if update.get("status") != "deleted"
+            ]
+
+            for item in updates_to_show:
+                item['content'] = apply_wrappers_to_content(item['content'], course_updates_module, request)
+            response_data['postings'] = updates_to_show
         else:
+            content = get_course_info_section(request, request.user, course_descriptor, 'updates')
+            if not content:
+                return Response({}, status=status.HTTP_404_NOT_FOUND)
             response_data['content'] = content
         return Response(response_data)
 
