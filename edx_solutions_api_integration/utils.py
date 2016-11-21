@@ -225,3 +225,12 @@ def strip_xblock_wrapper_div(html):
         return match.group(2).strip(' ')
     else:
         return html
+
+
+def strip_whitespaces_and_newlines(string):
+    """
+    Removes whitespaces and newline characters from string
+    """
+    string = string.replace('\n', '')
+    return string.strip()
+

@@ -41,6 +41,7 @@ from edx_solutions_api_integration.test_utils import (
     CourseGradingMixin,
     make_non_atomic,
 )
+from edx_solutions_api_integration.utils import strip_whitespaces_and_newlines
 
 from .content import TEST_COURSE_OVERVIEW_CONTENT, TEST_COURSE_UPDATES_CONTENT, TEST_COURSE_UPDATES_CONTENT_LEGACY
 from .content import TEST_STATIC_TAB1_CONTENT, TEST_STATIC_TAB2_CONTENT
@@ -176,7 +177,7 @@ class CoursesApiTests(
         cls.updates = ItemFactory.create(
             category="course_info",
             parent_location=cls.course.location,
-            data=TEST_COURSE_UPDATES_CONTENT,
+            data=cls.add_course_updates(),
             display_name="updates"
         )
 
@@ -248,6 +249,31 @@ class CoursesApiTests(
         Role.objects.get_or_create(
             name=FORUM_ROLE_MODERATOR,
             course_id=cls.course.id)
+
+    @classmethod
+    def add_course_updates(cls):
+        updates = {
+            u'items': [
+                {u'date': u'April 15, 2014',
+                 u'content': u'<p>A perfectly</p><p>formatted piece</p><p>of HTML</p>',
+                 u'status': u'visible',
+                 u'id': 4},
+                {u'date': u'April 16, 2014',
+                 u'content': u'Some text before paragraph tag<p>This is inside paragraph tag</p>Some text after tag'
+                             u'<p>one more</p>',
+                 u'status': u'visible',
+                 u'id': 3},
+                {u'date': u'April 17, 2014',
+                 u'content': u'Some text before paragraph tag<p>This is inside paragraph tag</p>Some text after tag',
+                 u'status': u'visible',
+                 u'id': 2},
+                {u'date': u'April 18, 2014',
+                 u'content': u'This does not have a paragraph tag around it',
+                 u'status': u'visible',
+                 u'id': 1},
+            ],
+            u'data': u''}
+        return updates
 
     def _find_item_by_class(self, items, class_name):
         """Helper method to match a single matching item"""
@@ -796,7 +822,7 @@ class CoursesApiTests(
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.data), 0)
-        self.assertEqual(response.data['content'], self.updates.data)
+        self.assertEqual(response.data['content'], TEST_COURSE_UPDATES_CONTENT)
 
         # then try parsed
         test_uri = self.base_courses_uri + '/' + self.test_course_id + '/updates?parse=True'
@@ -858,19 +884,19 @@ class CoursesApiTests(
         postings = response.data['postings']
         self.assertEqual(len(postings), 4)
         self.assertEqual(postings[0]['date'], 'April 18, 2014')
-        self.assertEqual(postings[0]['content'], 'This is some legacy content')
+        self.assertEqual(strip_whitespaces_and_newlines(postings[0]['content']), 'This is some legacy content')
         self.assertEqual(postings[1]['date'], 'April 17, 2014')
         self.assertEqual(
-            postings[1]['content'],
+            strip_whitespaces_and_newlines(postings[1]['content']),
             'Some text before paragraph tag<p>This is inside paragraph tag</p>Some text after tag'
         )
         self.assertEqual(postings[2]['date'], 'April 16, 2014')
         self.assertEqual(
-            postings[2]['content'],
+            strip_whitespaces_and_newlines(postings[2]['content']),
             'Some text before paragraph tag<p>This is inside paragraph tag</p>Some text after tag<p>one more</p>'
         )
         self.assertEqual(postings[3]['date'], 'April 15, 2014')
-        self.assertEqual(postings[3]['content'], '<p>A perfectly</p><p>formatted piece</p><p>of HTML</p>')
+        self.assertEqual(strip_whitespaces_and_newlines(postings[3]['content']), '<p>A perfectly</p><p>formatted piece</p><p>of HTML</p>')
 
     def test_static_tab_list_get(self):
         test_uri = '{}/{}/static_tabs'.format(self.base_courses_uri, self.test_course_id)
