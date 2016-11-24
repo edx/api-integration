@@ -384,7 +384,7 @@ class UsersList(SecureListAPIView):
         # Be sure to always create a UserProfile record when adding users
         # Bad things happen with the UserSerializer if one does not exist
         profile = UserProfile(user=user)
-        profile.name = '{} {}'.format(first_name, last_name)
+        profile.name = u'{} {}'.format(first_name, last_name)
         profile.city = city
         profile.country = country
         profile.level_of_education = level_of_education
@@ -623,7 +623,7 @@ class UsersDetail(SecureAPIView):
         existing_user_profile = UserProfile.objects.get(user_id=user_id)
         if existing_user_profile:
             if first_name and last_name:
-                existing_user_profile.name = '{} {}'.format(first_name, last_name)
+                existing_user_profile.name = u'{} {}'.format(first_name, last_name)
             city = request.data.get('city')
             if city:
                 existing_user_profile.city = city
