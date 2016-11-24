@@ -630,7 +630,7 @@ class UsersDetail(SecureAPIView):
         existing_user_profile = UserProfile.objects.get(user_id=user_id)
         if existing_user_profile:
             if first_name and last_name:
-                existing_user_profile.name = '{} {}'.format(first_name, last_name)
+                existing_user_profile.name = u'{} {}'.format(first_name, last_name)
             city = request.data.get('city')
             if city:
                 existing_user_profile.city = city

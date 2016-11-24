@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # pylint: disable=E1101
 # pylint: disable=E1103
 
@@ -2308,3 +2309,21 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         with before_after.before('gradebook.utils.generate_user_gradebook', get_users_courses_grades_detail):
             get_users_courses_grades_detail()
+
+    def test_user_detail_post_unicode_data(self):
+        test_first_name = u'Miké'
+        test_last_name = u'Meÿers'
+
+        test_uri = '{}/{}'.format(self.users_base_uri, self.user.id)
+        data = {
+            'first_name': test_first_name,
+            'last_name': test_last_name
+        }
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 200)
+
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['first_name'], test_first_name)
+        self.assertEqual(response.data['last_name'], test_last_name)
+        self.assertEqual(response.data['full_name'], u'{} {}'.format(test_first_name, test_last_name))
