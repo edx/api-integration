@@ -1,8 +1,10 @@
 """ Django REST Framework Serializers """
 from openedx.core.lib.courses import course_image_url
 
-from edx_solutions_api_integration.utils import generate_base_uri
 from rest_framework import serializers
+from rest_framework.reverse import reverse
+
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 
 
 class GradeSerializer(serializers.Serializer):
@@ -44,14 +46,13 @@ class CourseCompletionsLeadersSerializer(serializers.Serializer):
 class CourseSerializer(serializers.Serializer):
     """ Serializer for Courses """
     id = serializers.CharField()  # pylint: disable=invalid-name
-    name = serializers.CharField()
-    category = serializers.CharField()
-    number = serializers.CharField()
-    org = serializers.CharField()
+    name = serializers.CharField(source='display_name')
+    category = serializers.SerializerMethodField()
+    number = serializers.CharField(source='display_number_with_default')
+    org = serializers.CharField(source='display_org_with_default')
     uri = serializers.SerializerMethodField()
     course_image_url = serializers.SerializerMethodField()
-    resources = serializers.SerializerMethodField()
-    due = serializers.DateTimeField()
+    due = serializers.SerializerMethodField('get_due_date')
     start = serializers.DateTimeField()
     end = serializers.DateTimeField()
 
@@ -59,20 +60,25 @@ class CourseSerializer(serializers.Serializer):
         """
         Builds course detail uri
         """
-        return course.get('uri', None) if isinstance(course, dict) else \
-            "{}/{}".format(generate_base_uri(self.context['request']), course.id)
+        return reverse('course-detail', args=[course.id], request=self.context.get('request'))
 
     def get_course_image_url(self, course):
         """
         Builds course image url
         """
-        return course.get('course_image_url', None) if isinstance(course, dict) else course_image_url(course)
+        return course.course_image_url if isinstance(course, CourseOverview) else course_image_url(course)
 
-    def get_resources(self, course):
+    def get_category(self, course):
         """
-        Builds course resource list
+        category: The type of content. In this case, the value is always "course".
         """
-        return course.get('resources', []) if isinstance(course, dict) else []
+        return 'course'
+
+    def get_due_date(self, course):
+        """
+        due:  The due date. For courses, the value is always null.
+        """
+        return None
 
 
 class OrganizationCourseSerializer(CourseSerializer):

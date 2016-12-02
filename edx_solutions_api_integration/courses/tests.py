@@ -371,7 +371,7 @@ class CoursesApiTests(
         }
 
     def test_courses_list_get(self):
-        test_uri = self.base_courses_uri
+        test_uri = self.base_courses_uri + '/'
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.data['results']), 0)
@@ -383,7 +383,7 @@ class CoursesApiTests(
                 self.assertEqual(course['name'], self.test_course_name)
                 self.assertEqual(course['number'], self.test_course_number)
                 self.assertEqual(course['org'], self.test_course_org)
-                confirm_uri = self.test_server_prefix + test_uri + '/' + course['id']
+                confirm_uri = self.test_server_prefix + test_uri + course['id']
                 self.assertEqual(course['uri'], confirm_uri)
                 matched_course = True
         self.assertTrue(matched_course)

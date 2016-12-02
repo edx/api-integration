@@ -26,6 +26,7 @@ from courseware.views.views import get_static_tab_contents
 from mobile_api.course_info.views import apply_wrappers_to_content
 from openedx.core.lib.xblock_utils import get_course_update_items
 from openedx.core.lib.courses import course_image_url
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from django_comment_common.models import FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
 from instructor.access import revoke_access, update_forum_role
@@ -564,19 +565,12 @@ class CoursesList(SecureListAPIView):
 
     def get_queryset(self):
         course_ids = self.request.query_params.get('course_id', None)
-        depth = self.request.query_params.get('depth', 0)
-        course_descriptors = []
         if course_ids:
             course_ids = course_ids.split(',')
-            for course_id in course_ids:
-                course_key = get_course_key(course_id)
-                course_descriptor = get_course_descriptor(course_key, 0)
-                course_descriptors.append(course_descriptor)
+            course_keys = [get_course_key(course_id) for course_id in course_ids]
+            results = CourseOverview.get_select_courses(course_keys)
         else:
-            course_descriptors = get_modulestore().get_courses()
-
-        results = [_get_course_data(self.request, descriptor.id, descriptor, depth)
-                   for descriptor in course_descriptors]
+            results = CourseOverview.get_all_courses()
         return results
 
 
