@@ -60,10 +60,7 @@ class CourseSerializer(serializers.Serializer):
         """
         Builds course detail uri
         """
-        request = self.context.get('request')
-        uri = reverse('course-detail', args=[course.id], request=request)
-
-        return uri
+        return reverse('course-detail', args=[course.id], request=self.context.get('request'))
 
     def get_course_image_url(self, course):
         """
