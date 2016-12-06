@@ -1,8 +1,10 @@
 """ Django REST Framework Serializers """
 from openedx.core.lib.courses import course_image_url
 
-from edx_solutions_api_integration.utils import generate_base_uri
 from rest_framework import serializers
+from rest_framework.reverse import reverse
+
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 
 
 class GradeSerializer(serializers.Serializer):
@@ -49,7 +51,7 @@ class CourseSerializer(serializers.Serializer):
     number = serializers.CharField(source='display_number_with_default')
     org = serializers.CharField(source='display_org_with_default')
     uri = serializers.SerializerMethodField()
-    course_image_url = serializers.CharField()
+    course_image_url = serializers.SerializerMethodField()
     due = serializers.SerializerMethodField('get_due_date')
     start = serializers.DateTimeField()
     end = serializers.DateTimeField()
@@ -58,16 +60,16 @@ class CourseSerializer(serializers.Serializer):
         """
         Builds course detail uri
         """
-        request = self.context['request']
-        protocol = 'http'
-        if request.is_secure():
-            protocol += 's'
+        request = self.context.get('request')
+        uri = reverse('course-detail', args=[course.id], request=request)
 
-        base_content_uri = '{}://{}/api/server/courses'.format(
-            protocol,
-            request.get_host()
-        )
-        return '{}/{}'.format(base_content_uri, unicode(course.id))
+        return uri
+
+    def get_course_image_url(self, course):
+        """
+        Builds course image url
+        """
+        return course.course_image_url if isinstance(course, CourseOverview) else course_image_url(course)
 
     def get_category(self, course):
         """

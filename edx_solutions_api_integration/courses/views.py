@@ -565,19 +565,10 @@ class CoursesList(SecureListAPIView):
 
     def get_queryset(self):
         course_ids = self.request.query_params.get('course_id', None)
-        results = []
         if course_ids:
             course_ids = course_ids.split(',')
-            for course_id in course_ids:
-                try:
-                    course_key = get_course_key(course_id)
-                    results.append(CourseOverview.get_from_id(course_key))
-                except Exception as ex:
-                    log.exception(
-                        'An error occurred while getting course information for %s: %s',
-                        unicode(course_key),
-                        ex.message,
-                    )
+            course_keys = [get_course_key(course_id) for course_id in course_ids]
+            results = CourseOverview.get_select_courses(course_keys)
         else:
             results = CourseOverview.get_all_courses()
         return results
