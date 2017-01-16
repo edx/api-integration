@@ -3,6 +3,7 @@
 import socket
 import struct
 import json
+import re
 import datetime
 
 from django.utils.timezone import now
@@ -91,7 +92,7 @@ def extract_data_params(request):
     extracts all query params which starts with data__
     """
     data_params = []
-    for key, val in request.QUERY_PARAMS.iteritems():
+    for key, val in request.query_params.iteritems():
         if key.startswith('data__'):
             data_params.append({key[6:]: val})
     return data_params
@@ -202,7 +203,7 @@ def get_ids_from_list_param(request, param_name):
     """
     Returns list of ids extracted from query param
     """
-    ids = request.QUERY_PARAMS.get(param_name, None)
+    ids = request.query_params.get(param_name, None)
     if ids:
         upper_bound = getattr(settings, 'API_LOOKUP_UPPER_BOUND', 100)
         try:
@@ -211,3 +212,25 @@ def get_ids_from_list_param(request, param_name):
             raise ParseError("Invalid {} parameter value".format(param_name))
 
     return ids
+
+
+def strip_xblock_wrapper_div(html):
+    """
+    Removes xblock wrapper div from given html
+    """
+    match = re.search(
+        r'^<div class=\"xblock xblock-student_view(.+?)</script>(?:\n?)(.+?)(?:\n?)</div>$', html, re.DOTALL
+    )
+    if match:
+        return match.group(2).strip(' ')
+    else:
+        return html
+
+
+def strip_whitespaces_and_newlines(string):
+    """
+    Removes whitespaces and newline characters from string
+    """
+    string = string.replace('\n', '')
+    return string.strip()
+

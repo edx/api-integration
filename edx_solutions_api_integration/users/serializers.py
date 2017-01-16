@@ -21,9 +21,9 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
         super(DynamicFieldsModelSerializer, self).__init__(*args, **kwargs)
 
         if 'request' in self.context:
-            fields = self.context['request'].QUERY_PARAMS.get('fields', None)
+            fields = self.context['request'].query_params.get('fields', None)
             if not fields and 'default_fields' in self.context:
-                additional_fields = self.context['request'].QUERY_PARAMS.get('additional_fields', "")
+                additional_fields = self.context['request'].query_params.get('additional_fields', "")
                 fields = ','.join([self.context['default_fields'], additional_fields])
             if fields:
                 fields = fields.split(',')
@@ -44,7 +44,7 @@ class UserSerializer(DynamicFieldsModelSerializer):
     title = serializers.CharField(source='profile.title')
     country = serializers.CharField(source='profile.country')
     full_name = serializers.CharField(source='profile.name')
-    courses_enrolled = serializers.SerializerMethodField('get_courses_enrolled')
+    courses_enrolled = serializers.SerializerMethodField()
     roles = serializers.SerializerMethodField('get_user_roles')
     grades = serializers.SerializerMethodField('get_user_grades')
 
@@ -53,7 +53,7 @@ class UserSerializer(DynamicFieldsModelSerializer):
         if hasattr(user, 'courses_enrolled'):
             return user.courses_enrolled
 
-        return user.courseenrollment_set.count
+        return user.courseenrollment_set.all().count()
 
     def get_user_roles(self, user):
         """ returns list of user roles """
@@ -73,8 +73,10 @@ class UserSerializer(DynamicFieldsModelSerializer):
                 gradebook = StudentGradebook.objects.get(user=user, course_id=course_id)
                 grade = gradebook.grade
                 proforma_grade = gradebook.proforma_grade
-                section_breakdown = json.loads(gradebook.grade_summary)["section_breakdown"]
-            except ObjectDoesNotExist:
+                grade_summary = json.loads(gradebook.grade_summary)
+                if "section_breakdown" in grade_summary:
+                    section_breakdown = grade_summary["section_breakdown"]
+            except (ObjectDoesNotExist, ValueError):
                 pass
 
         return {'grade': grade, 'proforma_grade': proforma_grade, 'section_breakdown': section_breakdown}
@@ -124,5 +126,5 @@ class UserCountByCitySerializer(serializers.Serializer):
 
 class UserRolesSerializer(serializers.Serializer):
     """ Serializer for user roles """
-    course_id = serializers.CharField(source='course_id')
-    role = serializers.CharField(source='role')
+    course_id = serializers.CharField()
+    role = serializers.CharField()

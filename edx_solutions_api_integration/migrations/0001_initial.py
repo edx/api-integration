@@ -1,82 +1,111 @@
 # -*- coding: utf-8 -*-
-# pylint: disable=invalid-name, missing-docstring, unused-argument, unused-import, line-too-long
-import datetime
-from south.db import db
-from south.v2 import SchemaMigration
-from django.db import models
+from __future__ import unicode_literals
+
+from django.db import migrations, models
+import django.utils.timezone
+import model_utils.fields
 
 
-class Migration(SchemaMigration):
+class Migration(migrations.Migration):
 
-    def forwards(self, orm):
-        # Adding model 'GroupRelationship'
-        db.create_table('edx_solutions_api_integration_grouprelationship', (
-            ('group', self.gf('django.db.models.fields.related.OneToOneField')(to=orm['auth.Group'], unique=True, primary_key=True)),  # pylint: disable=C0301
-            ('name', self.gf('django.db.models.fields.CharField')(max_length=255)),
-            ('parent_group', self.gf('django.db.models.fields.related.ForeignKey')(default=0, related_name='child_groups', null=True, blank=True, to=orm['edx_solutions_api_integration.GroupRelationship'])),  # pylint: disable=C0301
-            ('record_active', self.gf('django.db.models.fields.BooleanField')(default=True)),
-            ('record_date_created', self.gf('django.db.models.fields.DateTimeField')(default=datetime.datetime(2014, 3, 27, 0, 0))),  # pylint: disable=C0301
-            ('record_date_modified', self.gf('django.db.models.fields.DateTimeField')(auto_now=True, blank=True)),
-        ))
-        db.send_create_signal('edx_solutions_api_integration', ['GroupRelationship'])
+    dependencies = [
+        ('auth', '0006_require_contenttypes_0002'),
+    ]
 
-        # Adding model 'LinkedGroupRelationship'
-        db.create_table('edx_solutions_api_integration_linkedgrouprelationship', (
-            ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('from_group_relationship', self.gf('django.db.models.fields.related.ForeignKey')(related_name='from_group_relationships', to=orm['edx_solutions_api_integration.GroupRelationship'])),  # pylint: disable=C0301
-            ('to_group_relationship', self.gf('django.db.models.fields.related.ForeignKey')(related_name='to_group_relationships', to=orm['edx_solutions_api_integration.GroupRelationship'])),  # pylint: disable=C0301
-            ('record_active', self.gf('django.db.models.fields.BooleanField')(default=True)),
-            ('record_date_created', self.gf('django.db.models.fields.DateTimeField')(default=datetime.datetime(2014, 3, 27, 0, 0))),  # pylint: disable=C0301
-            ('record_date_modified', self.gf('django.db.models.fields.DateTimeField')(auto_now=True, blank=True)),
-        ))
-        db.send_create_signal('edx_solutions_api_integration', ['LinkedGroupRelationship'])
-
-    def backwards(self, orm):
-        # Deleting model 'GroupRelationship'
-        db.delete_table('edx_solutions_api_integration_grouprelationship')
-
-        # Deleting model 'LinkedGroupRelationship'
-        db.delete_table('edx_solutions_api_integration_linkedgrouprelationship')
-
-    models = {
-        'edx_solutions_api_integration.grouprelationship': {
-            'Meta': {'object_name': 'GroupRelationship'},
-            'group': ('django.db.models.fields.related.OneToOneField', [], {'to': "orm['auth.Group']", 'unique': 'True', 'primary_key': 'True'}),  # pylint: disable=C0301
-            'name': ('django.db.models.fields.CharField', [], {'max_length': '255'}),
-            'parent_group': ('django.db.models.fields.related.ForeignKey', [], {'default': '0', 'related_name': "'child_groups'", 'null': 'True', 'blank': 'True', 'to': "orm['edx_solutions_api_integration.GroupRelationship']"}),  # pylint: disable=C0301
-            'record_active': ('django.db.models.fields.BooleanField', [], {'default': 'True'}),
-            'record_date_created': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime(2014, 3, 27, 0, 0)'}),  # pylint: disable=C0301
-            'record_date_modified': ('django.db.models.fields.DateTimeField', [], {'auto_now': 'True', 'blank': 'True'})
-        },
-        'edx_solutions_api_integration.linkedgrouprelationship': {
-            'Meta': {'object_name': 'LinkedGroupRelationship'},
-            'from_group_relationship': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'from_group_relationships'", 'to': "orm['edx_solutions_api_integration.GroupRelationship']"}),  # pylint: disable=C0301
-            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'record_active': ('django.db.models.fields.BooleanField', [], {'default': 'True'}),
-            'record_date_created': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime(2014, 3, 27, 0, 0)'}),  # pylint: disable=C0301
-            'record_date_modified': ('django.db.models.fields.DateTimeField', [], {'auto_now': 'True', 'blank': 'True'}),  # pylint: disable=C0301
-            'to_group_relationship': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'to_group_relationships'", 'to': "orm['edx_solutions_api_integration.GroupRelationship']"})  # pylint: disable=C0301
-        },
-        'auth.group': {
-            'Meta': {'object_name': 'Group'},
-            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'name': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '80'}),
-            'permissions': ('django.db.models.fields.related.ManyToManyField', [], {'to': "orm['auth.Permission']", 'symmetrical': 'False', 'blank': 'True'})  # pylint: disable=C0301
-        },
-        'auth.permission': {
-            'Meta': {'ordering': "('content_type__app_label', 'content_type__model', 'codename')", 'unique_together': "(('content_type', 'codename'),)", 'object_name': 'Permission'},  # pylint: disable=C0301
-            'codename': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
-            'content_type': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['contenttypes.ContentType']"}),  # pylint: disable=C0301
-            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'name': ('django.db.models.fields.CharField', [], {'max_length': '50'})
-        },
-        'contenttypes.contenttype': {
-            'Meta': {'ordering': "('name',)", 'unique_together': "(('app_label', 'model'),)", 'object_name': 'ContentType', 'db_table': "'django_content_type'"},  # pylint: disable=C0301
-            'app_label': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
-            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'model': ('django.db.models.fields.CharField', [], {'max_length': '100'}),
-            'name': ('django.db.models.fields.CharField', [], {'max_length': '100'})
-        }
-    }
-
-    complete_apps = ['edx_solutions_api_integration']
+    operations = [
+        migrations.CreateModel(
+            name='CourseContentGroupRelationship',
+            fields=[
+                ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                ('created', model_utils.fields.AutoCreatedField(default=django.utils.timezone.now, verbose_name='created', editable=False)),
+                ('modified', model_utils.fields.AutoLastModifiedField(default=django.utils.timezone.now, verbose_name='modified', editable=False)),
+                ('course_id', models.CharField(max_length=255, db_index=True)),
+                ('content_id', models.CharField(max_length=255, db_index=True)),
+                ('record_active', models.BooleanField(default=True)),
+            ],
+        ),
+        migrations.CreateModel(
+            name='CourseGroupRelationship',
+            fields=[
+                ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                ('created', model_utils.fields.AutoCreatedField(default=django.utils.timezone.now, verbose_name='created', editable=False)),
+                ('modified', model_utils.fields.AutoLastModifiedField(default=django.utils.timezone.now, verbose_name='modified', editable=False)),
+                ('course_id', models.CharField(max_length=255, db_index=True)),
+                ('record_active', models.BooleanField(default=True)),
+            ],
+            options={
+                'abstract': False,
+            },
+        ),
+        migrations.CreateModel(
+            name='GroupProfile',
+            fields=[
+                ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                ('created', model_utils.fields.AutoCreatedField(default=django.utils.timezone.now, verbose_name='created', editable=False)),
+                ('modified', model_utils.fields.AutoLastModifiedField(default=django.utils.timezone.now, verbose_name='modified', editable=False)),
+                ('group_type', models.CharField(max_length=32, null=True, db_index=True)),
+                ('name', models.CharField(max_length=255, null=True, blank=True)),
+                ('data', models.TextField(blank=True)),
+                ('record_active', models.BooleanField(default=True)),
+            ],
+            options={
+                'db_table': 'auth_groupprofile',
+            },
+        ),
+        migrations.CreateModel(
+            name='GroupRelationship',
+            fields=[
+                ('created', model_utils.fields.AutoCreatedField(default=django.utils.timezone.now, verbose_name='created', editable=False)),
+                ('modified', model_utils.fields.AutoLastModifiedField(default=django.utils.timezone.now, verbose_name='modified', editable=False)),
+                ('group', models.OneToOneField(primary_key=True, serialize=False, to='auth.Group')),
+                ('name', models.CharField(max_length=255)),
+                ('record_active', models.BooleanField(default=True)),
+                ('parent_group', models.ForeignKey(related_name='child_groups', default=0, blank=True, to='edx_solutions_api_integration.GroupRelationship', null=True)),
+            ],
+            options={
+                'abstract': False,
+            },
+        ),
+        migrations.CreateModel(
+            name='LinkedGroupRelationship',
+            fields=[
+                ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                ('created', model_utils.fields.AutoCreatedField(default=django.utils.timezone.now, verbose_name='created', editable=False)),
+                ('modified', model_utils.fields.AutoLastModifiedField(default=django.utils.timezone.now, verbose_name='modified', editable=False)),
+                ('record_active', models.BooleanField(default=True)),
+                ('from_group_relationship', models.ForeignKey(related_name='from_group_relationships', verbose_name=b'From Group', to='edx_solutions_api_integration.GroupRelationship')),
+                ('to_group_relationship', models.ForeignKey(related_name='to_group_relationships', verbose_name=b'To Group', to='edx_solutions_api_integration.GroupRelationship')),
+            ],
+            options={
+                'abstract': False,
+            },
+        ),
+        migrations.CreateModel(
+            name='APIUser',
+            fields=[
+            ],
+            options={
+                'proxy': True,
+            },
+            bases=('auth.user',),
+        ),
+        migrations.AddField(
+            model_name='groupprofile',
+            name='group',
+            field=models.OneToOneField(to='auth.Group'),
+        ),
+        migrations.AddField(
+            model_name='coursegrouprelationship',
+            name='group',
+            field=models.ForeignKey(to='auth.Group'),
+        ),
+        migrations.AddField(
+            model_name='coursecontentgrouprelationship',
+            name='group_profile',
+            field=models.ForeignKey(to='edx_solutions_api_integration.GroupProfile'),
+        ),
+        migrations.AlterUniqueTogether(
+            name='coursecontentgrouprelationship',
+            unique_together=set([('course_id', 'content_id', 'group_profile')]),
+        ),
+    ]

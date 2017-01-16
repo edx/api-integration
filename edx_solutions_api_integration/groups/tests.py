@@ -1,19 +1,16 @@
 # pylint: disable=E1103
 
 """
-Run these tests @ Devstack:
-    rake fasttest_lms[common/djangoapps/edx_solutions_api_integration/tests/test_group_views.py]
+Tests for groups module
 """
 from dateutil.relativedelta import relativedelta
 from random import randint
 import uuid
-import json
 import mock
 from urllib import urlencode
 
 from django.conf import settings
 from django.core.cache import cache
-from django.test import Client
 from django.test.utils import override_settings
 from django.utils import timezone
 
@@ -21,31 +18,21 @@ from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_st
 from edx_solutions_api_integration.models import GroupRelationship, GroupProfile
 from edx_solutions_organizations.models import Organization
 from edx_solutions_projects.models import Project
+from edx_solutions_api_integration.test_utils import APIClientMixin
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
-MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {}, include_xml=False)
-TEST_API_KEY = str(uuid.uuid4())
-
-
-class SecureClient(Client):
-    """ Django test client using a "secure" connection. """
-    def __init__(self, *args, **kwargs):
-        kwargs = kwargs.copy()
-        kwargs.update({'SERVER_PORT': 443, 'wsgi.url_scheme': 'https'})
-        super(SecureClient, self).__init__(*args, **kwargs)
+MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 
 
 @override_settings(MODULESTORE=MODULESTORE_CONFIG)
-@override_settings(EDX_API_KEY=TEST_API_KEY)
 @mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': False,
                                                    'ADVANCED_SECURITY': False,
                                                    'PREVENT_CONCURRENT_LOGINS': False})
-class GroupsApiTests(ModuleStoreTestCase):
+class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
     """ Test suite for Groups API views """
 
     def setUp(self):
         super(GroupsApiTests, self).setUp()
-        self.test_server_prefix = 'https://testserver'
         self.test_username = str(uuid.uuid4())
         self.test_password = str(uuid.uuid4())
         self.test_email = str(uuid.uuid4()) + '@test.org'
@@ -80,44 +67,15 @@ class GroupsApiTests(ModuleStoreTestCase):
             course_id=unicode(self.course.id),
             content_id=unicode(self.course_content.scope_ids.usage_id)
         )
-
-        self.client = SecureClient()
         cache.clear()
-
-    def do_post(self, uri, data):
-        """Submit an HTTP POST request"""
-        headers = {
-            'Content-Type': 'application/json',
-            'X-Edx-Api-Key': str(TEST_API_KEY),
-        }
-        response = self.client.post(uri, headers=headers, data=json.dumps(data), content_type='application/json')
-        return response
-
-    def do_get(self, uri):
-        """Submit an HTTP GET request"""
-        headers = {
-            'Content-Type': 'application/json',
-            'X-Edx-Api-Key': str(TEST_API_KEY),
-        }
-        response = self.client.get(uri, headers=headers)
-        return response
-
-    def do_delete(self, uri):
-        """Submit an HTTP DELETE request"""
-        headers = {
-            'Content-Type': 'application/json',
-            'X-Edx-Api-Key': str(TEST_API_KEY),
-        }
-        response = self.client.delete(uri, headers=headers)
-        return response
 
     def test_group_list_post(self):
         data = {'name': self.test_group_name, 'type': 'test'}
         response = self.do_post(self.base_groups_uri, data)
         self.assertEqual(response.status_code, 201)
         self.assertGreater(response.data['id'], 0)
-        confirm_uri = self.test_server_prefix + self.base_groups_uri + '/' + str(response.data['id'])
-        self.assertEqual(response.data['uri'], confirm_uri)
+        confirm_uri = self.base_groups_uri + '/' + str(response.data['id'])
+        self.assertIn(confirm_uri, response.data['uri'])
         self.assertGreater(len(response.data['name']), 0)
 
     def test_group_list_get_with_profile(self):  # pylint: disable=R0915
@@ -156,8 +114,7 @@ class GroupsApiTests(ModuleStoreTestCase):
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['id'], group_id)
-        confirm_uri = self.test_server_prefix + test_uri
-        self.assertEqual(response.data['uri'], confirm_uri)
+        self.assertIn(test_uri, response.data['uri'])
         self.assertEqual(response.data['name'], self.test_group_name)
         self.assertEqual(response.data['type'], group_type)
         response_profile_data = response.data['data']
@@ -229,8 +186,7 @@ class GroupsApiTests(ModuleStoreTestCase):
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['id'], group_id)
-        confirm_uri = self.test_server_prefix + test_uri
-        self.assertEqual(response.data['uri'], confirm_uri)
+        self.assertIn(test_uri, response.data['uri'])
         self.assertEqual(response.data['name'], self.test_group_name)
 
     def test_group_detail_get_uses_base_group_name(self):
@@ -246,8 +202,7 @@ class GroupsApiTests(ModuleStoreTestCase):
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['id'], group_id)
-        confirm_uri = self.test_server_prefix + test_uri
-        self.assertEqual(response.data['uri'], confirm_uri)
+        self.assertIn(test_uri, response.data['uri'])
         self.assertEqual(response.data['name'], '{:04d}: {}'.format(group_id, self.test_group_name))
 
     def test_group_detail_get_with_missing_profile(self):
@@ -261,8 +216,7 @@ class GroupsApiTests(ModuleStoreTestCase):
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['id'], group_id)
-        confirm_uri = self.test_server_prefix + test_uri
-        self.assertEqual(response.data['uri'], confirm_uri)
+        self.assertIn(test_uri, response.data['uri'])
         self.assertEqual(response.data['name'], '{:04d}: {}'.format(group_id, self.test_group_name))
 
     def test_group_detail_get_undefined(self):
@@ -359,8 +313,8 @@ class GroupsApiTests(ModuleStoreTestCase):
         data = {'user_id': user_id}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
-        confirm_uri = self.test_server_prefix + test_uri + '/' + str(response.data['user_id'])
-        self.assertEqual(response.data['uri'], confirm_uri)
+        confirm_uri = test_uri + '/' + str(response.data['user_id'])
+        self.assertIn(confirm_uri, response.data['uri'])
         self.assertEqual(response.data['group_id'], str(group_id))
         self.assertEqual(response.data['user_id'], str(user_id))
 
@@ -495,8 +449,7 @@ class GroupsApiTests(ModuleStoreTestCase):
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.data['uri']), 0)
-        confirm_uri = self.test_server_prefix + test_uri
-        self.assertEqual(response.data['uri'], confirm_uri)
+        self.assertIn(test_uri, response.data['uri'])
         self.assertEqual(response.data['group_id'], group_id)
         self.assertEqual(response.data['user_id'], user_id)
 
@@ -756,8 +709,7 @@ class GroupsApiTests(ModuleStoreTestCase):
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.data['uri']), 0)
-        confirm_uri = test_uri
-        self.assertEqual(response.data['uri'], confirm_uri)
+        self.assertEqual(response.data['uri'], test_uri)
         self.assertEqual(response.data['from_group_id'], str(alpha_group_id))
         self.assertEqual(response.data['to_group_id'], str(delta_group_id))
         self.assertEqual(response.data['relationship_type'], relationship_type)
@@ -786,8 +738,7 @@ class GroupsApiTests(ModuleStoreTestCase):
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.data['uri']), 0)
-        confirm_uri = test_uri
-        self.assertEqual(response.data['uri'], confirm_uri)
+        self.assertEqual(response.data['uri'], test_uri)
         self.assertEqual(response.data['from_group_id'], str(alpha_group_id))
         self.assertEqual(response.data['to_group_id'], str(delta_group_id))
         self.assertEqual(response.data['relationship_type'], relationship_type)
@@ -944,13 +895,12 @@ class GroupsApiTests(ModuleStoreTestCase):
         test_uri = '{}/{}/courses/{}'.format(self.base_groups_uri, group_id, self.test_course_id)
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
-        confirm_uri = '{}{}/{}/courses/{}'.format(
-            self.test_server_prefix,
+        confirm_uri = '{}/{}/courses/{}'.format(
             self.base_groups_uri,
             group_id,
             self.test_course_id
         )
-        self.assertEqual(response.data['uri'], confirm_uri)
+        self.assertIn(confirm_uri, response.data['uri'])
         self.assertEqual(response.data['group_id'], group_id)
         self.assertEqual(response.data['course_id'], self.test_course_id)
 

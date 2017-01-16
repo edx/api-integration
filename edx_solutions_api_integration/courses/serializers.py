@@ -1,4 +1,5 @@
 """ Django REST Framework Serializers """
+from openedx.core.lib.courses import course_image_url
 
 from edx_solutions_api_integration.utils import generate_base_uri
 from rest_framework import serializers
@@ -6,7 +7,7 @@ from rest_framework import serializers
 
 class GradeSerializer(serializers.Serializer):
     """ Serializer for model interactions """
-    grade = serializers.Field()
+    grade = serializers.FloatField()
 
 
 class CourseLeadersSerializer(serializers.Serializer):
@@ -16,7 +17,7 @@ class CourseLeadersSerializer(serializers.Serializer):
     title = serializers.CharField(source='user__profile__title')
     avatar_url = serializers.CharField(source='user__profile__avatar_url')
     # Percentage grade (versus letter grade)
-    grade = serializers.FloatField(source='grade')
+    grade = serializers.FloatField()
     recorded = serializers.DateTimeField(source='modified')
 
 
@@ -42,14 +43,14 @@ class CourseCompletionsLeadersSerializer(serializers.Serializer):
 
 class CourseSerializer(serializers.Serializer):
     """ Serializer for Courses """
-    id = serializers.CharField(source='id')  # pylint: disable=invalid-name
-    name = serializers.CharField(source='name')
-    category = serializers.CharField(source='category')
-    number = serializers.CharField(source='number')
-    org = serializers.CharField(source='org')
-    uri = serializers.CharField(source='uri')
-    course_image_url = serializers.CharField(source='course_image_url')
-    resources = serializers.CharField(source='resources')
+    id = serializers.CharField()  # pylint: disable=invalid-name
+    name = serializers.CharField()
+    category = serializers.CharField()
+    number = serializers.CharField()
+    org = serializers.CharField()
+    uri = serializers.SerializerMethodField()
+    course_image_url = serializers.SerializerMethodField()
+    resources = serializers.SerializerMethodField()
     due = serializers.DateTimeField()
     start = serializers.DateTimeField()
     end = serializers.DateTimeField()
@@ -58,13 +59,26 @@ class CourseSerializer(serializers.Serializer):
         """
         Builds course detail uri
         """
-        return "{}/{}".format(generate_base_uri(self.context['request']), course.id)
+        return course.get('uri', None) if isinstance(course, dict) else \
+            "{}/{}".format(generate_base_uri(self.context['request']), course.id)
+
+    def get_course_image_url(self, course):
+        """
+        Builds course image url
+        """
+        return course.get('course_image_url', None) if isinstance(course, dict) else course_image_url(course)
+
+    def get_resources(self, course):
+        """
+        Builds course resource list
+        """
+        return course.get('resources', []) if isinstance(course, dict) else []
 
 
 class OrganizationCourseSerializer(CourseSerializer):
     """ Serializer for Organization Courses """
     name = serializers.CharField(source='display_name')
-    enrolled_users = serializers.CharField()
+    enrolled_users = serializers.ListField(child=serializers.IntegerField())
 
     class Meta(object):
         """ Serializer/field specification """

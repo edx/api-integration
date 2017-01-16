@@ -142,7 +142,7 @@ class APIUserQuerySet(models.query.QuerySet):
 
 class APIUserManager(models.Manager):
     """ Custom Manager """
-    def get_query_set(self):
+    def get_queryset(self):
         return APIUserQuerySet(self.model)
 
 

@@ -121,7 +121,7 @@ class SessionApiSecurityTest(TestCase):
         """
         response, mock_audit_log = self._do_request(self.user_url, 'test', 'test_password', email='test@edx.org',
                                                     first_name='John', last_name='Doe', secure=True)
-        message = _('Password: Invalid Length (must be 12 characters or less)')
+        message = _('Password: Invalid Length (must be 12 characters or fewer)')
         self._assert_response(response, status=400, message=message)
 
     @override_settings(PASSWORD_COMPLEXITY={'UPPER': 2, 'LOWER': 2, 'PUNCTUATION': 2, 'DIGITS': 2})
