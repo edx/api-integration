@@ -20,6 +20,7 @@ from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.test.utils import override_settings
+from rest_framework import status
 
 from capa.tests.response_xml_factory import StringResponseXMLFactory
 from courseware import module_render
@@ -1133,6 +1134,16 @@ class CoursesApiTests(
         post_data['user_id'] = created_user_id
         response = self.do_post(test_uri, post_data)
         self.assertEqual(response.status_code, 201)
+
+        # now unenroll this user and enroll by email
+        user_detail_uri = '{}/{}'.format(test_uri, created_user_id)
+        response = self.do_delete(user_detail_uri)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        response = self.do_post(test_uri, {'email': local_email})
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        response = self.do_get(test_uri)
+        self.assertContains(response, local_email)
 
     def test_courses_users_list_post_invalid_course(self):
         test_uri = self.base_courses_uri + '/' + self.test_bogus_course_id + '/users'

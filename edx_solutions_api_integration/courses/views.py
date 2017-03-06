@@ -1038,8 +1038,6 @@ class CoursesUsersList(SecureListAPIView):
                 existing_user = User.objects.get(id=user_id)
             except ObjectDoesNotExist:
                 return Response({}, status=status.HTTP_404_NOT_FOUND)
-            CourseEnrollment.enroll(existing_user, course_key)
-            return Response({}, status=status.HTTP_201_CREATED)
         elif 'email' in request.data:
             try:
                 email = request.data['email']
@@ -1058,6 +1056,10 @@ class CoursesUsersList(SecureListAPIView):
                     return Response({}, status.HTTP_400_BAD_REQUEST)
         else:
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
+
+        # enroll user in the course
+        CourseEnrollment.enroll(existing_user, course_key)
+        return Response({}, status=status.HTTP_201_CREATED)
 
     def get(self, request, course_id):  # pylint: disable=W0221
         """
