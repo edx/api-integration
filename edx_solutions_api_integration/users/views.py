@@ -17,14 +17,14 @@ from rest_framework import status
 from rest_framework import filters
 from rest_framework.response import Response
 
-from courseware import grades, module_render
+from courseware import module_render
 from course_blocks.api import get_course_blocks
 from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
 from gradebook.utils import generate_user_gradebook
 from instructor.access import revoke_access, update_forum_role
-from lang_pref import LANGUAGE_KEY
+from openedx.core.djangoapps.lang_pref import LANGUAGE_KEY
 from lms.lib.comment_client.utils import CommentClientRequestError
 from lms.lib.comment_client.user import get_user_social_stats
 from notification_prefs.views import enable_notifications
@@ -1091,7 +1091,7 @@ class UsersCoursesGradesDetail(SecureAPIView):
             progress_summary = json.loads(gradebook_entry.progress_summary)
             grade_summary = json.loads(gradebook_entry.grade_summary)
             grading_policy = json.loads(gradebook_entry.grading_policy)
-        except ValueError:
+        except (ValueError, TypeError):
             # add to audit log
             AUDIT_LOG.info(
                 u"API:: unable to parse gradebook entry for user-id - %s and course-id - '%s'",
