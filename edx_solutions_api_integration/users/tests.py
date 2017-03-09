@@ -26,7 +26,7 @@ from django.utils.translation import ugettext as _
 
 from courseware import module_render
 from courseware.model_data import FieldDataCache
-from django_comment_common.models import Role, FORUM_ROLE_MODERATOR
+from django_comment_common.models import Role, FORUM_ROLE_MODERATOR, ForumsConfig
 from instructor.access import allow_access
 from edx_solutions_organizations.models import Organization
 from edx_solutions_projects.models import Project, Workgroup
