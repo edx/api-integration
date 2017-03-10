@@ -1091,7 +1091,7 @@ class UsersCoursesGradesDetail(SecureAPIView):
             progress_summary = json.loads(gradebook_entry.progress_summary)
             grade_summary = json.loads(gradebook_entry.grade_summary)
             grading_policy = json.loads(gradebook_entry.grading_policy)
-        except ValueError:
+        except (ValueError, TypeError):
             # add to audit log
             AUDIT_LOG.info(
                 u"API:: unable to parse gradebook entry for user-id - %s and course-id - '%s'",
