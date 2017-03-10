@@ -78,7 +78,7 @@ def _fake_get_user_social_stats_with_end(user_id, course_id, end_date=None):  # 
 @override_settings(MODULESTORE=MODULESTORE_CONFIG)
 @override_settings(PASSWORD_MIN_LENGTH=4)
 @mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': True})
-class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolationTestCase, APIClientMixin, CourseGradingMixin):
+class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolationTestCase, APIClientMixin):
     """ Test suite for Users API views """
 
     def get_module_for_user(self, user, course, problem):
@@ -1593,99 +1593,6 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_delete(test_uri)
         self.assertEqual(response.status_code, 404)
 
-    def test_user_courses_grades_list_get(self):  # pylint: disable=R0915
-        grading_course = self.setup_course_with_grading()
-        CourseEnrollmentFactory.create(user=self.user, course_id=grading_course.id)
-        module = self.get_module_for_user(self.user, grading_course, grading_course.midterm_assignment)
-        grade_dict = {'value': 1, 'max_value': 1, 'user_id': self.user.id}
-        module.system.publish(module, 'grade', grade_dict)
-
-        test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, unicode(grading_course.id))
-        response = self.do_get(test_uri)
-        self.assertEqual(response.status_code, 200)
-
-        courseware_summary = response.data['courseware_summary']
-        self.assertEqual(len(courseware_summary), 2)
-        self.assertEqual(courseware_summary[0]['course'], grading_course.display_name)
-        self.assertEqual(courseware_summary[0]['display_name'], 'Chapter 1')
-
-        sections = courseware_summary[0]['sections']
-        self.assertEqual(len(sections), 1)
-        self.assertEqual(sections[0]['display_name'], 'Sequence 1')
-        self.assertEqual(sections[0]['graded'], False)
-
-        sections = courseware_summary[1]['sections']
-        self.assertEqual(len(sections), 2)
-        self.assertEqual(sections[0]['display_name'], 'Sequence 2')
-        self.assertEqual(sections[0]['graded'], True)
-
-        grade_summary = response.data['grade_summary']
-        self.assertGreater(len(grade_summary['section_breakdown']), 0)
-        grading_policy = response.data['grading_policy']
-        self.assertGreater(len(grading_policy['GRADER']), 0)
-        self.assertIsNotNone(grading_policy['GRADE_CUTOFFS'])
-        self.assertAlmostEqual(response.data['current_grade'], 0.5, 1)
-        self.assertAlmostEqual(response.data['proforma_grade'], 1, 1)
-
-        test_uri = '{}/{}/courses/grades'.format(self.users_base_uri, self.user.id)
-
-        response = self.do_get(test_uri)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data[0]['course_id'], unicode(grading_course.id))
-        self.assertAlmostEqual(response.data[0]['current_grade'], 0.5, 1)
-        self.assertAlmostEqual(response.data[0]['proforma_grade'], 1, 1)
-        self.assertEqual(response.data[0]['complete_status'], False)
-
-    def test_user_courses_grades_list_get_after_enrollment(self):  # pylint: disable=R0915
-        grading_course = self.setup_course_with_grading()
-
-        # getting grades without user being enrolled in the course should raise 404
-        test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, unicode(grading_course.id))
-        response = self.do_get(test_uri)
-        self.assertEqual(response.status_code, 404)
-
-        # enroll user in the course
-        test_uri = '{}/{}/courses'.format(self.users_base_uri, self.user.id)
-        response = self.do_post(test_uri, {'course_id': unicode(grading_course.id)})
-        self.assertEqual(response.status_code, 201)
-
-        # now we should be able to fetch grades of user
-        test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, unicode(grading_course.id))
-        response = self.do_get(test_uri)
-        self.assertEqual(response.status_code, 200)
-
-        courseware_summary = response.data['courseware_summary']
-        self.assertEqual(len(courseware_summary), 2)
-        self.assertEqual(courseware_summary[0]['course'], grading_course.display_name)
-        self.assertEqual(courseware_summary[0]['display_name'], 'Chapter 1')
-
-        sections = courseware_summary[0]['sections']
-        self.assertEqual(len(sections), 1)
-        self.assertEqual(sections[0]['display_name'], 'Sequence 1')
-        self.assertEqual(sections[0]['graded'], False)
-
-        sections = courseware_summary[1]['sections']
-        self.assertEqual(len(sections), 2)
-        self.assertEqual(sections[0]['display_name'], 'Sequence 2')
-        self.assertEqual(sections[0]['graded'], True)
-
-        grade_summary = response.data['grade_summary']
-        self.assertGreater(len(grade_summary['section_breakdown']), 0)
-        grading_policy = response.data['grading_policy']
-        self.assertGreater(len(grading_policy['GRADER']), 0)
-        self.assertIsNotNone(grading_policy['GRADE_CUTOFFS'])
-        self.assertAlmostEqual(response.data['current_grade'], 0, 0)
-        self.assertAlmostEqual(response.data['proforma_grade'], 0, 0)
-
-        test_uri = '{}/{}/courses/grades'.format(self.users_base_uri, self.user.id)
-
-        response = self.do_get(test_uri)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data[0]['course_id'], unicode(grading_course.id))
-        self.assertAlmostEqual(response.data[0]['current_grade'], 0, 0)
-        self.assertAlmostEqual(response.data[0]['proforma_grade'], 0, 0)
-        self.assertEqual(response.data[0]['complete_status'], False)
-
     def is_user_profile_created_updated(self, response, data):
         """This function compare response with user profile data """
 
@@ -2193,3 +2100,103 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         # then verify unread count, which should be 0
         self.assertEqual(get_notifications_count_for_user(user_id, filters={'read': False}), 0)
+
+
+@override_settings(MODULESTORE=MODULESTORE_CONFIG)
+class UsersGradesApiTests(ModuleStoreTestCase, CacheIsolationTestCase, APIClientMixin, CourseGradingMixin):
+
+    def setUp(self):
+        super(UsersGradesApiTests, self).setUp()
+        self.user = UserFactory()
+        self.users_base_uri = '/api/server/users'
+
+    def test_user_courses_grades_list_get(self):  # pylint: disable=R0915
+        grading_course = self.setup_course_with_grading()
+        CourseEnrollmentFactory.create(user=self.user, course_id=grading_course.id)
+        module = self.get_module_for_user(self.user, grading_course, grading_course.midterm_assignment)
+        grade_dict = {'value': 1, 'max_value': 1, 'user_id': self.user.id}
+        module.system.publish(module, 'grade', grade_dict)
+
+        test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, unicode(grading_course.id))
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+
+        courseware_summary = response.data['courseware_summary']
+        self.assertEqual(len(courseware_summary), 2)
+        self.assertEqual(courseware_summary[0]['display_name'], 'Chapter 1')
+
+        sections = courseware_summary[0]['sections']
+        self.assertEqual(len(sections), 1)
+        self.assertEqual(sections[0]['display_name'], 'Sequence 1')
+        self.assertEqual(sections[0]['graded'], False)
+
+        sections = courseware_summary[1]['sections']
+        self.assertEqual(len(sections), 2)
+        self.assertEqual(sections[0]['display_name'], 'Sequence 2')
+        self.assertEqual(sections[0]['graded'], True)
+
+        grade_summary = response.data['grade_summary']
+        self.assertGreater(len(grade_summary['section_breakdown']), 0)
+        grading_policy = response.data['grading_policy']
+        self.assertGreater(len(grading_policy['GRADER']), 0)
+        self.assertIsNotNone(grading_policy['GRADE_CUTOFFS'])
+        self.assertAlmostEqual(response.data['current_grade'], 0.5, 1)
+        self.assertAlmostEqual(response.data['proforma_grade'], 1, 1)
+
+        test_uri = '{}/{}/courses/grades'.format(self.users_base_uri, self.user.id)
+
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]['course_id'], unicode(grading_course.id))
+        self.assertEqual(response.data[0]['current_grade'], 0.5, 1)
+        self.assertEqual(response.data[0]['proforma_grade'], 1, 1)
+        self.assertEqual(response.data[0]['complete_status'], False)
+
+    def test_user_courses_grades_list_get_after_enrollment(self):  # pylint: disable=R0915
+        grading_course = self.setup_course_with_grading()
+
+        # getting grades without user being enrolled in the course should raise 404
+        test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, unicode(grading_course.id))
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 404)
+
+        # enroll user in the course
+        test_uri = '{}/{}/courses'.format(self.users_base_uri, self.user.id)
+        response = self.do_post(test_uri, {'course_id': unicode(grading_course.id)})
+        self.assertEqual(response.status_code, 201)
+
+        # now we should be able to fetch grades of user
+        test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, unicode(grading_course.id))
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+
+        courseware_summary = response.data['courseware_summary']
+        self.assertEqual(len(courseware_summary), 2)
+        self.assertEqual(courseware_summary[0]['display_name'], 'Chapter 1')
+
+        sections = courseware_summary[0]['sections']
+        self.assertEqual(len(sections), 1)
+        self.assertEqual(sections[0]['display_name'], 'Sequence 1')
+        self.assertEqual(sections[0]['graded'], False)
+
+        sections = courseware_summary[1]['sections']
+        self.assertEqual(len(sections), 2)
+        self.assertEqual(sections[0]['display_name'], 'Sequence 2')
+        self.assertEqual(sections[0]['graded'], True)
+
+        grade_summary = response.data['grade_summary']
+        self.assertGreater(len(grade_summary['section_breakdown']), 0)
+        grading_policy = response.data['grading_policy']
+        self.assertGreater(len(grading_policy['GRADER']), 0)
+        self.assertIsNotNone(grading_policy['GRADE_CUTOFFS'])
+        self.assertAlmostEqual(response.data['current_grade'], 0, 0)
+        self.assertAlmostEqual(response.data['proforma_grade'], 0, 0)
+
+        test_uri = '{}/{}/courses/grades'.format(self.users_base_uri, self.user.id)
+
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]['course_id'], unicode(grading_course.id))
+        self.assertEqual(response.data[0]['current_grade'], 0, 0)
+        self.assertEqual(response.data[0]['proforma_grade'], 0, 0)
+        self.assertEqual(response.data[0]['complete_status'], False)
