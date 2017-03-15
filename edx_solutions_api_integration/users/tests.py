@@ -2103,7 +2103,13 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
 
 @override_settings(MODULESTORE=MODULESTORE_CONFIG)
-class UsersGradesApiTests(ModuleStoreTestCase, CacheIsolationTestCase, APIClientMixin, CourseGradingMixin):
+class UsersGradesApiTests(
+    SignalDisconnectTestMixin,
+    ModuleStoreTestCase,
+    CacheIsolationTestCase,
+    APIClientMixin,
+    CourseGradingMixin,
+):
 
     def setUp(self):
         super(UsersGradesApiTests, self).setUp()
