@@ -1879,37 +1879,26 @@ class CoursesMetricsSocial(SecureListAPIView):
         try:
             slash_course_id = get_course_key(course_id, slashseparated=True)
             organization = request.query_params.get('organization', None)
-            # the forum service expects the legacy slash separated string format
 
             # load the course so that we can see when the course end date is
             course_descriptor, course_key, course_content = get_course(self.request, self.request.user, course_id)  # pylint: disable=W0612,C0301
             if not course_descriptor:
                 raise Http404
 
-            # get the course social stats, passing along a course end date to remove any activity after the course
-            # closure from the stats
-            data = get_course_social_stats(slash_course_id, end_date=course_descriptor.end)
-
-            course_key = get_course_key(course_id)
-
             # remove any excluded users from the aggregate
             exclude_users = get_aggregate_exclusion_user_ids(course_key)
 
-            for user_id in exclude_users:
-                if str(user_id) in data:
-                    del data[str(user_id)]
             enrollment_qs = CourseEnrollment.objects.users_enrolled_in(course_key).filter(is_active=True)\
                 .exclude(id__in=exclude_users)
-            actual_data = {}
             if organization:
                 enrollment_qs = enrollment_qs.filter(organizations=organization)
 
             actual_users = enrollment_qs.values_list('id', flat=True)
-            for user_id in actual_users:
-                if str(user_id) in data:
-                    actual_data.update({str(user_id): data[str(user_id)]})
 
-            data = actual_data
+            # get the course social stats, passing along a course end date to remove any activity after the course
+            # closure from the stats
+            data = get_course_social_stats(slash_course_id, end_date=course_descriptor.end, user_ids=actual_users)
+
             total_enrollments = enrollment_qs.count()
             data = {'total_enrollments': total_enrollments, 'users': data}
             http_status = status.HTTP_200_OK
