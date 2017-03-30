@@ -1895,9 +1895,11 @@ class CoursesMetricsSocial(SecureListAPIView):
 
             actual_users = enrollment_qs.values_list('id', flat=True)
 
-            # get the course social stats, passing along a course end date to remove any activity after the course
-            # closure from the stats
-            data = get_course_social_stats(slash_course_id, end_date=course_descriptor.end, user_ids=actual_users)
+            data = {}
+            if actual_users:
+                # get the course social stats, passing along a course end date to remove any activity after the course
+                # closure from the stats
+                data = get_course_social_stats(slash_course_id, end_date=course_descriptor.end, user_ids=actual_users)
 
             total_enrollments = enrollment_qs.count()
             data = {'total_enrollments': total_enrollments, 'users': data}

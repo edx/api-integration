@@ -52,7 +52,7 @@ MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 USER_COUNT = 6
 
 
-def _fake_get_course_social_stats(course_id, end_date=None):
+def _fake_get_course_social_stats(course_id, end_date=None, user_ids=None):
     """ Fake get_course_social_stats method """
     if end_date:
         raise Exception("Expected None for end_date parameter")
@@ -62,14 +62,15 @@ def _fake_get_course_social_stats(course_id, end_date=None):
     return {str(user.id): {user.first_name: user.last_name} for user in users}
 
 
-def _fake_get_course_social_stats_date_expected(course_id, end_date=None):  # pylint: disable=C0103,W0613
+def _fake_get_course_social_stats_date_expected(course_id, end_date=None, user_ids=None):  # pylint: disable=C0103,W0613
     """ Fake get_course_social_stats_date_expected method """
     if not end_date:
         raise Exception("Expected non-None end_date parameter")
-    return {
-        '2': {'two': 'two-two'},
-        '3': {'three': 'three-three-three'}
-    }
+
+    data = {}
+    for user_id in user_ids:
+        data[str(user_id)] = {'test-data': 'test'}
+    return data
 
 
 def _fake_get_course_thread_stats(course_id):  # pylint: disable=W0613
