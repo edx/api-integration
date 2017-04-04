@@ -1898,8 +1898,7 @@ class CoursesMetricsSocial(SecureListAPIView):
             for user_id in exclude_users:
                 if str(user_id) in data:
                     del data[str(user_id)]
-            enrollment_qs = CourseEnrollment.objects.users_enrolled_in(course_key).filter(is_active=True)\
-                .exclude(id__in=exclude_users)
+            enrollment_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users)
             actual_data = {}
             if organization:
                 enrollment_qs = enrollment_qs.filter(organizations=organization)
@@ -1910,8 +1909,7 @@ class CoursesMetricsSocial(SecureListAPIView):
                     actual_data.update({str(user_id): data[str(user_id)]})
 
             data = actual_data
-            total_enrollments = enrollment_qs.count()
-            data = {'total_enrollments': total_enrollments, 'users': data}
+            data = {'total_enrollments': len(actual_users), 'users': data}
             http_status = status.HTTP_200_OK
         except CommentClientRequestError, e:  # pylint: disable=C0103
             data = {
@@ -1948,8 +1946,7 @@ class CoursesMetricsCities(SecureListAPIView):
             q_list = reduce(lambda a, b: a | b, q_list)
             queryset = queryset.filter(q_list)
 
-        queryset = queryset.values('profile__city').annotate(count=Count('profile__city'))\
-            .filter(count__gt=0).order_by('-count')
+        queryset = queryset.values('profile__city').annotate(count=Count('profile__city')).order_by('-count')
         return queryset
 
 
