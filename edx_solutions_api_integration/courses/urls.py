@@ -49,6 +49,8 @@ urlpatterns = patterns(
         courses_views.CoursesMetricsGradesLeadersList.as_view(), name='course-metrics-grades-leaders'),
     url(r'^{0}/metrics/social/$'.format(COURSE_ID_PATTERN),
         courses_views.CoursesMetricsSocial.as_view(), name='courses-social-metrics'),
+    url(r'^{0}/metrics/social/leaders/*$'.format(COURSE_ID_PATTERN),
+        courses_views.CoursesMetricsSocialLeadersList.as_view(), name='course-metrics-social-leaders'),
     url(r'^{0}/roles/(?P<role>[a-z_]+)/users/(?P<user_id>[0-9]+)*$'.format(COURSE_ID_PATTERN),
         courses_views.CoursesRolesUsersDetail.as_view(), name='courses-roles-users-detail'),
     url(r'^{0}/roles/*$'.format(COURSE_ID_PATTERN),
