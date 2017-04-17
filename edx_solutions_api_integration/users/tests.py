@@ -47,6 +47,7 @@ from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_st
 from django.contrib.auth.models import User
 from notification_prefs import NOTIFICATION_PREF_KEY
 
+
 MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 
 
@@ -2189,3 +2190,21 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         # then verify unread count, which should be 0
         self.assertEqual(get_notifications_count_for_user(user_id, filters={'read': False}), 0)
+
+    def test_user_detail_post_unicode_data(self):
+        test_first_name = u'Miké'
+        test_last_name = u'Meÿers'
+
+        test_uri = '{}/{}'.format(self.users_base_uri, self.user.id)
+        data = {
+            'first_name': test_first_name,
+            'last_name': test_last_name
+        }
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 200)
+
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['first_name'], test_first_name)
+        self.assertEqual(response.data['last_name'], test_last_name)
+        self.assertEqual(response.data['full_name'], u'{} {}'.format(test_first_name, test_last_name))
