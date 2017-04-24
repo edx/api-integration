@@ -3391,7 +3391,7 @@ class CoursesSocialMetricsApiTests(
         uri = "{}?organizations={}".format(self.social_leaders_api, org_id)
         response = self.do_get(uri)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['course_avg'], 15)
+        self.assertEqual(response.data['course_avg'], 4)
         self.assertEqual(len(response.data['leaders']), len(org_users))
 
     def test_social_metrics_leader_list_with_user_position(self):
