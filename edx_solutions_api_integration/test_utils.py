@@ -15,7 +15,7 @@ from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 from xmodule.modulestore.django import SignalHandler
 from courseware import module_render
 from courseware.model_data import FieldDataCache
-from lms.djangoapps.grades.signals.signals import PROBLEM_WEIGHTED_SCORE_CHANGED
+from openedx.core.djangoapps.signals.signals import COURSE_GRADE_CHANGED
 
 from course_metadata.signals import (
     course_publish_handler_in_course_metadata as listener_in_course_metadata
@@ -251,7 +251,7 @@ class SignalDisconnectTestMixin(object):
         post_save.connect(
             cmc_post_save_listener, sender=CourseModuleCompletion, dispatch_uid='lms.progress.post_save_cms'
         )
-        PROBLEM_WEIGHTED_SCORE_CHANGED.connect(on_course_grade_changed)
+        COURSE_GRADE_CHANGED.connect(on_course_grade_changed)
 
     @staticmethod
     def disconnect_signals():
@@ -264,4 +264,4 @@ class SignalDisconnectTestMixin(object):
         post_save.disconnect(
             cmc_post_save_listener, sender=CourseModuleCompletion, dispatch_uid='lms.progress.post_save_cms'
         )
-        PROBLEM_WEIGHTED_SCORE_CHANGED.disconnect(on_course_grade_changed)
+        COURSE_GRADE_CHANGED.disconnect(on_course_grade_changed)
