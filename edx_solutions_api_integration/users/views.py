@@ -22,7 +22,6 @@ from course_blocks.api import get_course_blocks
 from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
-from social_engagement.models import StudentSocialEngagementScore
 from gradebook.utils import generate_user_gradebook
 from instructor.access import revoke_access, update_forum_role
 from lang_pref import LANGUAGE_KEY
@@ -42,15 +41,8 @@ from openedx.core.djangoapps.course_groups.cohorts import (
 from openedx.core.djangoapps.user_api.models import UserPreference
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from student.models import CourseEnrollment, PasswordHistory, UserProfile
-from student.roles import (
-    CourseAccessRole,
-    CourseInstructorRole,
-    CourseObserverRole,
-    CourseStaffRole,
-    CourseAssistantRole,
-    UserBasedRole,
-    get_aggregate_exclusion_user_ids,
-)
+from student.roles import CourseAccessRole, CourseInstructorRole, CourseObserverRole, CourseStaffRole, \
+    CourseAssistantRole, UserBasedRole
 from util.bad_request_rate_limiter import BadRequestRateLimiter
 from util.password_policy_validators import (
     validate_password_length, validate_password_complexity,
@@ -64,13 +56,7 @@ from edx_solutions_api_integration.permissions import SecureAPIView, SecureListA
     HasOrgsFilterBackend
 from edx_solutions_api_integration.models import GroupProfile, APIUser as User
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
-from edx_solutions_api_integration.utils import (
-    generate_base_uri,
-    dict_has_items,
-    extract_data_params,
-    str2bool,
-    css_param_to_list,
-)
+from edx_solutions_api_integration.utils import generate_base_uri, dict_has_items, extract_data_params
 from edx_solutions_projects.serializers import BasicWorkgroupSerializer
 from .serializers import UserSerializer, UserCountByCitySerializer, UserRolesSerializer
 
@@ -725,16 +711,18 @@ class UsersGroupsList(SecureAPIView):
             existing_user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
-        group_type = css_param_to_list(request, 'type')
-        course = css_param_to_list(request, 'course')
+        group_type = request.query_params.get('type', None)
+        course = request.query_params.get('course', None)
         data_params = extract_data_params(request)
         response_data = {}
         base_uri = generate_base_uri(request)
         response_data['uri'] = base_uri
         groups = existing_user.groups.all()
         if group_type:
+            group_type = group_type.split(',')
             groups = groups.filter(groupprofile__group_type__in=group_type)
         if course:
+            course = course.split(',')
             groups = groups.filter(coursegrouprelationship__course_id__in=course)
         if data_params:
             groups = [group for group in groups if dict_has_items(group.groupprofile.data, data_params)]
@@ -1322,55 +1310,35 @@ class UsersSocialMetrics(SecureListAPIView):
     """
 
     def get(self, request, user_id, course_id):  # pylint: disable=W0613,W0221
-        include_stats = str2bool(request.query_params.get('include_stats', 'false'))
         try:
             user = User.objects.get(id=user_id)  # pylint: disable=W0612
         except ObjectDoesNotExist:
             return Response({}, status.HTTP_404_NOT_FOUND)
 
-        course_key = get_course_key(course_id)
-        exclude_users = get_aggregate_exclusion_user_ids(course_key)
+        # load the course so that we can see when the course end date is
+        course_descriptor, course_key, course_content = get_course(self.request, self.request.user, course_id)  # pylint: disable=W0612,C0301
+        if not course_descriptor:
+            raise Http404
+
+        # be robust to the try of course_id we get from caller
+        try:
+            # assume new style
+            course_key = CourseKey.from_string(course_id)
+            slash_course_id = course_key.to_deprecated_string()
+        except:  # pylint: disable=W0702
+            # assume course_id passed in is legacy format
+            slash_course_id = course_id
 
         try:
-            social_engagement = StudentSocialEngagementScore.objects.get(course_id__exact=course_key, user__id=user_id)
-            social_engagement_score = social_engagement.score
-        except StudentSocialEngagementScore.DoesNotExist:
-            social_engagement_score = 0
-
-        course_avg, __ = StudentSocialEngagementScore.generate_leaderboard(
-            course_key,
-            count=0,
-            exclude_users=exclude_users
-        )
-        data = {'course_avg': course_avg, 'score': social_engagement_score}
-        http_status = status.HTTP_200_OK
-        if include_stats:
-            # load the course so that we can see when the course end date is
-            course_descriptor, course_key, course_content = get_course(self.request, self.request.user, course_id)  # pylint: disable=W0612,C0301
-            if not course_descriptor:
-                raise Http404
-
-            # be robust to the try of course_id we get from caller
-            try:
-                # assume new style
-                course_key = CourseKey.from_string(course_id)
-                slash_course_id = course_key.to_deprecated_string()
-            except:  # pylint: disable=W0702
-                # assume course_id passed in is legacy format
-                slash_course_id = course_id
-
-            try:
-                # get the course social stats, passing along a course end date to remove any activity after the course
-                # closure from the stats
-                social_stats = (
-                    get_user_social_stats(user_id, slash_course_id, end_date=course_descriptor.end)
-                )[user_id]
-                data['stats'] = social_stats
-            except (CommentClientRequestError, ConnectionError), error:
-                data = {
-                    "err_msg": str(error)
-                }
-                http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
+            # get the course social stats, passing along a course end date to remove any activity after the course
+            # closure from the stats
+            data = (get_user_social_stats(user_id, slash_course_id, end_date=course_descriptor.end))[user_id]
+            http_status = status.HTTP_200_OK
+        except (CommentClientRequestError, ConnectionError), error:
+            data = {
+                "err_msg": str(error)
+            }
+            http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
 
         return Response(data, http_status)
 
