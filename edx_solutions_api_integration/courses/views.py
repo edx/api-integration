@@ -1,7 +1,7 @@
 """ API implementation for course-oriented interactions. """
 
 import sys
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 import logging
 import itertools
 from lxml import etree
@@ -27,6 +27,7 @@ from mobile_api.course_info.views import apply_wrappers_to_content
 from openedx.core.lib.xblock_utils import get_course_update_items
 from openedx.core.lib.courses import course_image_url
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from openedx.core.djangoapps.content.course_structures.api.v0 import api, errors
 from django_comment_common.models import FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
 from instructor.access import revoke_access, update_forum_role
@@ -117,8 +118,7 @@ def _serialize_content(request, course_key, content_descriptor):
 
     data['start'] = getattr(content_descriptor, 'start', None)
     data['end'] = getattr(content_descriptor, 'end', None)
-
-    data['category'] = content_descriptor.location.category
+    data['category'] = getattr(content_descriptor, 'category', None)
 
     # Some things we only do if the content object is a course
     if hasattr(content_descriptor, 'category') and content_descriptor.category == 'course':
@@ -129,7 +129,7 @@ def _serialize_content(request, course_key, content_descriptor):
 
     # Other things we do only if the content object is not a course
     else:
-        content_id = unicode(content_descriptor.location)
+        content_id = getattr(content_descriptor, 'id')
         # Need to use the CourseKey here, which will possibly result in a different (but valid)
         # URI due to the change in key formats during the "opaque keys" transition
         content_uri = '{}/{}/content/{}'.format(base_content_uri, unicode(course_key), content_id)
@@ -164,24 +164,34 @@ def _serialize_content_children(request, course_key, children):
     return data
 
 
-def _serialize_content_with_children(request, course_key, descriptor, depth):  # pylint: disable=C0103
+def _serialize_content_with_children(request, course_key, blocks, block):  # pylint: disable=C0103
     """
     Serializes course content and then dives into the content tree,
-    serializing each child module until specified depth limit is hit
+    serializing each child module
     """
+    BlockDescriptor = namedtuple(
+        'BlockDescriptor',
+        ['id', 'category', 'display_name', 'children']
+    )
+    block_descriptor = BlockDescriptor(
+        id=block.get('id'),
+        category=block.get('type'),
+        display_name=block.get('display_name'),
+        children=block.get('children')
+    )
     data = _serialize_content(
         request,
         course_key,
-        descriptor
+        block_descriptor
     )
-    if depth > 0:
-        data['children'] = []
-        for child in descriptor.get_children():
+    data['children'] = []
+    if block_descriptor.children:
+        for child in block_descriptor.children:
             data['children'].append(_serialize_content_with_children(
                 request,
                 course_key,
-                child,
-                depth - 1
+                blocks,
+                blocks[child]
             ))
     return data
 
@@ -310,22 +320,26 @@ def _get_course_data(request, course_key, course_descriptor, depth=0):
     """
     creates a dict of course attributes
     """
-
+    data = _serialize_content(request, course_key, course_descriptor)
     if depth > 0:
-        data = _serialize_content_with_children(
-            request,
-            course_key,
-            course_descriptor,  # Primer for recursive function
-            depth
-        )
-        data['content'] = data['children']
-        data.pop('children')
-    else:
-        data = _serialize_content(
-            request,
-            course_key,
-            course_descriptor
-        )
+        try:
+            course_structure = api.course_structure(course_key)
+        except errors.CourseStructureNotAvailableError:
+            log.exception("Course structure for course %s is not available", unicode(course_key))
+
+        children = []
+        if course_structure:
+            blocks = course_structure['blocks']
+            course_block = course_structure['blocks'][course_structure['root']]
+            for chapter_block_id in course_block['children']:
+                children_data = _serialize_content_with_children(
+                    request,
+                    course_key,
+                    blocks,
+                    blocks[chapter_block_id]  # Primer for recursive function
+                )
+                children.append(children_data)
+        data['content'] = children
     base_uri_without_qs = generate_base_uri(request, True)
     if unicode(course_descriptor.id) not in base_uri_without_qs:
         base_uri_without_qs = '{}/{}'.format(base_uri_without_qs, unicode(course_descriptor.id))
