@@ -9,7 +9,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from edx_solutions_api_integration.courses import views as courses_views
 
-CONTENT_ID_PATTERN = r'(?P<content_id>[\.a-zA-Z0-9_+\/:-]+)'
+CONTENT_ID_PATTERN = r'(?P<content_id>(?:i4x://?[^/]+/[^/]+/[^/]+/[^@]+(?:@[^/]+)?)|(?:[^/]+))'
 COURSE_ID_PATTERN = settings.COURSE_ID_PATTERN
 
 urlpatterns = patterns(

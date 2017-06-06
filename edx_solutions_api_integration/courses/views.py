@@ -35,6 +35,7 @@ from lms.lib.comment_client.user import get_course_social_stats
 from lms.lib.comment_client.thread import get_course_thread_stats
 from lms.lib.comment_client.utils import CommentClientRequestError
 from opaque_keys import InvalidKeyError
+from opaque_keys.edx.locator import BlockUsageLocator
 from progress.models import StudentProgress
 from edx_solutions_projects.models import Project, Workgroup
 from edx_solutions_projects.serializers import ProjectSerializer, BasicWorkgroupSerializer
@@ -77,21 +78,44 @@ from progress.serializers import CourseModuleCompletionSerializer
 log = logging.getLogger(__name__)
 
 
-def _get_content_children(content, content_type=None):
+def _get_content_children(request, course_key, content_id, content_type=None, children_only=True):
     """
-    Parses the provided content object looking for children
+    Retrieves children of content from course blocks
     Matches on child content type (category) when specified
     """
-    children = []
-    if hasattr(content, 'children'):
-        child_content = content.get_children()
-        for child in child_content:
-            if content_type:
-                if getattr(child, 'category') == content_type:
-                    children.append(child)
-            else:
-                children.append(child)
-    return children
+    try:
+        course_structure = api.course_structure(course_key)
+    except errors.CourseStructureNotAvailableError:
+        log.exception("Course structure for course %s is not available", unicode(course_key))
+
+    if course_structure:
+        children, block_data = [], {}
+        blocks = course_structure['blocks']
+        block = course_structure['blocks'][content_id]
+        for child_block_id in block.get('children'):
+            child_block = blocks[child_block_id]
+            if content_type and child_block['type'] != content_type:
+                continue
+
+            block_descriptor = _convert_block_to_object(child_block)
+            children_data = _serialize_content(
+                request,
+                course_key,
+                block_descriptor
+            )
+            children.append(children_data)
+        if children_only:
+            return children
+        else:
+            block_descriptor = _convert_block_to_object(block)
+            block_data = _serialize_content(
+                request,
+                course_key,
+                block_descriptor
+            )
+
+            block_data['children'] = children
+            return block_data
 
 
 def _serialize_content(request, course_key, content_descriptor):
@@ -147,47 +171,37 @@ def _serialize_content(request, course_key, content_descriptor):
     return data
 
 
-def _serialize_content_children(request, course_key, children):
+def _convert_block_to_object(block):
     """
-    Loads the specified content child data into the response dict
-    This should probably evolve to use DRF serializers
-    """
-    data = []
-    if children:
-        for child in children:
-            child_data = _serialize_content(
-                request,
-                course_key,
-                child
-            )
-            data.append(child_data)
-    return data
-
-
-def _serialize_content_with_children(request, course_key, blocks, block):  # pylint: disable=C0103
-    """
-    Serializes course content and then dives into the content tree,
-    serializing each child module
+    Converts give block dict to an object
     """
     BlockDescriptor = namedtuple(
         'BlockDescriptor',
-        ['id', 'category', 'display_name', 'children']
+        ['id', 'category', 'display_name']
     )
-    block_descriptor = BlockDescriptor(
+    return BlockDescriptor(
         id=block.get('id'),
         category=block.get('type'),
-        display_name=block.get('display_name'),
-        children=block.get('children')
+        display_name=block.get('display_name')
     )
+
+
+def _serialize_course_block(request, course_key, blocks, block, serialize_children=True):  # pylint: disable=C0103
+    """
+    Serializes course content and then dives into the content tree,
+    serializing each child block if serialize_children is True
+    """
+    block_descriptor = _convert_block_to_object(block)
     data = _serialize_content(
         request,
         course_key,
         block_descriptor
     )
-    data['children'] = []
-    if block_descriptor.children:
-        for child in block_descriptor.children:
-            data['children'].append(_serialize_content_with_children(
+
+    if serialize_children and block.get('children'):
+        data['children'] = []
+        for child in block.get('children'):
+            data['children'].append(_serialize_course_block(
                 request,
                 course_key,
                 blocks,
@@ -332,11 +346,12 @@ def _get_course_data(request, course_key, course_descriptor, depth=0):
             blocks = course_structure['blocks']
             course_block = course_structure['blocks'][course_structure['root']]
             for chapter_block_id in course_block['children']:
-                children_data = _serialize_content_with_children(
+                children_data = _serialize_course_block(
                     request,
                     course_key,
                     blocks,
-                    blocks[chapter_block_id]  # Primer for recursive function
+                    blocks[chapter_block_id],  # Primer for recursive function
+                    serialize_children=True
                 )
                 children.append(children_data)
         data['content'] = children
@@ -441,22 +456,23 @@ class CourseContentList(SecureAPIView):
         if not course_descriptor:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         if content_id is None:
-            content_id = course_id
-        response_data = []
+            course_usage_key = BlockUsageLocator(
+                course_key=course_key,
+                block_type='course',
+                block_id='course'
+            )
+            content_id = unicode(course_usage_key)
         content_type = request.query_params.get('type', None)
-        if course_id != content_id:
-            content_descriptor, content_key, content = get_course_child(request, request.user, course_key, content_id, load_content=True)  # pylint: disable=W0612,C0301
-        else:
-            content = course_descriptor
-        if content:
-            children = _get_content_children(content, content_type)
-            response_data = _serialize_content_children(
+        response_data = []
+        try:
+            response_data = _get_content_children(
                 request,
                 course_key,
-                children
+                content_id,
+                content_type,
             )
             status_code = status.HTTP_200_OK
-        else:
+        except KeyError:
             status_code = status.HTTP_404_NOT_FOUND
         return Response(response_data, status=status_code)
 
@@ -513,43 +529,21 @@ class CourseContentDetail(SecureAPIView):
         GET /api/courses/{course_id}/content/{content_id}
         """
         content, course_key, course_content = get_course(request, request.user, course_id)  # pylint: disable=W0612
-        response_data = {}
-        base_uri = generate_base_uri(request)
-        response_data['uri'] = base_uri
-        if course_id != content_id:
-            element_name = 'children'
-            content_descriptor, content_key, content = get_course_child(request, request.user, course_key, content_id, load_content=True)  # pylint: disable=W0612,C0301
-        else:
-            element_name = 'content'
-            protocol = 'http'
-            if request.is_secure():
-                protocol = protocol + 's'
-            response_data['uri'] = '{}://{}/api/server/courses/{}'.format(
-                protocol,
-                request.get_host(),
-                unicode(course_key)
-            )
-        if not content:
-            return Response(response_data, status=status.HTTP_404_NOT_FOUND)
-        response_data = _serialize_content(
-            request,
-            course_id,
-            content
-        )
         content_type = request.query_params.get('type', None)
-        children = _get_content_children(content, content_type)
-        response_data[element_name] = _serialize_content_children(
-            request,
-            course_id,
-            children
-        )
-        base_uri_without_qs = generate_base_uri(request, True)
-        resource_uri = '{}/groups'.format(base_uri_without_qs)
-        response_data['resources'] = []
-        response_data['resources'].append({'uri': resource_uri})
-        resource_uri = '{}/users'.format(base_uri_without_qs)
-        response_data['resources'].append({'uri': resource_uri})
-        return Response(response_data, status=status.HTTP_200_OK)
+        response_data = {}
+        try:
+            response_data = _get_content_children(request, course_key, content_id, content_type, children_only=False)
+            base_uri_without_qs = generate_base_uri(request, True)
+            resource_uri = '{}/groups'.format(base_uri_without_qs)
+            response_data['resources'] = []
+            response_data['resources'].append({'uri': resource_uri})
+            resource_uri = '{}/users'.format(base_uri_without_qs)
+            response_data['resources'].append({'uri': resource_uri})
+            status_code = status.HTTP_200_OK
+        except KeyError:
+            status_code = status.HTTP_404_NOT_FOUND
+
+        return Response(response_data, status=status_code)
 
 
 class CoursesList(SecureListAPIView):
