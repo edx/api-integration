@@ -177,12 +177,15 @@ def _convert_block_to_object(block):
     """
     BlockDescriptor = namedtuple(
         'BlockDescriptor',
-        ['id', 'category', 'display_name']
+        ['id', 'category', 'display_name', 'start', 'end', 'due']
     )
     return BlockDescriptor(
         id=block.get('id'),
         category=block.get('type'),
-        display_name=block.get('display_name')
+        display_name=block.get('display_name'),
+        start=block.get('start'),
+        end=block.get('end'),
+        due=block.get('due')
     )
 
 
@@ -198,7 +201,7 @@ def _serialize_course_block(request, course_key, blocks, block, serialize_childr
         block_descriptor
     )
 
-    if serialize_children and block.get('children'):
+    if serialize_children:
         data['children'] = []
         for child in block.get('children'):
             data['children'].append(_serialize_course_block(
