@@ -25,7 +25,7 @@ from gradebook.models import StudentGradebook
 from gradebook.utils import generate_user_gradebook
 from instructor.access import revoke_access, update_forum_role
 from openedx.core.djangoapps.lang_pref import LANGUAGE_KEY
-from lms.lib.comment_client.utils import CommentClientRequestError
+from lms.lib.comment_client.utils import CommentClientRequestError, CommentClientMaintenanceError
 from lms.lib.comment_client.user import get_user_social_stats
 from notification_prefs.views import enable_notifications
 from opaque_keys import InvalidKeyError
@@ -1334,7 +1334,7 @@ class UsersSocialMetrics(SecureListAPIView):
             # closure from the stats
             data = (get_user_social_stats(user_id, slash_course_id, end_date=course_descriptor.end))[user_id]
             http_status = status.HTTP_200_OK
-        except (CommentClientRequestError, ConnectionError), error:
+        except (CommentClientRequestError, CommentClientMaintenanceError, ConnectionError), error:
             data = {
                 "err_msg": str(error)
             }
