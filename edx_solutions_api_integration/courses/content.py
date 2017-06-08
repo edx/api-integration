@@ -7,11 +7,9 @@ from textwrap import dedent
 
 TEST_COURSE_UPDATES_CONTENT = dedent(
     """
-    <section aria-labelledby="course-updates-heading">
-        <h2 class="hd hd-2 sr" id="course-updates-heading">All course updates</h2>
     <div class="recent-updates">
         <article class="updates-article">
-            <h2 class="date" id="msg-date-0">April 18, 2014</h2>
+            <h5 class="date" id="msg-date-0">April 18, 2014</h5>
             <button
                 class="toggle-visibility-button"
                 data-hide="Hide"
@@ -21,11 +19,11 @@ TEST_COURSE_UPDATES_CONTENT = dedent(
                 aria-expanded="true"
             ></button>
           <div class="toggle-visibility-element article-content " id="msg-content-0">
-            This does not have a paragraph tag around it
+          This does not have a paragraph tag around it
           </div>
         </article>
         <article class="updates-article">
-            <h2 class="date" id="msg-date-1">April 17, 2014</h2>
+            <h5 class="date" id="msg-date-1">April 17, 2014</h5>
             <button
                 class="toggle-visibility-button"
                 data-hide="Hide"
@@ -35,11 +33,11 @@ TEST_COURSE_UPDATES_CONTENT = dedent(
                 aria-expanded="true"
             ></button>
           <div class="toggle-visibility-element article-content hidden" id="msg-content-1">
-            Some text before paragraph tag<p>This is inside paragraph tag</p>Some text after tag
+          Some text before paragraph tag<p>This is inside paragraph tag</p>Some text after tag
           </div>
         </article>
         <article class="updates-article">
-            <h2 class="date" id="msg-date-2">April 16, 2014</h2>
+            <h5 class="date" id="msg-date-2">April 16, 2014</h5>
             <button
                 class="toggle-visibility-button"
                 data-hide="Hide"
@@ -49,7 +47,7 @@ TEST_COURSE_UPDATES_CONTENT = dedent(
                 aria-expanded="true"
             ></button>
           <div class="toggle-visibility-element article-content hidden" id="msg-content-2">
-            Some text before paragraph tag<p>This is inside paragraph tag</p>Some text after tag<p>one more</p>
+          Some text before paragraph tag<p>This is inside paragraph tag</p>Some text after tag<p>one more</p>
           </div>
         </article>
     </div>
@@ -64,7 +62,7 @@ TEST_COURSE_UPDATES_CONTENT = dedent(
 
     <div class="old-updates hidden toggle-visibility-element" id="old-updates">
         <article class="updates-article">
-          <h2 class="date" id="msg-date-3">April 15, 2014</h2>
+          <h5 class="date" id="msg-date-3">April 15, 2014</h5>
           <button
               class="toggle-visibility-button"
               data-hide="Hide"
@@ -76,7 +74,6 @@ TEST_COURSE_UPDATES_CONTENT = dedent(
           <div class="toggle-visibility-element article-content hidden" id="msg-content-3"><p>A perfectly</p><p>formatted piece</p><p>of HTML</p></div>
         </article>
     </div>
-    </section>
     """
 )
 

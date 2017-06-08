@@ -15,14 +15,12 @@ from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 from xmodule.modulestore.django import SignalHandler
 from courseware import module_render
 from courseware.model_data import FieldDataCache
-from courseware.signals import score_changed
+from lms.djangoapps.grades.signals.signals import PROBLEM_WEIGHTED_SCORE_CHANGED
 
 from course_metadata.signals import (
     course_publish_handler_in_course_metadata as listener_in_course_metadata
 )
-from gradebook.signals import (
-    on_score_changed as score_changed_listener
-)
+from gradebook.signals import on_course_grade_changed
 from progress.models import CourseModuleCompletion
 from progress.signals import (
     handle_cmc_post_save_signal as cmc_post_save_listener
@@ -151,6 +149,8 @@ class CourseGradingMixin(object):
             data=StringResponseXMLFactory().build_xml(answer='bar'),
             display_name=u"test mentoring midterm",
         )
+
+        grading_course = self.store.get_course(grading_course.id)
         setattr(grading_course, 'homework_assignment', item)
         setattr(grading_course, 'midterm_assignment', item2)
         return grading_course
@@ -248,10 +248,10 @@ class SignalDisconnectTestMixin(object):
         SignalHandler.course_published.connect(
             listener_in_course_metadata, dispatch_uid='course_metadata'
         )
-        score_changed.connect(score_changed_listener, dispatch_uid='lms.courseware.score_changed')
         post_save.connect(
             cmc_post_save_listener, sender=CourseModuleCompletion, dispatch_uid='lms.progress.post_save_cms'
         )
+        PROBLEM_WEIGHTED_SCORE_CHANGED.connect(on_course_grade_changed)
 
     @staticmethod
     def disconnect_signals():
@@ -261,7 +261,7 @@ class SignalDisconnectTestMixin(object):
         SignalHandler.course_published.disconnect(
             listener_in_course_metadata, dispatch_uid='course_metadata'
         )
-        score_changed.disconnect(score_changed_listener, dispatch_uid='lms.courseware.score_changed')
         post_save.disconnect(
             cmc_post_save_listener, sender=CourseModuleCompletion, dispatch_uid='lms.progress.post_save_cms'
         )
+        PROBLEM_WEIGHTED_SCORE_CHANGED.disconnect(on_course_grade_changed)

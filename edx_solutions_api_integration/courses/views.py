@@ -42,10 +42,16 @@ from student.roles import CourseAccessRole, CourseInstructorRole, CourseStaffRol
     CourseAssistantRole, UserBasedRole, get_aggregate_exclusion_user_ids
 from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.search import path_to_location
+from xmodule.modulestore.exceptions import ItemNotFoundError
 from course_metadata.models import CourseAggregatedMetaData
 
-from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, \
-    course_exists, get_modulestore, get_course_descriptor
+from edx_solutions_api_integration.courseware_access import (
+    get_course,
+    get_course_child,
+    get_course_key,
+    course_exists,
+    get_course_child_key,
+)
 from edx_solutions_api_integration.models import (
     CourseGroupRelationship,
     CourseContentGroupRelationship,
@@ -2067,10 +2073,15 @@ class CourseNavView(SecureAPIView):
         """
         items = modulestore().get_items(course_key, qualifiers={'name': module_id})
         if len(items) == 0:
-            raise Http404(
-                u"Could not find id: {0} in course_id: {1}. Referer: {2}".format(
-                    module_id, course_key, request.META.get("HTTP_REFERER", "")
-                ))
+            usage_key = get_course_child_key(module_id)
+            if usage_key:
+                try:
+                    item = modulestore().get_item(usage_key)
+                    return item.location
+                except ItemNotFoundError:
+                    raise Http404()
+            else:
+                raise Http404()
         return items[0].location
 
     def get(self, request, course_id, usage_key_string):  # pylint: disable=W0613
