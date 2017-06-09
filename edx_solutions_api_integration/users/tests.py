@@ -19,8 +19,8 @@ from urllib import urlencode
 from edx_notifications.data import NotificationType, NotificationMessage
 from edx_notifications.lib.consumer import get_notifications_count_for_user
 from edx_notifications.lib.publisher import register_notification_type, publish_notification_to_user
-from requests.exceptions import ConnectionError
 from django.conf import settings
+from requests.exceptions import ConnectionError
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.test.utils import override_settings
@@ -48,7 +48,7 @@ from student.models import anonymous_id_for_user
 from openedx.core.djangoapps.user_api.models import UserPreference
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_store_config, SharedModuleStoreTestCase
+from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase
 from xmodule.modulestore import ModuleStoreEnum
 from xmodule.modulestore.tests.django_utils import (
     ModuleStoreTestCase,
