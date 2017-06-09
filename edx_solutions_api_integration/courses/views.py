@@ -32,7 +32,7 @@ from gradebook.models import StudentGradebook
 from instructor.access import revoke_access, update_forum_role
 from lms.lib.comment_client.user import get_course_social_stats
 from lms.lib.comment_client.thread import get_course_thread_stats
-from lms.lib.comment_client.utils import CommentClientRequestError
+from lms.lib.comment_client.utils import CommentClientRequestError, CommentClientMaintenanceError
 from opaque_keys import InvalidKeyError
 from progress.models import StudentProgress
 from edx_solutions_projects.models import Project, Workgroup

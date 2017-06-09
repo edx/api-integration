@@ -120,47 +120,50 @@ TEST_COURSE_OVERVIEW_CONTENT = dedent(
       <h2>About This Course</h2>
       <p>Include your long course description here. The long course description should contain 150-400 words.</p>
 
-      <p>This is paragraph 2 of the long course description. Add more paragraphs as needed.
-          Make sure to enclose them in paragraph tags.</p>
+      <p>This is paragraph 2 of the long course description. Add more paragraphs as needed. Make sure to enclose them in paragraph tags.</p>
     </section>
 
     <section class="prerequisites">
-      <h2>Prerequisites</h2>
-      <p>Add information about course prerequisites here.</p>
+      <h2>Requirements</h2>
+      <p>Add information about the skills and knowledge students need to take this course.</p>
     </section>
 
     <section class="course-staff">
       <h2>Course Staff</h2>
       <article class="teacher">
         <div class="teacher-image">
-          <img src="/images/pl-faculty.png" align="left" style="margin:0 20 px 0" alt="Course Staff Image #1">
+          <img src="/asset-v1:{}+type@asset+block/images_placeholder-faculty.png" align="left" style="margin:0 20 px 0" alt="Course Staff Image #1">
         </div>
+
         <h3>Staff Member #1</h3>
         <p>Biography of instructor/staff member #1</p>
       </article>
 
       <article class="teacher">
         <div class="teacher-image">
-          <img src="/images/pl-faculty.png" align="left" style="margin:0 20 px 0" alt="Course Staff Image #2">
+          <img src="/asset-v1:{}+type@asset+block/images_placeholder-faculty.png" align="left" style="margin:0 20 px 0" alt="Course Staff Image #2">
         </div>
+
         <h3>Staff Member #2</h3>
         <p>Biography of instructor/staff member #2</p>
-      </article>
-
-      <article class="author">
-        <div class="author-image">
-          <img src="/images/pl-author.png" align="left" style="margin:0 20 px 0" alt="Author Name">
-        </div>
-        <h3>Author Name</h3>
-        <p>Biography of Author Name</p>
       </article>
     </section>
 
     <section class="faq">
-        <p>Some text here</p>
-    </section>
+      <section class="responses">
+        <h2>Frequently Asked Questions</h2>
+        <article class="response">
+          <h3>What web browser should I use?</h3>
+          <p>The Open edX platform works best with current versions of Chrome, Firefox or Safari, or with Internet Explorer version 9 and above.</p>
+          <p>See our <a href="http://edx.readthedocs.org/projects/open-edx-learner-guide/en/latest/front_matter/browsers.html">list of supported browsers</a> for the most up-to-date information.</p>
+        </article>
 
-    <section class="intro-video" data-videoid="foobar">
+        <article class="response">
+          <h3>Question #2</h3>
+          <p>Your answer would be displayed here.</p>
+        </article>
+      </section>
     </section>
     """
 )
+
