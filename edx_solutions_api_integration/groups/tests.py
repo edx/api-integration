@@ -13,24 +13,26 @@ from django.conf import settings
 from django.core.cache import cache
 from django.test.utils import override_settings
 from django.utils import timezone
-
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_store_config
 from edx_solutions_api_integration.models import GroupRelationship, GroupProfile
 from edx_solutions_organizations.models import Organization
 from edx_solutions_projects.models import Project
 from edx_solutions_api_integration.test_utils import APIClientMixin
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 from student.tests.factories import GroupFactory
+from xmodule.modulestore.tests.django_utils import (
+    ModuleStoreTestCase,
+    TEST_DATA_SPLIT_MODULESTORE
+)
 
-MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 
 
-@override_settings(MODULESTORE=MODULESTORE_CONFIG)
 @mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': False,
                                                    'ADVANCED_SECURITY': False,
                                                    'PREVENT_CONCURRENT_LOGINS': False})
 class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
     """ Test suite for Groups API views """
+
+    MODULESTORE = TEST_DATA_SPLIT_MODULESTORE
 
     def setUp(self):
         super(GroupsApiTests, self).setUp()
@@ -51,7 +53,7 @@ class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
         self.course_content = ItemFactory.create(
             category="videosequence",
             parent_location=self.course.location,
-            data=self.test_course_data,
+            # data=self.test_course_data,
             due=self.course_end_date,
             display_name="View_Sequence"
         )
