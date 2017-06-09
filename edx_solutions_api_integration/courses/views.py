@@ -78,16 +78,25 @@ from progress.serializers import CourseModuleCompletionSerializer
 log = logging.getLogger(__name__)
 
 
+def _get_course_blocks(course_key):
+    """
+    Retrieves course blocks data from course structure api.
+    :param course_key:
+    :return: course blocks dictionary
+    """
+    try:
+        course_structure = api.course_structure(course_key)
+        return course_structure
+    except errors.CourseStructureNotAvailableError:
+        log.exception("Course structure for course %s is not available", unicode(course_key))
+
+
 def _get_content_children(request, course_key, content_id, content_type=None, children_only=True):
     """
     Retrieves children of content from course blocks
     Matches on child content type (category) when specified
     """
-    try:
-        course_structure = api.course_structure(course_key)
-    except errors.CourseStructureNotAvailableError:
-        log.exception("Course structure for course %s is not available", unicode(course_key))
-
+    course_structure = _get_course_blocks(course_key)
     if course_structure:
         children, block_data = [], {}
         blocks = course_structure['blocks']
@@ -339,11 +348,7 @@ def _get_course_data(request, course_key, course_descriptor, depth=0):
     """
     data = _serialize_content(request, course_key, course_descriptor)
     if depth > 0:
-        try:
-            course_structure = api.course_structure(course_key)
-        except errors.CourseStructureNotAvailableError:
-            log.exception("Course structure for course %s is not available", unicode(course_key))
-
+        course_structure = _get_course_blocks(course_key)
         children = []
         if course_structure:
             blocks = course_structure['blocks']
