@@ -2358,6 +2358,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['full_name'], u'{} {}'.format(test_first_name, test_last_name))
 
 
+@ddt.ddt
 class UsersGradesApiTests(
     SignalDisconnectTestMixin,
     ModuleStoreTestCase,
@@ -2465,6 +2466,7 @@ class UsersGradesApiTests(
         self.assertEqual(response.data[0]['complete_status'], False)
 
 
+@ddt.ddt
 class UsersProgressApiTests(
     SignalDisconnectTestMixin, SharedModuleStoreTestCase, APIClientMixin, CourseGradingMixin
 ):
