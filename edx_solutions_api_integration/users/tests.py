@@ -19,8 +19,8 @@ from urllib import urlencode
 from edx_notifications.data import NotificationType, NotificationMessage
 from edx_notifications.lib.consumer import get_notifications_count_for_user
 from edx_notifications.lib.publisher import register_notification_type, publish_notification_to_user
-from requests.exceptions import ConnectionError
 from django.conf import settings
+from requests.exceptions import ConnectionError
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.test.utils import override_settings
