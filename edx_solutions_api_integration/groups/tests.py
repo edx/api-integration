@@ -25,7 +25,6 @@ from xmodule.modulestore.tests.django_utils import (
 )
 
 
-
 @mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': False,
                                                    'ADVANCED_SECURITY': False,
                                                    'PREVENT_CONCURRENT_LOGINS': False})

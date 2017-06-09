@@ -7,20 +7,19 @@ Run these tests @ Devstack:
     paver test_system -s lms --fasttest
         --fail_fast --verbose --test_id=lms/djangoapps/edx_solutions_api_integration/users
 """
+import mock
+import before_after
+import ddt
+import uuid
+
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from random import randint
-import uuid
 from urllib import urlencode
 from edx_notifications.data import NotificationType, NotificationMessage
 from edx_notifications.lib.consumer import get_notifications_count_for_user
 from edx_notifications.lib.publisher import register_notification_type, publish_notification_to_user
-import mock
-import before_after
-
 from requests.exceptions import ConnectionError
-import ddt
-
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
@@ -2360,6 +2359,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['full_name'], u'{} {}'.format(test_first_name, test_last_name))
 
 
+@ddt.ddt
 class UsersGradesApiTests(
     SignalDisconnectTestMixin,
     ModuleStoreTestCase,
@@ -2467,6 +2467,7 @@ class UsersGradesApiTests(
         self.assertEqual(response.data[0]['complete_status'], False)
 
 
+@ddt.ddt
 class UsersProgressApiTests(
     SignalDisconnectTestMixin, SharedModuleStoreTestCase, APIClientMixin, CourseGradingMixin
 ):

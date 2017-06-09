@@ -1137,8 +1137,9 @@ class CoursesApiTests(
         self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.data), 0)
 
-    def test_courses_users_list_post_nonexisting_user_allow(self):
-        course = CourseFactory.create(display_name="TEST COURSE", org='TESTORG2')
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_courses_users_list_post_nonexisting_user_allow(self, store):
+        course = CourseFactory.create(display_name="TEST COURSE", org='TESTORG2', default_store=store)
         test_uri = self.base_courses_uri + '/' + unicode(course.id) + '/users'
         post_data = {}
         post_data['email'] = 'test+pending@tester.com'
@@ -1229,10 +1230,11 @@ class CoursesApiTests(
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
 
-    def test_courses_users_list_courses_enrolled(self):
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_courses_users_list_courses_enrolled(self, store):
         """ Test courses_enrolled value returned by courses users list api """
-        course = CourseFactory.create()
-        course2 = CourseFactory.create()
+        course = CourseFactory.create(default_store=store)
+        course2 = CourseFactory.create(default_store=store)
         test_uri = self.base_courses_uri + '/{course_id}/users?additional_fields=courses_enrolled'
         # create a 2 new users
         users = UserFactory.create_batch(2)
