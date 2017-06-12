@@ -685,7 +685,10 @@ class CoursesGroupsList(SecureAPIView):
         POST /api/courses/{course_id}/groups
         """
         response_data = {}
-        group_id = request.data['group_id']
+        group_id = request.data.get('group_id', None)
+        if not group_id:
+            return Response({'message': _('group_id is missing')}, status.HTTP_400_BAD_REQUEST)
+
         base_uri = generate_base_uri(request)
         if not course_exists(request, request.user, course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
@@ -1163,7 +1166,7 @@ class CoursesUsersDetail(SecureAPIView):
         if not course_descriptor:
             return Response(response_data, status=status.HTTP_404_NOT_FOUND)
         if CourseEnrollment.is_enrolled(user, course_key):
-            response_data['position'] = course_content.position
+            response_data['position'] = getattr(course_content, 'position', None)
             response_status = status.HTTP_200_OK
         else:
             response_status = status.HTTP_404_NOT_FOUND
@@ -1629,8 +1632,12 @@ class CoursesTimeSeriesMetrics(SecureAPIView):
         if interval not in ['days', 'weeks', 'months']:
             return Response({"message": _("Interval parameter is not valid. It should be one of these "
                                           "'days', 'weeks', 'months'")}, status=status.HTTP_400_BAD_REQUEST)
-        start_dt = parse_datetime(start)
-        end_dt = parse_datetime(end)
+        try:
+            start_dt = parse_datetime(start)
+            end_dt = parse_datetime(end)
+        except ValueError:
+            return Response({'message': _('date format is invalid')}, status=status.HTTP_400_BAD_REQUEST)
+
         course_key = get_course_key(course_id)
         exclude_users = get_aggregate_exclusion_user_ids(course_key)
         grade_complete_match_range = getattr(settings, 'GRADEBOOK_GRADE_COMPLETE_PROFORMA_MATCH_RANGE', 0.01)

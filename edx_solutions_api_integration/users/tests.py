@@ -16,6 +16,7 @@ from edx_notifications.data import NotificationType, NotificationMessage
 from edx_notifications.lib.consumer import get_notifications_count_for_user
 from edx_notifications.lib.publisher import register_notification_type, publish_notification_to_user
 import mock
+import before_after
 
 from django.conf import settings
 from django.core.cache import cache
@@ -37,7 +38,7 @@ from edx_solutions_api_integration.test_utils import (
     APIClientMixin,
     SignalDisconnectTestMixin,
 )
-from student.tests.factories import UserFactory, CourseEnrollmentFactory
+from student.tests.factories import UserFactory, CourseEnrollmentFactory, GroupFactory
 from student.models import anonymous_id_for_user
 
 from openedx.core.djangoapps.user_api.models import UserPreference
@@ -2098,6 +2099,128 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         # then verify unread count, which should be 0
         self.assertEqual(get_notifications_count_for_user(user_id, filters={'read': False}), 0)
+
+    @mock.patch("edx_solutions_api_integration.users.views.module_render.get_module_for_descriptor")
+    def test_user_courses_detail_get_undefined_course_module(self, mock_get_module_for_descriptor):
+        # Enroll test user in test course
+        CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
+
+        # Get user course details when course_module is None
+        mock_get_module_for_descriptor.return_value = None
+
+        test_uri = '{}/{}/courses/{}'.format(self.users_base_uri, self.user.id, self.course.id)
+        response = self.do_get(test_uri)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['position'], None)
+
+    def test_users_list_post_missing_email(self):
+        # Test with missing email in the request data
+        data = {'username': self.test_username, 'password': self.test_password}
+        response = self.do_post(self.users_base_uri, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_list_post_missing_username(self):
+        # Test with missing username in the request data
+        data = {'email': self.test_email, 'password': self.test_password}
+        response = self.do_post(self.users_base_uri, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_list_post_missing_password(self):
+        # Test with missing password in the request data
+        data = {'email': self.test_email, 'username': self.test_username}
+        response = self.do_post(self.users_base_uri, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_groups_list_missing_group_id(self):
+        # Test with missing group_id in request data
+        test_uri = '{}/{}/groups/'.format(self.users_base_uri, self.user.id)
+        data = {'group_id': ''}
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_groups_detail_delete_invalid_user_id(self):
+        # Test with invalid user_id
+        test_group = GroupFactory.create()
+        test_uri = '{}/{}/groups/{}'.format(self.users_base_uri, '1234567', test_group.id)
+        response = self.do_delete(test_uri)
+        self.assertEqual(response.status_code, 404)
+
+    def test_users_courses_list_post_missing_course_id(self):
+        # Test with missing course_id in request data
+        test_uri = '{}/{}/courses/'.format(self.users_base_uri, self.user.id)
+        data = {'course_id': ''}
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_notifications_detail_missing_read_value(self):
+        test_uri = '{}/{}/notifications/{}/'.format(self.users_base_uri, self.user.id, '1')
+        response = self.do_post(test_uri, {})
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_courses_detail_post_missing_positions(self):
+        test_uri = '{}/{}/courses/{}'.format(self.users_base_uri, self.user.id, self.course.id)
+        response = self.do_post(test_uri, data={})
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_courses_detail_post_missing_parent_content_id(self):
+        position_data = {'positions': [{'child_content_id': str(self.course.location)}]}
+        test_uri = '{}/{}/courses/{}'.format(self.users_base_uri, self.user.id, self.course.id)
+
+        response = self.do_post(test_uri, data=position_data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_courses_detail_post_missing_child_content_id(self):
+        position_data = {'positions': [{'parent_content_id': str(self.course.id)}]}
+        test_uri = '{}/{}/courses/{}'.format(self.users_base_uri, self.user.id, self.course.id)
+
+        response = self.do_post(test_uri, data=position_data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_roles_list_put_missing_roles(self):
+        # Test with missing roles in request data
+        test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
+        response = self.do_put(test_uri, {})
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_roles_list_put_missing_role_value(self):
+        test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
+        data = {'roles': [{'course_id': unicode(self.course.id)}]}
+        response = self.do_put(test_uri, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_roles_list_put_missing_course_id(self):
+        test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
+        data = {'roles': [{'role': 'instructor'}]}
+        response = self.do_put(test_uri, data)
+        self.assertEqual(response.status_code, 400)
+
+    def test_users_groups_detail_delete_invalid_user_id(self):
+        # Test with invalid user_id
+        test_group = GroupFactory.create()
+        test_uri = '{}/{}/groups/{}'.format(self.users_base_uri, '1234567', test_group.id)
+        response = self.do_delete(test_uri)
+        self.assertEqual(response.status_code, 404)
+
+    def test_users_courses_grades_detail_race_condition(self):
+        """
+        This unit test is written to create the race condition which caused IntegrityError in UsersCoursesGradesDetail
+        api when two threads try ko execute the generate_user_gradebook function at the same time. One thread
+        creates a new record in database and when other tries to create the record, error occurs.
+
+        Here we halt thread 1 execution at the point before it calls generate_user_gradebook method, the
+        thread 2 executes. Thread 2 will create new record and when thread 1 resume, it will find the new
+        record in the database which is handled with the get_or_create method in the api.
+        """
+        CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
+
+        def get_users_courses_grades_detail(*args):
+            test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, unicode(self.course.id))
+            response = self.do_get(test_uri)
+            self.assertEqual(response.status_code, 200)
+
+        with before_after.before('gradebook.utils.generate_user_gradebook', get_users_courses_grades_detail):
+            get_users_courses_grades_detail()
 
     def test_user_detail_post_unicode_data(self):
         test_first_name = u'Miké'

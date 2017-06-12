@@ -5,6 +5,7 @@ import json
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import Http404
+from django.utils.translation import ugettext_lazy as _
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -247,7 +248,11 @@ class GroupsUsersList(SecureAPIView):
             existing_group = Group.objects.get(id=group_id)
         except ObjectDoesNotExist:
             return Response({}, status.HTTP_404_NOT_FOUND)
-        user_id = request.data['user_id']
+
+        user_id = request.data.get('user_id', None)
+        if not user_id:
+            return Response({'message': _('user_id is missing')}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             existing_user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
@@ -380,8 +385,14 @@ class GroupsGroupsList(SecureAPIView):
         POST /api/groups/{group_id}/groups/{related_group_id}
         """
         response_data = {}
-        to_group_id = request.data['group_id']
-        relationship_type = request.data['relationship_type']
+        to_group_id = request.data.get('group_id', None)
+        if not to_group_id:
+            return Response({'message': _('group_id is missing')}, status=status.HTTP_400_BAD_REQUEST)
+
+        relationship_type = request.data.get('relationship_type', None)
+        if not relationship_type:
+            return Response({'message': _('relationship_type is missing')}, status=status.HTTP_400_BAD_REQUEST)
+
         base_uri = generate_base_uri(request)
         response_data['uri'] = '{}/{}'.format(base_uri, to_group_id)
         response_data['group_id'] = str(to_group_id)
@@ -469,23 +480,24 @@ class GroupsGroupsDetail(SecureAPIView):
         response_data['from_group_id'] = group_id
         response_data['to_group_id'] = related_group_id
         response_status = status.HTTP_404_NOT_FOUND
-        from_group_relationship = GroupRelationship.objects.get(group__id=group_id)
-        if from_group_relationship:
-            try:
-                to_group_relationship = GroupRelationship.objects.get(group__id=related_group_id)
-            except ObjectDoesNotExist:
-                return Response(response_data, status=status.HTTP_404_NOT_FOUND)
-            if to_group_relationship and str(to_group_relationship.parent_group_id) == str(group_id):
-                response_data['relationship_type'] = RELATIONSHIP_TYPES['hierarchical']
+
+        try:
+            from_group_relationship = GroupRelationship.objects.get(group__id=group_id)
+            to_group_relationship = GroupRelationship.objects.get(group__id=related_group_id)
+        except ObjectDoesNotExist:
+            return Response(response_data, response_status)
+
+        if to_group_relationship and str(to_group_relationship.parent_group_id) == str(group_id):
+            response_data['relationship_type'] = RELATIONSHIP_TYPES['hierarchical']
+            response_status = status.HTTP_200_OK
+        else:
+            linked_group_exists = from_group_relationship.check_linked_group_relationship(
+                to_group_relationship,
+                symmetrical=True
+            )
+            if linked_group_exists:
+                response_data['relationship_type'] = RELATIONSHIP_TYPES['graph']
                 response_status = status.HTTP_200_OK
-            else:
-                linked_group_exists = from_group_relationship.check_linked_group_relationship(
-                    to_group_relationship,
-                    symmetrical=True
-                )
-                if linked_group_exists:
-                    response_data['relationship_type'] = RELATIONSHIP_TYPES['graph']
-                    response_status = status.HTTP_200_OK
         return Response(response_data, response_status)
 
     def delete(self, request, group_id, related_group_id):  # pylint: disable=W0613
@@ -542,7 +554,10 @@ class GroupsCoursesList(SecureAPIView):
             existing_group = Group.objects.get(id=group_id)
         except ObjectDoesNotExist:
             return Response({}, status.HTTP_404_NOT_FOUND)
-        course_id = request.data['course_id']
+
+        course_id = request.data.get('course_id', None)
+        if not course_id:
+            return Response({'message': _('course_id is missing')}, status=status.HTTP_400_BAD_REQUEST)
 
         base_uri = generate_base_uri(request)
         response_data['uri'] = '{}/{}'.format(base_uri, course_id)
