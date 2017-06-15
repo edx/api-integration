@@ -1907,6 +1907,22 @@ Allows for a caller to mark a user's notification as read, passed in by msg_id. 
         {}
 
 
+## User Course Certificate [/users/{user_id}/courses/{course_id}/certificate]
+
+It returns details for user certificate for specified course
+
+### User Course Certificate Detail [GET]
+
+Returns a JSON representation of user certificate details for a specified course
+
++ Response 200 (application/json)
+
+        {
+            "status": "generated",
+            "web_view_uri": "http://lms.mcka.local/certificates/86927f12cc234e088c3f4663b2e00dc9",
+        }
+
+
 # Group Courses
 Resources related to courses in the API.
 
@@ -3065,6 +3081,37 @@ Returns navigation information
             "final_target_id": "i4x://bbg/cs1/chapter/04331cefe53a4cf9a01bd0854c5a7081",
             "position": "None"
         }
+
+
+## Course Certificates Status [/courses/{course_id}/certificates/status]
+
+It returns status for course certificates
+
+### Course Certificates Status [GET]
+
+Returns a JSON representation of certificate details for a specified course, also return status if we can request certificate generation for the course, possible statuses can be 'available', 'notavailable', 'generated', 'generating'
+
++ Response 200 (application/json)
+
+        {
+            "status": "available",
+            "generation_uri": "http://lms.mcka.local/api/server/courses/course-v1:edX+DemoX+Demo_Course/certificates/generate",
+        }
+
+
+## Generate Course Certificates [/courses/{course_id}/certificates/generate]
+
+It starts generation of certificates fot the specified course
+
+### Generate Course Certificates [POST]
+
++ Request (application/json)
+
+        {}
+
++ Response 200 (application/json)
+
+        {}
 
 
 # Group Groups
@@ -4574,3 +4621,13 @@ Resources related to User Management in the API.
 [List/Create User Preferences](#reference/users/user-preferences)
 
 [Delete User Preferences](#reference/users/user-preferences-detail)
+
+
+# Group Certificate APIs
+Resources related to Certificate in the API.
+
+[Get Course Certificates Status](#reference/courses/course-certificates-status)
+
+[Generate Course Certificates](#reference/courses/generate-course-certificates)
+
+[Get User Course Certificate Detail](#reference/users/user-course-certificate)
