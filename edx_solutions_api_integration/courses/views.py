@@ -1128,9 +1128,7 @@ class CoursesUsersPassedList(SecureAPIView):
     """
     **Use Case**
 
-        CoursesUsersPassedList returns a collection of users passed in the course.
-
-        You also use CoursesUsersPassedList to enroll a new user in the course.
+        CoursesUsersPassedList returns a list of user ids passed in the course.
 
     **Example Requests**
 
@@ -1138,17 +1136,17 @@ class CoursesUsersPassedList(SecureAPIView):
 
     **GET Response Values**
 
-        * results: The collection of user_ids in the course.
+        * results: The list of user ids passed in the course.
         * GET supports filtering of user by organization(s), groups
-         * To get users paased in a course and are also member of organization
-         ```/api/courses/{course_id}/users?organizations={organization_id}```
+         * To get a list of user ids passed in a course and are also member of organization
+         ```/api/courses/{course_id}/users/passed?organizations={organization_id}```
          * organizations filter can be a single id or multiple ids separated by comma
-         ```/api/courses/{course_id}/users?organizations={organization_id1},{organization_id2}```
-         * To get users paased in a course and also member of specific groups
-         ```/api/courses/{course_id}/users?groups={group_id1},{group_id2}```
+         ```/api/courses/{course_id}/users/passed?organizations={organization_id1},{organization_id2}```
+         * To get a list of user ids passed in a course and also member of specific groups
+         ```/api/courses/{course_id}/users/passed?groups={group_id1},{group_id2}```
     """
 
-    def get(self, request, course_id):  # pylint: disable=W0613
+    def get(self, request, course_id):  # pylint: disable=unused-argument
         """
         GET /api/courses/{course_id}/users/passed
         """
