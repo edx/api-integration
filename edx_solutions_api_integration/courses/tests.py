@@ -1225,6 +1225,41 @@ class CoursesApiTests(
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(response.data['results'][0]['courses_enrolled'], 2)
 
+    def test_courses_users_list_courses_passed(self):
+        """ Test courses_passed value returned by courses users list api """
+        course = self.setup_course_with_grading()
+
+        test_uri = self.base_courses_uri + '/{course_id}/users/passed'
+
+        # create a 2 new users
+        users = UserFactory.create_batch(2)
+
+        # create course enrollments
+        CourseEnrollmentFactory.create(user=users[0], course_id=course.id)
+        CourseEnrollmentFactory.create(user=users[1], course_id=course.id)
+
+        module = self.get_module_for_user(users[0], course, course.homework_assignment)
+        grade_dict = {'value': 0.5, 'max_value': 1, 'user_id': users[0].id}
+        module.system.publish(module, 'grade', grade_dict)
+
+        response = self.do_get(test_uri.format(course_id=unicode(course.id)))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 0)
+
+        module = self.get_module_for_user(users[0], course, course.homework_assignment)
+        grade_dict = {'value': 1, 'max_value': 1, 'user_id': users[0].id}
+        module.system.publish(module, 'grade', grade_dict)
+
+        module = self.get_module_for_user(users[1], course, course.homework_assignment)
+        grade_dict = {'value': 1, 'max_value': 1, 'user_id': users[1].id}
+        module.system.publish(module, 'grade', grade_dict)
+
+        response = self.do_get(test_uri.format(course_id=unicode(course.id)))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0], users[0].id)
+        self.assertEqual(response.data[1], users[1].id)
+
     def test_courses_users_list_get_attributes(self):
         """ Test presence of newly added attributes to courses users list api """
         course = CourseFactory.create(

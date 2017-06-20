@@ -1124,6 +1124,48 @@ class CoursesUsersList(SecureListAPIView):
         return users
 
 
+class CoursesUsersPassedList(SecureAPIView):
+    """
+    **Use Case**
+
+        CoursesUsersPassedList returns a list of user ids passed in the course.
+
+    **Example Requests**
+
+          GET /api/courses/{course_id}/users/passed
+
+    **GET Response Values**
+
+        * results: The list of user ids passed in the course.
+        * GET supports filtering of user by organization(s), groups
+         * To get a list of user ids passed in a course and are also member of organization
+         ```/api/courses/{course_id}/users/passed?organizations={organization_id}```
+         * organizations filter can be a single id or multiple ids separated by comma
+         ```/api/courses/{course_id}/users/passed?organizations={organization_id1},{organization_id2}```
+         * To get a list of user ids passed in a course and also member of specific groups
+         ```/api/courses/{course_id}/users/passed?groups={group_id1},{group_id2}```
+    """
+
+    def get(self, request, course_id):  # pylint: disable=unused-argument
+        """
+        GET /api/courses/{course_id}/users/passed
+        """
+        if not course_exists(request, request.user, course_id):
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+
+        course_key = get_course_key(course_id)
+        exclude_users = get_aggregate_exclusion_user_ids(course_key)
+
+        org_ids = get_ids_from_list_param(self.request, 'organization')
+        group_ids = get_ids_from_list_param(self.request, 'groups')
+
+        users_passed = StudentGradebook.get_passed_users(
+            course_key, exclude_users=exclude_users, org_ids=org_ids, group_ids=group_ids
+        )
+
+        return Response(users_passed, status=status.HTTP_200_OK)
+
+
 class CoursesUsersDetail(SecureAPIView):
     """
     **Use Case**
