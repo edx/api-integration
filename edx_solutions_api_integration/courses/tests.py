@@ -1225,6 +1225,42 @@ class CoursesApiTests(
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(response.data['results'][0]['courses_enrolled'], 2)
 
+    def test_courses_users_list_courses_passed(self):
+        """ Test courses_passed value returned by courses users list api """
+        course = CourseFactory.create()
+        course2 = CourseFactory.create()
+        test_uri = self.base_courses_uri + '/{course_id}/users/passed'
+        # create a 2 new users
+        users = UserFactory.create_batch(2)
+
+        # create course enrollments
+        CourseEnrollmentFactory.create(user=users[0], course_id=course.id)
+        CourseEnrollmentFactory.create(user=users[0], course_id=course2.id)
+        CourseEnrollmentFactory.create(user=users[1], course_id=course2.id)
+
+        user_grade, user_proforma_grade = 0.9, 0.91
+
+        # create student gradebook
+        StudentGradebook.objects.create(user=users[0], course_id=course.id,
+                grade=user_grade, proforma_grade=user_proforma_grade, is_passed=True)
+        StudentGradebook.objects.create(user=users[0], course_id=course2.id,
+                grade=user_grade, proforma_grade=user_proforma_grade, is_passed=True)
+        StudentGradebook.objects.create(user=users[1], course_id=course2.id,
+                grade=user_grade, proforma_grade=user_proforma_grade, is_passed=True)
+
+        # fetch course 1 passed users
+        response = self.do_get(test_uri.format(course_id=unicode(course.id)))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0], users[0].id)
+
+        # fetch course 2 passed users
+        response = self.do_get(test_uri.format(course_id=unicode(course2.id)))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0], users[0].id)
+        self.assertEqual(response.data[1], users[1].id)
+
     def test_courses_users_list_get_attributes(self):
         """ Test presence of newly added attributes to courses users list api """
         course = CourseFactory.create(
