@@ -6,6 +6,7 @@ from django.core.exceptions import ObjectDoesNotExist
 
 from edx_solutions_api_integration.models import APIUser
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
+from edx_solutions_api_integration.utils import get_profile_image_urls_by_username
 from student.roles import CourseAccessRole
 
 
@@ -37,7 +38,7 @@ class UserSerializer(DynamicFieldsModelSerializer):
     """ Serializer for User model interactions """
     organizations = BasicOrganizationSerializer(many=True, required=False)
     created = serializers.DateTimeField(source='date_joined', required=False)
-    avatar_url = serializers.CharField(source='profile.avatar_url')
+    profile_image = serializers.SerializerMethodField()
     city = serializers.CharField(source='profile.city')
     title = serializers.CharField(source='profile.title')
     country = serializers.CharField(source='profile.country')
@@ -45,6 +46,16 @@ class UserSerializer(DynamicFieldsModelSerializer):
     courses_enrolled = serializers.SerializerMethodField()
     roles = serializers.SerializerMethodField('get_user_roles')
     grades = serializers.SerializerMethodField('get_user_grades')
+
+    def get_profile_image(self, user):
+        """
+        Returns metadata about a user's profile image
+        """
+        try:
+            profile_image_uploaded_at = user.profile.profile_image_uploaded_at
+        except ObjectDoesNotExist:
+            profile_image_uploaded_at = None
+        return get_profile_image_urls_by_username(user.username, profile_image_uploaded_at)
 
     def get_courses_enrolled(self, user):
         """ Serialize user enrolled courses """
@@ -100,7 +111,7 @@ class UserSerializer(DynamicFieldsModelSerializer):
             "last_name",
             "created",
             "is_active",
-            "avatar_url",
+            "profile_image",
             "city",
             "title",
             "country",

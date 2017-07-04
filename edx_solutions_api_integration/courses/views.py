@@ -65,8 +65,7 @@ from edx_solutions_api_integration.models import (
 from progress.models import CourseModuleCompletion
 from social_engagement.models import StudentSocialEngagementScore
 from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView
-from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer, \
-    SimpleUserSerializer
+from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer
 from edx_solutions_api_integration.utils import (
     generate_base_uri,
     str2bool,
@@ -84,9 +83,9 @@ from edx_solutions_api_integration.utils import (
 from edx_solutions_api_integration.courses.serializers import (
     CourseSerializer,
     GradeSerializer,
-    CourseLeadersSerializer,
     CourseCompletionsLeadersSerializer,
     CourseSocialLeadersSerializer,
+    CourseProficiencyLeadersSerializer,
 )
 from progress.serializers import CourseModuleCompletionSerializer
 
@@ -1080,7 +1079,7 @@ class CoursesUsersList(SecureListAPIView):
             "last_name",
             "created",
             "is_active",
-            "avatar_url",
+            "profile_image",
             "city",
             "title",
             "country",
@@ -1855,7 +1854,7 @@ class CoursesMetricsGradesLeadersList(SecureListAPIView):
                                                                      count=count,
                                                                      exclude_users=exclude_users)
 
-            serializer = CourseLeadersSerializer(leaderboard_data['queryset'], many=True)
+            serializer = CourseProficiencyLeadersSerializer(leaderboard_data['queryset'], many=True)
             data['leaders'] = serializer.data  # pylint: disable=E1101
             data['course_avg'] = leaderboard_data['course_avg']
             if 'user_position' in leaderboard_data:
