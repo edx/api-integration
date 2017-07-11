@@ -1355,10 +1355,21 @@ class UsersSocialMetrics(SecureListAPIView):
             data = (get_user_social_stats(user_id, slash_course_id, end_date=course_descriptor.end))[user_id]
             http_status = status.HTTP_200_OK
         except (CommentClientRequestError, CommentClientMaintenanceError, ConnectionError), error:
+            logging.error("Forum service returned an error: %s", str(error))
+
             data = {
-                "err_msg": str(error)
+                'err_msg': str(error),
+                'num_threads': 0,
+                'num_thread_followers': 0,
+                'num_replies': 0,
+                'num_flagged': 0,
+                'num_comments': 0,
+                'num_threads_read': 0,
+                'num_downvotes': 0,
+                'num_upvotes': 0,
+                'num_comments_generated': 0
             }
-            http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
+            http_status = status.HTTP_200_OK
 
         return Response(data, http_status)
 

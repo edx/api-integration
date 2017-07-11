@@ -17,6 +17,8 @@ from django.http import Http404
 from django.utils.translation import ugettext_lazy as _
 from django.db.models import Q, F
 
+from requests.exceptions import ConnectionError
+
 from rest_framework import status
 from rest_framework.response import Response
 
@@ -32,7 +34,7 @@ from gradebook.models import StudentGradebook
 from instructor.access import revoke_access, update_forum_role
 from lms.lib.comment_client.user import get_course_social_stats
 from lms.lib.comment_client.thread import get_course_thread_stats
-from lms.lib.comment_client.utils import CommentClientRequestError
+from lms.lib.comment_client.utils import CommentClientRequestError, CommentClientMaintenanceError
 from opaque_keys import InvalidKeyError
 from progress.models import StudentProgress
 from edx_solutions_projects.models import Project, Workgroup
@@ -1628,11 +1630,14 @@ class CoursesMetrics(SecureAPIView):
         thread_stats = {}
         try:
             thread_stats = get_course_thread_stats(slash_course_id)
-        except CommentClientRequestError, e:  # pylint: disable=C0103
+        except (CommentClientMaintenanceError, CommentClientRequestError, ConnectionError), e:  # pylint: disable=C0103
+            logging.error("Forum service returned an error: %s", str(e))
+
             data = {
                 "err_msg": str(e)
             }
-            return Response(data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(data, status=status.HTTP_200_OK)
+
         data.update(thread_stats)
         return Response(data, status=status.HTTP_200_OK)
 
@@ -1931,6 +1936,9 @@ class CoursesMetricsSocial(SecureListAPIView):
 
     def get(self, request, course_id):  # pylint: disable=arguments-differ
 
+        total_enrollments = 0
+        data = {}
+
         try:
             slash_course_id = get_course_key(course_id, slashseparated=True)
             organization = request.query_params.get('organization', None)
@@ -1966,13 +1974,19 @@ class CoursesMetricsSocial(SecureListAPIView):
 
             data = actual_data
             total_enrollments = enrollment_qs.count()
+
             data = {'total_enrollments': total_enrollments, 'users': data}
             http_status = status.HTTP_200_OK
-        except CommentClientRequestError, e:  # pylint: disable=C0103
+        except (CommentClientMaintenanceError, CommentClientRequestError, ConnectionError), e:  # pylint: disable=C0103
+            logging.error("Forum service returned an error: %s", str(e))
+
             data = {
-                "err_msg": str(e)
+                "err_msg": str(e),
+                'total_enrollments': total_enrollments,
+                'users': data
             }
-            http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
+            http_status = status.HTTP_200_OK
+
         return Response(data, http_status)
 
 
