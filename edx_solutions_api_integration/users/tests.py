@@ -18,6 +18,8 @@ from edx_notifications.lib.publisher import register_notification_type, publish_
 import mock
 import before_after
 
+from requests.exceptions import ConnectionError
+
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
@@ -75,6 +77,13 @@ def _fake_get_user_social_stats_with_end(user_id, course_id, end_date=None):  # 
     return {
         str(user_id): {'foo': 'bar'}
     }
+
+
+def _fake_get_service_unavailability(user_id, course_id, end_date=None):
+    """
+    Fake get_service_unavailability method
+    """
+    raise ConnectionError
 
 
 @override_settings(DEBUG=True)
@@ -1807,10 +1816,16 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['results'][0]['city'], 'New York City')
         self.assertEqual(response.data['results'][0]['count'], 6)
 
-    def test_users_social_metrics_get_service_unavailable(self):
+    def test_users_social_metrics_check_service_availability(self):
         test_uri = '{}/{}/courses/{}/metrics/social/'.format(self.users_base_uri, self.user.id, self.course.id)
         response = self.do_get(test_uri)
-        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.status_code, 200)
+
+    @mock.patch("edx_solutions_api_integration.users.views.get_user_social_stats", _fake_get_service_unavailability)
+    def test_users_social_metrics_get_service_unavailability(self):
+        test_uri = '{}/{}/courses/{}/metrics/social/'.format(self.users_base_uri, self.user.id, self.course.id)
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
 
     def test_users_social_metrics_get_invalid_user(self):
         test_uri = '{}/12345/courses/{}/metrics/social/'.format(self.users_base_uri, self.course.id)
@@ -2194,13 +2209,6 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         data = {'roles': [{'role': 'instructor'}]}
         response = self.do_put(test_uri, data)
         self.assertEqual(response.status_code, 400)
-
-    def test_users_groups_detail_delete_invalid_user_id(self):
-        # Test with invalid user_id
-        test_group = GroupFactory.create()
-        test_uri = '{}/{}/groups/{}'.format(self.users_base_uri, '1234567', test_group.id)
-        response = self.do_delete(test_uri)
-        self.assertEqual(response.status_code, 404)
 
     def test_users_courses_grades_detail_race_condition(self):
         """

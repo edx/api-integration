@@ -15,6 +15,8 @@ from urllib import urlencode
 from freezegun import freeze_time
 from dateutil.relativedelta import relativedelta
 
+from requests.exceptions import ConnectionError
+
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.cache import cache
@@ -87,6 +89,10 @@ def _fake_get_course(request, user, course_id, depth=0, load_content=False):
     if course_key:
         course_descriptor = get_course_descriptor(course_key, depth)
     return course_descriptor, course_key, course_content
+
+
+def _fake_get_service_unavailability(course_id, end_date=None):
+    raise ConnectionError
 
 
 @mock.patch("edx_solutions_api_integration.courses.views.get_course_thread_stats", _fake_get_course_thread_stats)
@@ -2017,6 +2023,17 @@ class CoursesApiTests(
         completion_uri = '{}/{}/completions/'.format(self.base_courses_uri, self.test_bogus_course_id)
         response = self.do_get(completion_uri)
         self.assertEqual(response.status_code, 404)
+
+    def test_courses_metrics_social_check_service_availability(self):
+        test_uri = '{}/{}/metrics/social/'.format(self.base_courses_uri, self.test_course_id)
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+
+    @mock.patch("edx_solutions_api_integration.courses.views.get_course_social_stats", _fake_get_service_unavailability)
+    def test_courses_social_metrics_get_service_unavailability(self):
+        test_uri = '{}/{}/metrics/social/'.format(self.base_courses_uri, self.test_course_id)
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
 
     @mock.patch(
         "edx_solutions_api_integration.courses.views.get_course_social_stats",
