@@ -1250,7 +1250,7 @@ class CoursesApiTests(
 
         response = self.do_get(test_uri.format(course_id=unicode(course.id)))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(response.data["count"], 0)
 
         module = self.get_module_for_user(users[0], course, course.homework_assignment)
         grade_dict = {'value': 1, 'max_value': 1, 'user_id': users[0].id}
@@ -1262,9 +1262,18 @@ class CoursesApiTests(
 
         response = self.do_get(test_uri.format(course_id=unicode(course.id)))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 2)
-        self.assertEqual(response.data[0], users[0].id)
-        self.assertEqual(response.data[1], users[1].id)
+        self.assertEqual(response.data["count"], 2)
+
+        self.assertIn('id', response.data['results'][0])
+        self.assertIn('email', response.data['results'][0])
+        self.assertIn('username', response.data['results'][0])
+        self.assertIn('first_name', response.data['results'][0])
+        self.assertIn('last_name', response.data['results'][0])
+        self.assertIn('created', response.data['results'][0])
+        self.assertIn('is_active', response.data['results'][0])
+
+        self.assertEqual(response.data["results"][0]["id"], users[0].id)
+        self.assertEqual(response.data["results"][1]["id"], users[1].id)
 
     def test_courses_users_list_get_attributes(self):
         """ Test presence of newly added attributes to courses users list api """

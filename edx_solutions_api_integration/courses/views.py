@@ -61,7 +61,8 @@ from edx_solutions_api_integration.models import (
 )
 from progress.models import CourseModuleCompletion
 from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView
-from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer
+from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer, \
+    SimpleUserSerializer
 from edx_solutions_api_integration.utils import (
     generate_base_uri,
     str2bool,
@@ -1126,11 +1127,11 @@ class CoursesUsersList(SecureListAPIView):
         return users
 
 
-class CoursesUsersPassedList(SecureAPIView):
+class CoursesUsersPassedList(SecureListAPIView):
     """
     **Use Case**
 
-        CoursesUsersPassedList returns a list of user ids passed in the course.
+        CoursesUsersPassedList returns a list of users passed in the course.
 
     **Example Requests**
 
@@ -1138,34 +1139,35 @@ class CoursesUsersPassedList(SecureAPIView):
 
     **GET Response Values**
 
-        * results: The list of user ids passed in the course.
+        * results: The list of users passed in the course.
         * GET supports filtering of user by organization(s), groups
-         * To get a list of user ids passed in a course and are also member of organization
+         * To get a list of users passed in a course and are also member of organization
          ```/api/courses/{course_id}/users/passed?organizations={organization_id}```
          * organizations filter can be a single id or multiple ids separated by comma
          ```/api/courses/{course_id}/users/passed?organizations={organization_id1},{organization_id2}```
-         * To get a list of user ids passed in a course and also member of specific groups
+         * To get a list of users passed in a course and also member of specific groups
          ```/api/courses/{course_id}/users/passed?groups={group_id1},{group_id2}```
     """
+    serializer_class = SimpleUserSerializer
 
-    def get(self, request, course_id):  # pylint: disable=unused-argument
+    def get_queryset(self):
         """
         GET /api/courses/{course_id}/users/passed
         """
-        if not course_exists(request, request.user, course_id):
-            return Response({}, status=status.HTTP_404_NOT_FOUND)
-
-        course_key = get_course_key(course_id)
-        exclude_users = get_aggregate_exclusion_user_ids(course_key)
+        course_id = self.kwargs['course_id']
+        if not course_exists(self.request, self.request.user, course_id):
+            raise Http404
 
         org_ids = get_ids_from_list_param(self.request, 'organization')
         group_ids = get_ids_from_list_param(self.request, 'groups')
 
-        users_passed = StudentGradebook.get_passed_users(
+        course_key = get_course_key(course_id)
+        exclude_users = get_aggregate_exclusion_user_ids(course_key)
+
+        queryset = StudentGradebook.get_passed_users(
             course_key, exclude_users=exclude_users, org_ids=org_ids, group_ids=group_ids
         )
-
-        return Response(users_passed, status=status.HTTP_200_OK)
+        return queryset
 
 
 class CoursesUsersDetail(SecureAPIView):
