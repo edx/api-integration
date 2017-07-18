@@ -41,7 +41,7 @@ from edx_solutions_projects.models import Project, Workgroup
 from edx_solutions_projects.serializers import ProjectSerializer, BasicWorkgroupSerializer
 from student.models import CourseEnrollment, CourseEnrollmentAllowed
 from student.roles import CourseAccessRole, CourseInstructorRole, CourseStaffRole, CourseObserverRole, \
-    CourseAssistantRole, UserBasedRole, get_aggregate_exclusion_user_ids
+    CourseAssistantRole, UserBasedRole
 from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.search import path_to_location
 from xmodule.modulestore.exceptions import ItemNotFoundError
@@ -70,6 +70,10 @@ from edx_solutions_api_integration.utils import (
     parse_datetime,
     get_ids_from_list_param,
     strip_xblock_wrapper_div,
+    get_cached_data,
+    cache_course_data,
+    cache_course_user_data,
+    get_aggregate_exclusion_user_ids,
 )
 from .serializers import CourseSerializer
 from .serializers import GradeSerializer, CourseLeadersSerializer, CourseCompletionsLeadersSerializer
@@ -1123,7 +1127,25 @@ class CoursesUsersList(SecureListAPIView):
         if exclude_groups:
             users = users.exclude(groups__in=exclude_groups)
 
-        users = users.prefetch_related('organizations').select_related('profile')
+        additional_fields = self.request.query_params.get('additional_fields', [])
+        if 'organizations' in additional_fields:
+            users = users.prefetch_related(
+                'organizations'
+            )
+        if 'roles' in additional_fields:
+            users = users.prefetch_related(
+                'courseaccessrole_set'
+            )
+        if 'grades' in additional_fields:
+            users = users.prefetch_related(
+                'studentgradebook_set'
+            )
+        if 'courses_enrolled' in additional_fields:
+            users = users.prefetch_related(
+                'courseenrollment_set'
+            )
+
+        users = users.select_related('profile')
         return users
 
 
@@ -1792,6 +1814,8 @@ class CoursesMetricsGradesLeadersList(SecureListAPIView):
     ``` /api/courses/{course_id}/metrics/grades/leaders/?count=3```
     To exclude users with certain roles from leaders
     ```/api/courses/{course_id}/metrics/grades/leaders/?exclude_roles=observer,assistant```
+    To get only grade of a user and course average skipleaders parameter can be used
+    ```/api/courses/{course_id}/metrics/grades/leaders/?user_id={user_id}&skipleaders=true```
     ### Use Cases/Notes:
     * Example: Display grades leaderboard of a given course
     * Example: Display position of a users in a course in terms of grade and course avg
@@ -1805,29 +1829,39 @@ class CoursesMetricsGradesLeadersList(SecureListAPIView):
         group_ids = get_ids_from_list_param(self.request, 'groups')
         count = self.request.query_params.get('count', 3)
         exclude_roles = self.request.query_params.get('exclude_roles', None)
+        skipleaders = str2bool(self.request.query_params.get('skipleaders', 'false'))
         if exclude_roles:
             exclude_roles = [role for role in filter(None, exclude_roles.split(','))]
 
         data = {}
-        course_avg = 0  # pylint: disable=W0612
         if not course_exists(request, request.user, course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         course_key = get_course_key(course_id)
         # Users having certain roles (such as an Observer) are excluded from aggregations
         exclude_users = get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles)
-        leaderboard_data = StudentGradebook.generate_leaderboard(course_key,
-                                                                 user_id=user_id,
-                                                                 group_ids=group_ids,
-                                                                 count=count,
-                                                                 exclude_users=exclude_users)
+        if skipleaders and user_id:
+            cached_grade_data = get_cached_data('grade', course_id, user_id)
+            if not cached_grade_data:
+                data['course_avg'] = StudentGradebook.course_grade_avg(course_key, exclude_users=exclude_users)
+                data['user_grade'] = StudentGradebook.get_user_grade(course_key, user_id)
+                cache_course_data('grade', course_id, {'course_avg': data['course_avg']})
+                cache_course_user_data('grade', course_id, user_id, {'user_grade': data['user_grade']})
+            else:
+                data.update(cached_grade_data)
+        else:
+            leaderboard_data = StudentGradebook.generate_leaderboard(course_key,
+                                                                     user_id=user_id,
+                                                                     group_ids=group_ids,
+                                                                     count=count,
+                                                                     exclude_users=exclude_users)
 
-        serializer = CourseLeadersSerializer(leaderboard_data['queryset'], many=True)
-        data['leaders'] = serializer.data  # pylint: disable=E1101
-        data['course_avg'] = leaderboard_data['course_avg']
-        if 'user_position' in leaderboard_data:
-            data['user_position'] = leaderboard_data['user_position']
-        if 'user_grade' in leaderboard_data:
-            data['user_grade'] = leaderboard_data['user_grade']
+            serializer = CourseLeadersSerializer(leaderboard_data['queryset'], many=True)
+            data['leaders'] = serializer.data  # pylint: disable=E1101
+            data['course_avg'] = leaderboard_data['course_avg']
+            if 'user_position' in leaderboard_data:
+                data['user_position'] = leaderboard_data['user_position']
+            if 'user_grade' in leaderboard_data:
+                data['user_grade'] = leaderboard_data['user_grade']
 
         return Response(data, status=status.HTTP_200_OK)
 
@@ -1871,6 +1905,12 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
         course_avg = 0
         if not course_exists(request, request.user, course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
+        if user_id and skipleaders:  # for single user's progress fetch from cache if available
+            cached_progress_data = get_cached_data('progress', course_id, user_id)
+            if cached_progress_data:
+                data.update(cached_progress_data)
+                return Response(data, status=status.HTTP_200_OK)
+
         course_key = get_course_key(course_id)
         course_metadata = CourseAggregatedMetaData.get_from_id(course_key)
         total_possible_completions = float(course_metadata.total_assessments)
@@ -1906,6 +1946,9 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
             serializer = CourseCompletionsLeadersSerializer(queryset, many=True,
                                                             context={'total_completions': total_possible_completions})
             data['leaders'] = serializer.data  # pylint: disable=E1101
+        else:
+            cache_course_data('progress', course_id, {'course_avg': data['course_avg']})
+            cache_course_user_data('progress', course_id, user_id, {'completions': data['completions']})
         return Response(data, status=status.HTTP_200_OK)
 
 

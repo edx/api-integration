@@ -37,6 +37,7 @@ from student.models import CourseEnrollment
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase, mixed_store_config
 from xmodule.modulestore import ModuleStoreEnum
+from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
 from edx_solutions_api_integration.courseware_access import get_course_key, get_course_descriptor
 from edx_solutions_api_integration.test_utils import (
     APIClientMixin,
@@ -101,7 +102,7 @@ def _fake_get_service_unavailability(course_id, end_date=None):
                                                    'ADVANCED_SECURITY': False,
                                                    'PREVENT_CONCURRENT_LOGINS': False})
 class CoursesApiTests(
-    SignalDisconnectTestMixin, SharedModuleStoreTestCase, APIClientMixin, CourseGradingMixin
+    SignalDisconnectTestMixin, SharedModuleStoreTestCase, CacheIsolationTestCase, APIClientMixin, CourseGradingMixin
 ):
     """ Test suite for Courses API views """
 
@@ -259,8 +260,6 @@ class CoursesApiTests(
         cls.test_content_child_id = unicode(cls.content_child.scope_ids.usage_id)
         cls.base_course_content_uri = '{}/{}/content'.format(cls.base_courses_uri, cls.test_course_id)
         cls.base_chapters_uri = cls.base_course_content_uri + '?type=chapter'
-
-        cache.clear()
 
         Role.objects.get_or_create(
             name=FORUM_ROLE_MODERATOR,
@@ -2062,6 +2061,7 @@ class CoursesApiTests(
         users = [user for user in self.users if user.id == 2]
         allow_access(self.course, users[0], 'observer')
 
+        cache.clear()
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data.keys()), 2)
@@ -2141,7 +2141,6 @@ class CoursesApiTests(
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.data.get('leaders', None))
-        self.assertEqual(response.data['position'], 0)
         self.assertEqual(response.data['completions'], 0)
 
         # test a case where completions are greater than total course modules. it should not be more than 100

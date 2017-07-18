@@ -6,12 +6,19 @@ import json
 import re
 import datetime
 
+from django.core.cache import cache
 from django.utils.timezone import now
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta, MO
 from django.conf import settings
 
 from rest_framework.exceptions import ParseError
+
+from student.roles import CourseRole, CourseObserverRole
+
+
+USER_METRICS_CACHE_TTL = 60 * 60
+COURSE_METRICS_CACHE_TTL = 60 * 60
 
 
 def address_exists_in_network(ip_address, net_n_bits):
@@ -85,6 +92,96 @@ def dict_has_items(obj, items):
             else:
                 return False
     return has_items
+
+
+def get_cache_key(category, course_id, user_id=None):
+    """
+    :param category: string which represents type of cache data e.g. `grade`, `progress`, `social_score`
+    :param course_id: string course_id of course for which data is being cached
+    :param user_id: int user_id of user for which data is being cached
+    :return:
+    """
+
+    return u"edx_solutions_api_integration.{category}.{course_id}.{user_id}".format(
+        category=category,
+        course_id=unicode(course_id),
+        user_id=user_id,
+    )
+
+
+def get_cached_data(category, course_id, user_id=None):
+    """
+    Fetches cached data for a given metric, course and user
+    If user_id is given, it makes sure both course and user data is available, if either
+    course or user data is not available it returns None
+    """
+    metric_course_key = get_cache_key(category, course_id)
+    metric_course_data = cache.get(metric_course_key)
+    if user_id:
+        metric_cache_key = get_cache_key(category, course_id, user_id)
+        metric_user_data = cache.get(metric_cache_key)
+
+        if isinstance(metric_course_data, dict) and isinstance(metric_user_data, dict):
+            metric_course_data.update(metric_user_data)
+            return metric_course_data
+    else:
+        return metric_course_data
+
+
+def cache_course_data(category, course_id, data):
+    """
+    caches course data for a given metric and course
+    """
+    metric_cache_key = get_cache_key(category, course_id)
+    cache.set(metric_cache_key, data, COURSE_METRICS_CACHE_TTL)
+
+
+def cache_course_user_data(category, course_id, user_id, data):
+    """
+    caches user data for a given metric and course
+    """
+    metric_cache_key = get_cache_key(category, course_id, user_id)
+    cache.set(metric_cache_key, data, USER_METRICS_CACHE_TTL)
+
+
+def invalid_user_data_cache(category, course_id, user_id=None):
+    """
+    Invalidates course and user's data cache for a category in given course
+    :param category:
+    :param course_id:
+    :param user_id:
+    """
+    course_cache_key = get_cache_key(category, course_id)
+    cache.delete(course_cache_key)
+    if user_id:
+        user_cache_key = get_cache_key(category, course_id, user_id)
+        cache.delete(user_cache_key)
+
+
+def get_aggregate_exclusion_user_ids(course_key, roles=None):  # pylint: disable=invalid-name
+    """
+    This helper method will return the list of user ids that are marked in roles
+    that can be excluded from certain aggregate queries. The list of roles to exclude
+    can either be passed in roles argument or defined in a AGGREGATION_EXCLUDE_ROLES settings variable.
+    """
+
+    cache_key = get_cache_key('exclude_users', unicode(course_key) + '_'.join(roles or 'None'))
+    cached_data = cache.get(cache_key)
+    if cached_data is not None:
+        return cached_data
+    exclude_user_ids = set()
+    exclude_role_list = roles or getattr(settings, 'AGGREGATION_EXCLUDE_ROLES', [CourseObserverRole.ROLE])
+
+    for role in exclude_role_list:
+        users = CourseRole(role, course_key).users_with_role()
+        user_ids = set()
+        for user in users:
+            user_ids.add(user.id)
+
+        exclude_user_ids = exclude_user_ids.union(user_ids)
+
+    cache.set(cache_key, exclude_user_ids, 60 * 60)
+    return exclude_user_ids
 
 
 def extract_data_params(request):

@@ -7,7 +7,6 @@ from django.core.exceptions import ObjectDoesNotExist
 from edx_solutions_api_integration.models import APIUser
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from student.roles import CourseAccessRole
-from gradebook.models import StudentGradebook
 
 
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
@@ -35,7 +34,6 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(DynamicFieldsModelSerializer):
-
     """ Serializer for User model interactions """
     organizations = BasicOrganizationSerializer(many=True, required=False)
     created = serializers.DateTimeField(source='date_joined', required=False)
@@ -57,27 +55,37 @@ class UserSerializer(DynamicFieldsModelSerializer):
 
     def get_user_roles(self, user):
         """ returns list of user roles """
-        queryset = CourseAccessRole.objects.filter(user=user)
+        access_roles = user.courseaccessrole_set.all()
         if 'course_id' in self.context:
             course_id = self.context['course_id']
-            queryset = queryset.filter(course_id=course_id)
+            roles = [access_role.role for access_role in access_roles if access_role.course_id == course_id]
+        else:
+            roles = [access_role.role for access_role in access_roles]
 
-        return queryset.values_list('role', flat=True).distinct()
+        return roles
 
     def get_user_grades(self, user):
         """ returns user proforma_grade, grade and grade_summary """
         grade, proforma_grade, section_breakdown = None, None, None
-        if 'course_id' in self.context:
+        gradebooks = user.studentgradebook_set.all()
+        if 'course_id' in self.context and gradebooks:
             course_id = self.context['course_id']
-            try:
-                gradebook = StudentGradebook.objects.get(user=user, course_id=course_id)
-                grade = gradebook.grade
-                proforma_grade = gradebook.proforma_grade
-                grade_summary = json.loads(gradebook.grade_summary)
-                if "section_breakdown" in grade_summary:
-                    section_breakdown = grade_summary["section_breakdown"]
-            except (ObjectDoesNotExist, ValueError):
-                pass
+            course_gradebook = next(
+                (
+                    gradebook
+                    for gradebook in gradebooks
+                    if gradebook.course_id == course_id
+                ), None
+            )
+            if course_gradebook:
+                try:
+                    grade = course_gradebook.grade
+                    proforma_grade = course_gradebook.proforma_grade
+                    grade_summary = json.loads(course_gradebook.grade_summary)
+                    if "section_breakdown" in grade_summary:
+                        section_breakdown = grade_summary["section_breakdown"]
+                except (ObjectDoesNotExist, ValueError):
+                    pass
 
         return {'grade': grade, 'proforma_grade': proforma_grade, 'section_breakdown': section_breakdown}
 
