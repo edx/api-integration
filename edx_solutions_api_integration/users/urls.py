@@ -49,6 +49,8 @@ urlpatterns = patterns(
         users_views.UsersNotificationsDetail.as_view(), name='users-notifications-detail'),
     url(r'^(?P<user_id>[a-zA-Z0-9]+)$', users_views.UsersDetail.as_view(), name='apimgr-users-detail'),
     url(r'/*$^', users_views.UsersList.as_view(), name='apimgr-users-list'),
+    url(r'^(?P<user_id>[a-zA-Z0-9]+)/courses/progress',
+        users_views.UsersCourseProgressList.as_view(), name='users-courses-progress'),
 )
 
 urlpatterns = format_suffix_patterns(urlpatterns)

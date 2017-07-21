@@ -46,11 +46,10 @@ from student.models import anonymous_id_for_user
 from openedx.core.djangoapps.user_api.models import UserPreference
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_store_config
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_store_config, SharedModuleStoreTestCase
 
 from django.contrib.auth.models import User
 from notification_prefs import NOTIFICATION_PREF_KEY
-
 
 MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 
@@ -2353,3 +2352,119 @@ class UsersGradesApiTests(
         self.assertEqual(response.data[0]['current_grade'], 0, 0)
         self.assertEqual(response.data[0]['proforma_grade'], 0, 0)
         self.assertEqual(response.data[0]['complete_status'], False)
+
+
+@override_settings(MODULESTORE=MODULESTORE_CONFIG)
+class UsersProgressApiTests(
+    SignalDisconnectTestMixin, SharedModuleStoreTestCase, APIClientMixin, CourseGradingMixin
+):
+    """ Test suite for User Progress API views """
+
+    @classmethod
+    def setUpClass(cls):
+        super(UsersProgressApiTests, cls).setUpClass()
+        cls.base_courses_uri = '/api/server/courses'
+        cls.base_users_uri = '/api/server/users'
+
+        cls.course_start_date = timezone.now() + relativedelta(days=-1)
+        cls.course_end_date = timezone.now() + relativedelta(days=60)
+        cls.course = CourseFactory.create(
+            start=cls.course_start_date,
+            end=cls.course_end_date,
+        )
+        cls.test_data = '<html>{}</html>'.format(str(uuid.uuid4()))
+
+        cls.chapter = ItemFactory.create(
+            category="chapter",
+            parent_location=cls.course.location,
+            data=cls.test_data,
+            due=cls.course_end_date,
+            display_name="Overview",
+        )
+
+        cls.course_project = ItemFactory.create(
+            category="chapter",
+            parent_location=cls.course.location,
+            data=cls.test_data,
+            display_name="Group Project"
+        )
+
+        cls.course_project2 = ItemFactory.create(
+            category="chapter",
+            parent_location=cls.course.location,
+            data=cls.test_data,
+            display_name="Group Project2"
+        )
+
+        cls.course_content2 = ItemFactory.create(
+            category="sequential",
+            parent_location=cls.chapter.location,
+            data=cls.test_data,
+            display_name="Sequential",
+        )
+
+        cls.content_child2 = ItemFactory.create(
+            category="vertical",
+            parent_location=cls.course_content2.location,
+            data=cls.test_data,
+            display_name="Vertical Sequence"
+        )
+
+        cls.course_content = ItemFactory.create(
+            category="videosequence",
+            parent_location=cls.content_child2.location,
+            data=cls.test_data,
+            display_name="Video_Sequence",
+        )
+
+        cls.content_child = ItemFactory.create(
+            category="video",
+            parent_location=cls.course_content.location,
+            data=cls.test_data,
+            display_name="Video"
+        )
+
+        cls.content_subchild = ItemFactory.create(
+            category="video",
+            parent_location=cls.content_child2.location,
+            data=cls.test_data,
+            display_name="Child Video",
+        )
+
+        cls.user = UserFactory()
+        cache.clear()
+
+    def test_users_progress_list(self):
+        """ Test progress value returned by users progress list api """
+        CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
+
+        completions_uri = '{}/{}/completions/'.format(self.base_courses_uri, self.course.id)
+        completions_data = {
+            'content_id': unicode(self.course_content.scope_ids.usage_id),
+            'user_id': self.user.id,
+            'stage': 'First'
+        }
+        response = self.do_post(completions_uri, completions_data)
+        self.assertEqual(response.status_code, 201)
+
+        test_uri = '{}/{}/courses/progress'.format(self.base_users_uri, self.user.id)
+        response = self.do_get(test_uri)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+
+        response_obj = response.data[0]
+
+        self.assertIn('created', response_obj)
+        self.assertIn('is_active', response_obj)
+        self.assertIn('progress', response_obj)
+        self.assertIn('course', response_obj)
+
+        self.assertEqual(response.data[0]['progress'], 50.0)
+        self.assertEqual(response.data[0]['is_active'], True)
+
+        self.assertIn('course_image_url', response_obj['course'])
+        self.assertIn('display_name', response_obj['course'])
+        self.assertIn('start', response_obj['course'])
+        self.assertIn('end', response_obj['course'])
+        self.assertIn('id', response_obj['course'])

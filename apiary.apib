@@ -3078,7 +3078,32 @@ Returns a list of user ids of course passing users
 
 + Response 200 (application/json)
 
-        [2,10,18,19,33,66]
+        {
+            "count": 2,
+            "previous": null,
+            "num_pages": 1,
+            "results": [
+                {
+                    "id": 13,
+                    "email": "user13@example.com",
+                    "username": "user13",
+                    "first_name": "user13",
+                    "last_name": "",
+                    "created": "2017-05-16T08:09:02.937034Z",
+                    "is_active": true
+                },
+                {
+                    "id": 11,
+                    "email": "staff@example.com",
+                    "username": "edxapp",
+                    "first_name": "",
+                    "last_name": "",
+                    "created": "2017-05-15T12:27:41.341650Z",
+                    "is_active": true
+                }
+            ],
+            "next": null
+        }
 
 
 # Group Groups
@@ -4588,3 +4613,46 @@ Resources related to User Management in the API.
 [List/Create User Preferences](#reference/users/user-preferences)
 
 [Delete User Preferences](#reference/users/user-preferences-detail)
+
+
+# User
+Resources related to User in the API.
+
+## User Progress List [/users/{user_id}/courses/progress]
+
+It allows clients to get a list of courses user enrolled in and the progress of the user in that course
+
+### User Progress List [GET]
+
+Returns a list of courses user enrolled in and the progress of the user in that course.
+Progress here is in percentage.
+
+
++ Response 200 (application/json)
+
+        [
+            {
+                "created": "2017-05-16 10:52:08.545346+00:00",
+                "is_active": true,
+                "course": {
+                    "start": "2017-04-06T00:00:00Z",
+                    "course_image_url": "/asset-v1:edX+DemoX+Demo_Course+type@asset+block@images_course_image.jpg",
+                    "end": null,
+                    "id": "course-v1:edX+DemoX+Demo_Course",
+                    "display_name": "edX Demonstration Course"
+                },
+                "progress": 1
+            },
+            {
+                "created": "2017-05-16 08:09:03.294214+00:00",
+                "is_active": true,
+                "course": {
+                    "start": "2015-10-29T01:00:00Z",
+                    "course_image_url": "/c4x/OrganizationX/cs202/asset/McKA_course_tile_BusStrat.png",
+                    "end": "2019-02-09T23:00:00Z",
+                    "id": "OrganizationX/cs202/2017_S1",
+                    "display_name": "[Test] Business Strategy Jan 2016"
+                },
+                "progress": 21
+            }
+        ]
