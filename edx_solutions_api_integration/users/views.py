@@ -2,9 +2,8 @@
 
 import json
 import logging
-from edx_notifications.lib.consumer import mark_notification_read
-from requests.exceptions import ConnectionError
 
+from requests.exceptions import ConnectionError
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
@@ -31,6 +30,7 @@ from notification_prefs.views import enable_notifications
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import UsageKey, CourseKey
 from opaque_keys.edx.locations import Location, SlashSeparatedCourseKey
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.course_groups.models import CourseUserGroup, CourseCohort
 from openedx.core.djangoapps.course_groups.cohorts import (
     get_cohort_by_name,
@@ -40,6 +40,9 @@ from openedx.core.djangoapps.course_groups.cohorts import (
 )
 from openedx.core.djangoapps.user_api.models import UserPreference
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
+from edx_notifications.lib.consumer import mark_notification_read
+from course_metadata.models import CourseAggregatedMetaData
+from progress.models import StudentProgress
 from student.models import CourseEnrollment, PasswordHistory, UserProfile
 from student.roles import CourseAccessRole, CourseInstructorRole, CourseObserverRole, CourseStaffRole, \
     CourseAssistantRole, UserBasedRole
@@ -56,6 +59,7 @@ from edx_solutions_api_integration.permissions import SecureAPIView, SecureListA
     HasOrgsFilterBackend
 from edx_solutions_api_integration.models import GroupProfile, APIUser as User
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
+from edx_solutions_api_integration.users.serializers import CourseProgressSerializer
 from edx_solutions_api_integration.utils import generate_base_uri, dict_has_items, extract_data_params
 from edx_solutions_projects.serializers import BasicWorkgroupSerializer
 from .serializers import UserSerializer, UserCountByCitySerializer, UserRolesSerializer
@@ -1554,3 +1558,35 @@ class UsersNotificationsDetail(SecureAPIView):
         mark_notification_read(int(user_id), int(msg_id), read=bool(read))
 
         return Response({}, status=status.HTTP_201_CREATED)
+
+
+class UsersCourseProgressList(SecureListAPIView):
+    """
+    The UsersCourseProgressList view allows you to retrieve a list of courses user enrolled in and the progress
+    for a user
+    - URI: ```/api/users/{user_id}/courses/progress```
+    """
+    pagination_class = None
+
+    def get(self, request, user_id):  # pylint: disable=unused-argument
+        try:
+            user = User.objects.get(id=user_id)
+        except ObjectDoesNotExist:
+            raise Http404
+        enrollments = CourseEnrollment.objects.filter(user=user).values('course_id', 'created', 'is_active')
+
+        course_keys = []
+        for course_enrollment in enrollments:
+            course_keys.append(CourseKey.from_string(course_enrollment['course_id']))
+
+        student_progress = StudentProgress.objects.filter(user=user).values('course_id', 'completions')
+        course_overview = CourseOverview.objects.filter(id__in=course_keys).values('id', 'start', 'end', 'course_image_url', 'display_name')
+        course_meta_data = CourseAggregatedMetaData.objects.filter(id__in=course_keys).values('id', 'total_assessments')
+
+        serializer = CourseProgressSerializer(enrollments, many=True, context={
+            'student_progress': student_progress,
+            'course_overview': course_overview,
+            'course_metadata': course_meta_data,
+        })
+
+        return Response(serializer.data, status=status.HTTP_200_OK)

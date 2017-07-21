@@ -128,3 +128,43 @@ class UserRolesSerializer(serializers.Serializer):
     """ Serializer for user roles """
     course_id = serializers.CharField()
     role = serializers.CharField()
+
+
+class CourseProgressSerializer(serializers.Serializer):
+    """ Serializer for course progress """
+    created = serializers.DateTimeField()
+    is_active = serializers.BooleanField()
+    progress = serializers.SerializerMethodField()
+    course = serializers.SerializerMethodField()
+
+    def get_progress(self, enrollment):
+        completion_percentage = 0
+
+        actual_completions = next(
+            (
+                progress['completions']
+                for progress in self.context['student_progress']
+                if progress['course_id'] == enrollment['course_id']
+             ), 0
+        )
+        total_possible_completions = next(
+            (
+                metadata['total_assessments']
+                for metadata in self.context['course_metadata']
+                if metadata['id'] == enrollment['course_id']
+            ), 0
+        )
+
+        if total_possible_completions > 0:
+            completion_percentage = min(100 * (actual_completions / float(total_possible_completions)), 100)
+        return completion_percentage
+
+    def get_course(self, enrollment):
+        course_overview = next(
+            (
+                course_overview
+                for course_overview in self.context['course_overview']
+                if course_overview['id'] == enrollment['course_id']
+            ), None
+        )
+        return course_overview
