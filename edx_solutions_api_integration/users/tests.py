@@ -2468,3 +2468,31 @@ class UsersProgressApiTests(
         self.assertIn('start', response_obj['course'])
         self.assertIn('end', response_obj['course'])
         self.assertIn('id', response_obj['course'])
+
+    def test_users_no_progress_in_course(self):
+        """ 
+        Test progress value returned by users progress list api 
+        User is enrolled in a course but nothing done. Progress should be zero. 
+        """
+        CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
+
+        test_uri = '{}/{}/courses/progress'.format(self.base_users_uri, self.user.id)
+        response = self.do_get(test_uri)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+
+        response_obj = response.data[0]
+        self.assertIn('created', response_obj)
+        self.assertIn('is_active', response_obj)
+        self.assertIn('progress', response_obj)
+        self.assertIn('course', response_obj)
+
+        self.assertEqual(response.data[0]['progress'], 0.0)
+        self.assertEqual(response.data[0]['is_active'], True)
+
+        self.assertIn('course_image_url', response_obj['course'])
+        self.assertIn('display_name', response_obj['course'])
+        self.assertIn('start', response_obj['course'])
+        self.assertIn('end', response_obj['course'])
+        self.assertIn('id', response_obj['course'])
