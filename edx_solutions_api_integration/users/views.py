@@ -60,6 +60,7 @@ from edx_solutions_api_integration.permissions import SecureAPIView, SecureListA
 from edx_solutions_api_integration.models import GroupProfile, APIUser as User
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from edx_solutions_api_integration.users.serializers import CourseProgressSerializer
+from edx_solutions_api_integration.utils import str2bool
 from edx_solutions_api_integration.utils import generate_base_uri, dict_has_items, extract_data_params
 from edx_solutions_projects.serializers import BasicWorkgroupSerializer
 from .serializers import UserSerializer, UserCountByCitySerializer, UserRolesSerializer
@@ -1565,10 +1566,14 @@ class UsersCourseProgressList(SecureListAPIView):
     The UsersCourseProgressList view allows you to retrieve a list of courses user enrolled in and the progress
     for a user
     - URI: ```/api/users/{user_id}/courses/progress```
+    To get course of mobile only
+    GET ```/api/users/{user_id}/courses/progress?mobile_only=true```
     """
     pagination_class = None
 
     def get(self, request, user_id):  # pylint: disable=unused-argument
+        mobile_only = self.request.query_params.get('mobile_only', None)
+
         try:
             user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
@@ -1580,8 +1585,18 @@ class UsersCourseProgressList(SecureListAPIView):
             course_keys.append(CourseKey.from_string(course_enrollment['course_id']))
 
         student_progress = StudentProgress.objects.filter(user=user).values('course_id', 'completions')
-        course_overview = CourseOverview.objects.filter(id__in=course_keys).values('id', 'start', 'end', 'course_image_url', 'display_name')
         course_meta_data = CourseAggregatedMetaData.objects.filter(id__in=course_keys).values('id', 'total_assessments')
+
+        course_overview = CourseOverview.objects.filter(id__in=course_keys)
+        if str2bool(mobile_only):
+            course_overview = course_overview.filter(mobile_available=True)
+        course_overview = course_overview.values('id', 'start', 'end', 'course_image_url', 'display_name')
+
+        enrollments = [
+                enrollment
+                for enrollment in enrollments
+                if enrollment['course_id'] in course_overview.values_list('id', flat=True)
+            ]
 
         serializer = CourseProgressSerializer(enrollments, many=True, context={
             'student_progress': student_progress,
