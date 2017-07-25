@@ -2468,3 +2468,63 @@ class UsersProgressApiTests(
         self.assertIn('start', response_obj['course'])
         self.assertIn('end', response_obj['course'])
         self.assertIn('id', response_obj['course'])
+
+    def test_users_no_progress_in_course(self):
+        """ 
+        Test progress value returned by users progress list api 
+        User is enrolled in a course but nothing done. Progress should be zero. 
+        """
+        CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
+
+        test_uri = '{}/{}/courses/progress'.format(self.base_users_uri, self.user.id)
+        response = self.do_get(test_uri)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+
+        self.assertEqual(response.data[0]['progress'], 0.0)
+
+    def test_users_progress_in_mobile_only_courses(self):
+        """ 
+        Test progress value returned by users progress list api 
+        Only the mobile available courses will be returned if the flag has been set in the params. 
+        """
+        mobile_course = CourseFactory.create(mobile_available=True)
+        mobile_course_content = ItemFactory.create(
+            category="chapter",
+            parent_location=mobile_course.location,
+            display_name="Overview"
+        )
+
+        CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
+        CourseEnrollmentFactory.create(user=self.user, course_id=mobile_course.id)
+
+        completions_uri = '{}/{}/completions/'.format(self.base_courses_uri, self.course.id)
+        completions_data = {
+            'content_id': unicode(self.course_content.scope_ids.usage_id),
+            'user_id': self.user.id,
+            'stage': 'First'
+        }
+        response = self.do_post(completions_uri, completions_data)
+        self.assertEqual(response.status_code, 201)
+
+        completions_uri = '{}/{}/completions/'.format(self.base_courses_uri, mobile_course.id)
+        completions_data = {
+            'content_id': unicode(mobile_course_content.scope_ids.usage_id),
+            'user_id': self.user.id,
+            'stage': 'First'
+        }
+        response = self.do_post(completions_uri, completions_data)
+        self.assertEqual(response.status_code, 201)
+
+        test_uri = '{}/{}/courses/progress'.format(self.base_users_uri, self.user.id)
+        response = self.do_get(test_uri)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+
+        test_uri = '{}/{}/courses/progress?mobile_only=true'.format(self.base_users_uri, self.user.id)
+        response = self.do_get(test_uri)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)

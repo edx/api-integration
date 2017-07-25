@@ -4618,7 +4618,7 @@ Resources related to User Management in the API.
 # User
 Resources related to User in the API.
 
-## User Progress List [/users/{user_id}/courses/progress]
+## User Progress List [/users/{user_id}/courses/progress?mobile_only=true]
 
 It allows clients to get a list of courses user enrolled in and the progress of the user in that course
 
@@ -4641,7 +4641,7 @@ Progress here is in percentage.
                     "id": "course-v1:edX+DemoX+Demo_Course",
                     "display_name": "edX Demonstration Course"
                 },
-                "progress": 1
+                "progress": 1.0
             },
             {
                 "created": "2017-05-16 08:09:03.294214+00:00",
@@ -4653,6 +4653,6 @@ Progress here is in percentage.
                     "id": "OrganizationX/cs202/2017_S1",
                     "display_name": "[Test] Business Strategy Jan 2016"
                 },
-                "progress": 21
+                "progress": 21.67
             }
         ]
