@@ -1592,10 +1592,12 @@ class UsersCourseProgressList(SecureListAPIView):
             course_overview = course_overview.filter(mobile_available=True)
         course_overview = course_overview.values('id', 'start', 'end', 'course_image_url', 'display_name')
 
+        filtered_course_overview = [overview["id"] for overview in course_overview]
+
         enrollments = [
                 enrollment
                 for enrollment in enrollments
-                if enrollment['course_id'] in course_overview.values_list('id', flat=True)
+                if enrollment['course_id'] in filtered_course_overview
             ]
 
         serializer = CourseProgressSerializer(enrollments, many=True, context={
