@@ -5,6 +5,7 @@ from rest_framework import serializers
 from rest_framework.reverse import reverse
 
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from django.conf import settings
 
 
 class GradeSerializer(serializers.Serializer):
@@ -89,3 +90,22 @@ class OrganizationCourseSerializer(CourseSerializer):
     class Meta(object):
         """ Serializer/field specification """
         fields = ('id', 'name', 'number', 'org', 'start', 'end', 'due', 'enrolled_users', )
+
+
+class UserGradebookSerializer(serializers.Serializer):
+    """ Serializer for users passed in a specific course """
+    id = serializers.IntegerField(source='user_id')
+    email = serializers.CharField(source='user.email')
+    username = serializers.CharField(source='user.username')
+    first_name = serializers.CharField(source='user.first_name')
+    last_name = serializers.CharField(source='user.last_name')
+    is_active = serializers.BooleanField(source='user.is_active')
+    created = serializers.DateTimeField(source='user.date_joined')
+    complete_status = serializers.SerializerMethodField()
+
+    def get_complete_status(self, gradebook):
+        grade_complete_match_range = getattr(settings, 'GRADEBOOK_GRADE_COMPLETE_PROFORMA_MATCH_RANGE', 0.01)
+        complete_status = False
+        if gradebook.grade and (gradebook.proforma_grade <= gradebook.grade + grade_complete_match_range):
+            complete_status = True
+        return complete_status

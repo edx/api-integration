@@ -1233,13 +1233,9 @@ class CoursesApiTests(
     def test_courses_users_list_courses_passed(self):
         """ Test courses_passed value returned by courses users list api """
         course = self.setup_course_with_grading()
-
         test_uri = self.base_courses_uri + '/{course_id}/users/passed'
 
-        # create a 2 new users
         users = UserFactory.create_batch(2)
-
-        # create course enrollments
         CourseEnrollmentFactory.create(user=users[0], course_id=course.id)
         CourseEnrollmentFactory.create(user=users[1], course_id=course.id)
 
@@ -1273,6 +1269,33 @@ class CoursesApiTests(
 
         self.assertEqual(response.data["results"][0]["id"], users[0].id)
         self.assertEqual(response.data["results"][1]["id"], users[1].id)
+
+    def test_courses_passed_users_list_complete_status(self):
+        """ Test complete_status in users passed list of a course """
+        course = self.setup_course_with_grading()
+        test_uri = self.base_courses_uri + '/{course_id}/users/passed'
+
+        users = UserFactory.create_batch(2)
+        CourseEnrollmentFactory.create(user=users[0], course_id=course.id)
+        CourseEnrollmentFactory.create(user=users[1], course_id=course.id)
+
+        module = self.get_module_for_user(users[0], course, course.homework_assignment)
+        grade_dict = {'value': 1, 'max_value': 1, 'user_id': users[0].id}
+        module.system.publish(module, 'grade', grade_dict)
+        module = self.get_module_for_user(users[0], course, course.midterm_assignment)
+        grade_dict = {'value': 1, 'max_value': 1, 'user_id': users[0].id}
+        module.system.publish(module, 'grade', grade_dict)
+        module = self.get_module_for_user(users[1], course, course.homework_assignment)
+        grade_dict = {'value': 1, 'max_value': 1, 'user_id': users[1].id}
+        module.system.publish(module, 'grade', grade_dict)
+
+        response = self.do_get(test_uri.format(course_id=unicode(course.id)))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('complete_status', response.data['results'][0])
+        self.assertEqual(response.data["results"][0]["id"], users[0].id)
+        self.assertEqual(response.data["results"][1]["id"], users[1].id)
+        self.assertEqual(response.data["results"][0]["complete_status"], True)
+        self.assertEqual(response.data["results"][1]["complete_status"], False)
 
     def test_courses_users_list_get_attributes(self):
         """ Test presence of newly added attributes to courses users list api """

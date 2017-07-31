@@ -47,6 +47,7 @@ from xmodule.modulestore.search import path_to_location
 from xmodule.modulestore.exceptions import ItemNotFoundError
 from course_metadata.models import CourseAggregatedMetaData
 
+from edx_solutions_api_integration.courses.serializers import UserGradebookSerializer
 from edx_solutions_api_integration.courseware_access import (
     get_course,
     get_course_child,
@@ -1170,7 +1171,7 @@ class CoursesUsersPassedList(SecureListAPIView):
          * To get a list of users passed in a course and also member of specific groups
          ```/api/courses/{course_id}/users/passed?groups={group_id1},{group_id2}```
     """
-    serializer_class = SimpleUserSerializer
+    serializer_class = UserGradebookSerializer
 
     def get_queryset(self):
         """
@@ -1186,7 +1187,7 @@ class CoursesUsersPassedList(SecureListAPIView):
         course_key = get_course_key(course_id)
         exclude_users = get_aggregate_exclusion_user_ids(course_key)
 
-        queryset = StudentGradebook.get_passed_users(
+        queryset = StudentGradebook.get_passed_users_gradebook(
             course_key, exclude_users=exclude_users, org_ids=org_ids, group_ids=group_ids
         )
         return queryset
