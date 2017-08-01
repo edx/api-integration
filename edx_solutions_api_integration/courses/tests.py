@@ -34,6 +34,7 @@ from edx_solutions_organizations.models import Organization
 from edx_solutions_projects.models import Workgroup, Project
 from student.tests.factories import UserFactory, CourseEnrollmentFactory, GroupFactory
 from student.models import CourseEnrollment
+from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 from xmodule.modulestore.tests.django_utils import SharedModuleStoreTestCase, mixed_store_config
 from xmodule.modulestore import ModuleStoreEnum
@@ -256,7 +257,7 @@ class CoursesApiTests(
         cls.test_course_org = cls.course.org
         cls.test_chapter_id = unicode(cls.chapter.scope_ids.usage_id)
         cls.test_course_content_id = unicode(cls.course_content.scope_ids.usage_id)
-        cls.test_bogus_content_id = "j5y://foo/bar/baz"
+        cls.test_bogus_content_id = "i4x://foo/bar/baz/12345"
         cls.test_content_child_id = unicode(cls.content_child.scope_ids.usage_id)
         cls.base_course_content_uri = '{}/{}/content'.format(cls.base_courses_uri, cls.test_course_id)
         cls.base_chapters_uri = cls.base_course_content_uri + '?type=chapter'
@@ -432,11 +433,12 @@ class CoursesApiTests(
         self.assertEqual(response.data['end'], create_course_with_out_date_values.end)
 
     def test_courses_detail_get(self):
+        test_course_usage_key = unicode(modulestore().make_course_usage_key(self.course.id))
         test_uri = self.base_courses_uri + '/' + self.test_course_id
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.data), 0)
-        self.assertEqual(response.data['id'], self.test_course_id)
+        self.assertEqual(response.data['id'], test_course_usage_key)
         self.assertEqual(response.data['name'], self.test_course_name)
         self.assertEqual(
             datetime.strftime(response.data['start'], '%Y-%m-%d %H:%M:%S'),
@@ -452,6 +454,7 @@ class CoursesApiTests(
         self.assertEqual(response.data['uri'], confirm_uri)
 
     def test_courses_detail_get_with_child_content(self):
+        test_course_usage_key = unicode(modulestore().make_course_usage_key(self.course.id))
         test_uri = self.base_courses_uri + '/' + self.test_course_id
         response = self.do_get('{}?depth=100'.format(test_uri))
         self.assertEqual(response.status_code, 200)
@@ -553,7 +556,9 @@ class CoursesApiTests(
         self.assertEqual(response.status_code, 404)
 
     def test_course_content_list_get_invalid_content(self):
-        test_uri = '{}/{}/children'.format(self.base_course_content_uri, self.test_bogus_content_id)
+        test_uri = '{}/{}/content/{}/children'.format(
+            self.base_courses_uri, self.test_bogus_course_id, self.test_bogus_content_id
+        )
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
 
@@ -586,7 +591,8 @@ class CoursesApiTests(
         self.assertEqual(response.data['uri'], confirm_uri)
 
     def test_course_content_detail_get_course(self):
-        test_uri = self.base_course_content_uri + '/' + self.test_course_id
+        test_course_usage_key = unicode(modulestore().make_course_usage_key(self.course.id))
+        test_uri = self.base_course_content_uri + '/' + test_course_usage_key
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.data), 0)
@@ -596,7 +602,9 @@ class CoursesApiTests(
         self.assertGreater(len(response.data['content']), 0)
 
     def test_course_content_detail_get_notfound(self):
-        test_uri = self.base_course_content_uri + '/' + self.test_bogus_content_id
+        test_uri = '{}/{}/content/{}'.format(
+            self.base_courses_uri, self.test_bogus_course_id, self.test_bogus_content_id
+        )
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
 
