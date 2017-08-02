@@ -433,12 +433,11 @@ class CoursesApiTests(
         self.assertEqual(response.data['end'], create_course_with_out_date_values.end)
 
     def test_courses_detail_get(self):
-        test_course_usage_key = unicode(modulestore().make_course_usage_key(self.course.id))
         test_uri = self.base_courses_uri + '/' + self.test_course_id
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.data), 0)
-        self.assertEqual(response.data['id'], test_course_usage_key)
+        self.assertEqual(response.data['id'], self.test_course_id)
         self.assertEqual(response.data['name'], self.test_course_name)
         self.assertEqual(
             datetime.strftime(response.data['start'], '%Y-%m-%d %H:%M:%S'),
@@ -454,7 +453,6 @@ class CoursesApiTests(
         self.assertEqual(response.data['uri'], confirm_uri)
 
     def test_courses_detail_get_with_child_content(self):
-        test_course_usage_key = unicode(modulestore().make_course_usage_key(self.course.id))
         test_uri = self.base_courses_uri + '/' + self.test_course_id
         response = self.do_get('{}?depth=100'.format(test_uri))
         self.assertEqual(response.status_code, 200)
