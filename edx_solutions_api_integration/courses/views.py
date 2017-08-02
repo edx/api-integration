@@ -238,7 +238,6 @@ def _make_block_tree(request, blocks_data, course_key, course_block, block=None,
 
             if data['category'] == 'course':
                 data['content'] = children
-                data['id'] = unicode(course_block.id)
             else:
                 data['children'] = children
 
@@ -247,6 +246,7 @@ def _make_block_tree(request, blocks_data, course_key, course_block, block=None,
             content_uri = '{}/{}'.format(base_content_uri, content_id)
             data['number'] = course_block.location.course
             data['org'] = course_block.location.org
+            data['id'] = unicode(course_block.id)
         else:
             content_uri = '{}/{}/content/{}'.format(base_content_uri, unicode(course_key), data['id'])
 
