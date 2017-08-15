@@ -207,7 +207,7 @@ def _manage_role(course_descriptor, user, role, action):
                 update_forum_role(course_descriptor.id, user, FORUM_ROLE_MODERATOR, 'revoke')
 
 
-def _make_block_tree(request, blocks_data, course_key, course_block, block=None, depth=1, usage_key=None):
+def _make_block_tree(request, blocks_data, course_key, course_block, block=None, depth=1, usage_key=None, content_block=None):    # pylint: disable=line-too-long
     """
     Its a nested method that will return a serialized details
     of a content block and its children depending on the depth.
@@ -256,7 +256,7 @@ def _make_block_tree(request, blocks_data, course_key, course_block, block=None,
         if include_fields:
             include_fields = include_fields.split(',')
             for field in include_fields:
-                data[field] = getattr(course_block, field, None)
+                data[field] = getattr(content_block, field, None)
         return data
     else:
         # result from the course block method includes the parent block too.
@@ -424,6 +424,7 @@ class CourseContentDetail(SecureAPIView):
         depth is 1 as we have to return only the children of the given node not more than that
         """
         response_data = {}
+        child_descriptor = None
         base_uri = generate_base_uri(request)
         response_data['uri'] = base_uri
         course_descriptor, course_key, course_content = get_course(request, request.user, course_id)  # pylint: disable=W0612
@@ -431,6 +432,10 @@ class CourseContentDetail(SecureAPIView):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
 
         if course_id != content_id:
+            if 'include_fields' in request.query_params:
+                # Here we need to get some additional fields from child_descriptor.
+                # Only needed when we have include_fields param in request
+                child_descriptor, child_key, child_content = get_course_child(request, request.user, course_key, content_id, True)  # pylint: disable=line-too-long
             usage_key = UsageKey.from_string(content_id)
         else:
             usage_key = modulestore().make_course_usage_key(course_key)
@@ -451,7 +456,12 @@ class CourseContentDetail(SecureAPIView):
         )
         root_block = data_blocks['blocks'][data_blocks['root']]
         response_data = _make_block_tree(
-            request, data_blocks['blocks'], course_key, course_descriptor, root_block
+            request,
+            data_blocks['blocks'],
+            course_key,
+            course_descriptor,
+            root_block,
+            content_block=child_descriptor
         )
         base_uri_without_qs = generate_base_uri(request, True)
         resource_uri = '{}/groups'.format(base_uri_without_qs)
@@ -572,7 +582,13 @@ class CoursesDetail(SecureAPIView):
             )
             root_block = data_blocks['blocks'][data_blocks['root']]
             response_data = _make_block_tree(
-                request, data_blocks['blocks'], course_key, course_descriptor, root_block, depth_int
+                request,
+                data_blocks['blocks'],
+                course_key,
+                course_descriptor,
+                root_block,
+                depth_int,
+                content_block=course_descriptor
             )
             base_uri_without_qs = generate_base_uri(request, True)
             if unicode(course_descriptor.id) not in base_uri_without_qs:
