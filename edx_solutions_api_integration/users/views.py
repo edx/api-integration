@@ -17,10 +17,10 @@ from rest_framework import filters
 from rest_framework.response import Response
 
 from courseware import module_render
-from course_blocks.api import get_course_blocks
 from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
+from social_engagement.models import StudentSocialEngagementScore
 from gradebook.utils import generate_user_gradebook
 from instructor.access import revoke_access, update_forum_role
 from openedx.core.djangoapps.lang_pref import LANGUAGE_KEY
@@ -43,10 +43,15 @@ from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from edx_notifications.lib.consumer import mark_notification_read
 from course_metadata.models import CourseAggregatedMetaData
 from progress.models import StudentProgress
-from social_engagement.models import StudentSocialEngagementScore
 from student.models import CourseEnrollment, PasswordHistory, UserProfile
-from student.roles import CourseAccessRole, CourseInstructorRole, CourseObserverRole, CourseStaffRole, \
-    CourseAssistantRole, UserBasedRole
+from student.roles import (
+    CourseAccessRole,
+    CourseInstructorRole,
+    CourseObserverRole,
+    CourseStaffRole,
+    CourseAssistantRole,
+    UserBasedRole,
+)
 from util.bad_request_rate_limiter import BadRequestRateLimiter
 from util.password_policy_validators import (
     validate_password_length, validate_password_complexity,
@@ -60,18 +65,26 @@ from edx_solutions_api_integration.permissions import SecureAPIView, SecureListA
     HasOrgsFilterBackend
 from edx_solutions_api_integration.models import GroupProfile, APIUser as User
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
-from edx_solutions_api_integration.users.serializers import CourseProgressSerializer
 from edx_solutions_api_integration.utils import (
-    str2bool,
     generate_base_uri,
     dict_has_items,
     extract_data_params,
     get_user_from_request_params,
     get_aggregate_exclusion_user_ids,
+    str2bool,
+    css_param_to_list,
+    get_aggregate_exclusion_user_ids,
+    cache_course_data,
+    cache_course_user_data,
+    get_cached_data,
 )
 from edx_solutions_projects.serializers import BasicWorkgroupSerializer
-from .serializers import UserSerializer, UserCountByCitySerializer, UserRolesSerializer
-
+from edx_solutions_api_integration.users.serializers import (
+    UserSerializer,
+    UserCountByCitySerializer,
+    UserRolesSerializer,
+    CourseProgressSerializer,
+)
 
 log = logging.getLogger(__name__)
 AUDIT_LOG = logging.getLogger("audit")
@@ -727,18 +740,16 @@ class UsersGroupsList(SecureAPIView):
             existing_user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
-        group_type = request.query_params.get('type', None)
-        course = request.query_params.get('course', None)
+        group_type = css_param_to_list(request, 'type')
+        course = css_param_to_list(request, 'course')
         data_params = extract_data_params(request)
         response_data = {}
         base_uri = generate_base_uri(request)
         response_data['uri'] = base_uri
         groups = existing_user.groups.all()
         if group_type:
-            group_type = group_type.split(',')
             groups = groups.filter(groupprofile__group_type__in=group_type)
         if course:
-            course = course.split(',')
             groups = groups.filter(coursegrouprelationship__course_id__in=course)
         if data_params:
             groups = [group for group in groups if dict_has_items(group.groupprofile.data, data_params)]
@@ -1334,19 +1345,27 @@ class UsersSocialMetrics(SecureListAPIView):
     """
 
     def get(self, request, *args, **kwargs):  # pylint: disable=unused-arguments
+        include_stats = str2bool(request.query_params.get('include_stats', 'false'))
         user = get_user_from_request_params(self.request, self.kwargs)
         course_id = kwargs.get('course_id', None)
         if course_id is None:
             course_id = self.request.query_params.get('course_id', None)
 
-        course_key = get_course_key(course_id)
-
         if not course_exists(request, self.request.user, course_id):
             raise Http404
 
-        data = self._get_user_discussion_metrics(request, user, course_id)
-        data['score'] = self._get_user_score(course_key, user)
-        data['course_avg_score'] = self._get_course_average_score(course_key)
+        course_key = get_course_key(course_id)
+        cached_social_data = get_cached_data('social', course_id, user.id)
+        if not cached_social_data:
+            social_engagement_score = self._get_user_score(course_key, user)
+            course_avg = self._get_course_average_score(course_key)
+            data = {'course_avg': course_avg, 'score': social_engagement_score}
+            cache_course_data('social', course_id, {'course_avg': course_avg})
+            cache_course_user_data('social', course_id, user.id, {'score': social_engagement_score})
+        else:
+            data = cached_social_data
+        if include_stats:
+            data['stats'] = self._get_user_discussion_metrics(request, user, course_id)
 
         return Response(data, status.HTTP_200_OK)
 

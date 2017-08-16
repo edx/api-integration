@@ -33,6 +33,7 @@ from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR, ForumsConfig
 from instructor.access import allow_access
 from edx_solutions_organizations.models import Organization
+from social_engagement.models import StudentSocialEngagementScore
 from edx_solutions_projects.models import Project, Workgroup
 from edx_solutions_api_integration.test_utils import (
     get_non_atomic_database_settings,
@@ -1866,7 +1867,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['results'][0]['count'], 6)
 
     def test_users_social_metrics_check_service_availability(self):
-        test_uri = '{}/{}/courses/{}/metrics/social/'.format(self.users_base_uri, self.user.id, self.course.id)
+        test_uri = '{}/{}/courses/{}/metrics/social/?include_stats=true'.format(self.users_base_uri, self.user.id, self.course.id)
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
 
@@ -1883,17 +1884,27 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
     @mock.patch("edx_solutions_api_integration.users.views.get_user_social_stats", _fake_get_user_social_stats)
     def test_users_social_metrics(self):
-        test_uri = '{}/{}/courses/{}/metrics/social/'.format(self.users_base_uri, self.user.id, self.course.id)
+        test_uri = '{}/{}/courses/{}/metrics/social/?include_stats=true'.format(
+            self.users_base_uri, self.user.id, self.course.id
+        )
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
 
     @mock.patch("edx_solutions_api_integration.users.views.get_user_social_stats", _fake_get_user_social_stats_with_end)
     def test_users_social_metrics_end_date(self):
+        user_score = 30
         course = CourseFactory.create(org='TUCGLG', run='TUCGLG1', end=datetime(2012, 1, 1))
-
-        test_uri = '{}/{}/courses/{}/metrics/social/'.format(self.users_base_uri, self.user.id, course.id)
+        CourseEnrollmentFactory(user=self.user, course_id=course.id)
+        StudentSocialEngagementScore.objects.get_or_create(
+            user=self.user, course_id=course.id, defaults={'score': user_score}
+        )
+        test_uri = '{}/{}/courses/{}/metrics/social/?include_stats=true'.format(
+            self.users_base_uri, self.user.id, course.id
+        )
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['score'], user_score)
+        self.assertEqual(response.data['course_avg'], user_score)
 
     def test_user_social_metrics_engagement_scores(self):
         other_user = UserFactory()
@@ -1912,7 +1923,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['score'], user_score.score)
-        self.assertEqual(response.data['course_avg_score'], course_avg_score)
+        self.assertEqual(response.data['course_avg'], course_avg_score)
 
     def test_users_roles_list_get(self):
         allow_access(self.course, self.user, 'staff')

@@ -63,6 +63,7 @@ from edx_solutions_api_integration.models import (
     GroupProfile,
 )
 from progress.models import CourseModuleCompletion
+from social_engagement.models import StudentSocialEngagementScore
 from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView
 from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer, \
     SimpleUserSerializer
@@ -78,9 +79,15 @@ from edx_solutions_api_integration.utils import (
     cache_course_user_data,
     get_aggregate_exclusion_user_ids,
     get_user_from_request_params,
+    css_param_to_list,
 )
-from .serializers import CourseSerializer
-from .serializers import GradeSerializer, CourseLeadersSerializer, CourseCompletionsLeadersSerializer
+from edx_solutions_api_integration.courses.serializers import (
+    CourseSerializer,
+    GradeSerializer,
+    CourseLeadersSerializer,
+    CourseCompletionsLeadersSerializer,
+    CourseSocialLeadersSerializer,
+)
 from progress.serializers import CourseModuleCompletionSerializer
 
 
@@ -505,9 +512,8 @@ class CoursesList(SecureListAPIView):
     serializer_class = CourseSerializer
 
     def get_queryset(self):
-        course_ids = self.request.query_params.get('course_id', None)
+        course_ids = css_param_to_list(self.request, 'course_id')
         if course_ids:
-            course_ids = course_ids.split(',')
             course_keys = [get_course_key(course_id) for course_id in course_ids]
             results = CourseOverview.get_select_courses(course_keys)
         else:
@@ -1576,6 +1582,9 @@ class CoursesMetrics(SecureAPIView):
     - URI: ```/api/courses/{course_id}/metrics/?organization={organization_id}```
     - GET: Returns a JSON representation (array) of the set of course metrics
     - metrics can be filtered by organization by adding organization parameter to GET request
+    - metrics_required param should be comma separated list of metrics required
+    - possible values for metrics_required param are
+    - ``` users_started,modules_completed,users_completed,thread_stats ```
     ### Use Cases/Notes:
     * Example: Display number of users enrolled in a given course
     """
@@ -1591,6 +1600,7 @@ class CoursesMetrics(SecureAPIView):
         exclude_users = get_aggregate_exclusion_user_ids(course_key)
         users_enrolled_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users)
         organization = request.query_params.get('organization', None)
+        metrics_required = css_param_to_list(request, 'metrics_required')
         org_ids = None
         if organization:
             users_enrolled_qs = users_enrolled_qs.filter(organizations=organization)
@@ -1600,39 +1610,43 @@ class CoursesMetrics(SecureAPIView):
         if group_ids:
             users_enrolled_qs = users_enrolled_qs.filter(groups__in=group_ids)
 
-        users_started = StudentProgress.get_num_users_started(course_key,
-                                                              exclude_users=exclude_users,
-                                                              org_ids=org_ids,
-                                                              group_ids=group_ids)
-        users_enrolled = users_enrolled_qs.distinct().count()
-        modules_completed = StudentProgress.get_total_completions(
-            course_key, exclude_users=exclude_users, org_ids=org_ids, group_ids=group_ids
-        )
-        users_completed = StudentGradebook.get_num_users_completed(
-            course_key, exclude_users=exclude_users, org_ids=org_ids, group_ids=group_ids
-        )
-
         data = {
-            'users_enrolled': users_enrolled,
-            'users_started': users_started,
-            'users_not_started': users_enrolled - users_started,
-            'modules_completed': modules_completed,
-            'users_completed': users_completed,
-            'grade_cutoffs': course_descriptor.grading_policy['GRADE_CUTOFFS']
+            'grade_cutoffs': course_descriptor.grading_policy['GRADE_CUTOFFS'],
+            'users_enrolled': users_enrolled_qs.distinct().count()
         }
 
-        thread_stats = {}
-        try:
-            thread_stats = get_course_thread_stats(slash_course_id)
-        except (CommentClientMaintenanceError, CommentClientRequestError, ConnectionError), e:  # pylint: disable=C0103
-            logging.error("Forum service returned an error: %s", str(e))
+        if 'users_started' in metrics_required:
+            users_started = StudentProgress.get_num_users_started(
+                course_key,
+                exclude_users=exclude_users,
+                org_ids=org_ids,
+                group_ids=group_ids
+            )
+            data['users_started'] = users_started
+            data['users_not_started'] = data['users_enrolled'] - users_started
 
-            data = {
-                "err_msg": str(e)
-            }
-            return Response(data, status=status.HTTP_200_OK)
+        if 'modules_completed' in metrics_required:
+            modules_completed = StudentProgress.get_total_completions(
+                course_key, exclude_users=exclude_users, org_ids=org_ids, group_ids=group_ids
+            )
+            data['modules_completed'] = modules_completed
 
-        data.update(thread_stats)
+        if 'users_completed' in metrics_required:
+            users_completed = StudentGradebook.get_num_users_completed(
+                course_key, exclude_users=exclude_users, org_ids=org_ids, group_ids=group_ids
+            )
+            data['users_completed'] = users_completed
+
+        if 'thread_stats' in metrics_required:
+            try:
+                data['thread_stats'] = get_course_thread_stats(slash_course_id)
+            except (CommentClientMaintenanceError, CommentClientRequestError, ConnectionError), e:
+                logging.error("Forum service returned an error: %s", str(e))
+
+                data = {
+                    "err_msg": str(e)
+                }
+                return Response(data, status=status.HTTP_200_OK)
         return Response(data, status=status.HTTP_200_OK)
 
 
@@ -1798,10 +1812,8 @@ class CoursesMetricsGradesLeadersList(SecureListAPIView):
         user_id = self.request.query_params.get('user_id', None)
         group_ids = get_ids_from_list_param(self.request, 'groups')
         count = self.request.query_params.get('count', 3)
-        exclude_roles = self.request.query_params.get('exclude_roles', None)
+        exclude_roles = css_param_to_list(self.request, 'exclude_roles')
         skipleaders = str2bool(self.request.query_params.get('skipleaders', 'false'))
-        if exclude_roles:
-            exclude_roles = [role for role in filter(None, exclude_roles.split(','))]
 
         data = {}
         if not course_exists(request, request.user, course_id):
@@ -1866,10 +1878,7 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
         """
         user_id = self.request.query_params.get('user_id', None)
         count = self.request.query_params.get('count', None)
-        exclude_roles = self.request.query_params.get('exclude_roles', None)
-        if exclude_roles:
-            exclude_roles = [role for role in filter(None, exclude_roles.split(','))]
-
+        exclude_roles = css_param_to_list(self.request, 'exclude_roles')
         skipleaders = str2bool(self.request.query_params.get('skipleaders', 'false'))
         data = {}
         course_avg = 0
@@ -1919,6 +1928,57 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
         else:
             cache_course_data('progress', course_id, {'course_avg': data['course_avg']})
             cache_course_user_data('progress', course_id, user_id, {'completions': data['completions']})
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class CoursesMetricsSocialLeadersList(SecureListAPIView):
+    """
+    ### The CoursesMetricsSocialLeadersList view allows clients to retrieve top n users who are leading
+    in terms of social engagement and course social score average for the specified Course.
+    If user_id parameter is given it would return user's position/rank in social engagement leaderboard
+    - URI: ```/api/courses/{course_id}/metrics/social/leaders/?user_id={user_id}```
+    - GET: Returns a JSON representation (array) of the users with social scores
+    By default leaderboard has top 3 user scores to get more than 3 users use count parameter
+    ``` /api/courses/{course_id}/metrics/social/leaders/?count=10```
+    To exclude users with certain roles from leaderboard
+    ```/api/courses/{course_id}/metrics/social/leaders/?exclude_roles=observer,assistant```
+    ### Use Cases/Notes:
+    * Example: Display social engagement leaderboard of a given course
+    * Example: Display position of a users in a course in terms of social engagement and course avg
+    """
+
+    def get(self, request, course_id):
+        """
+        GET /api/courses/{course_id}/metrics/social/leaders/
+        """
+        user_id = self.request.query_params.get('user_id', None)
+        org_ids = get_ids_from_list_param(self.request, 'organizations')
+        count = self.request.query_params.get('count', 3)
+        exclude_roles = css_param_to_list(self.request, 'exclude_roles')
+
+        data = {}
+        if not course_exists(request, request.user, course_id):
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+        course_key = get_course_key(course_id)
+        # Users having certain roles (such as an Observer) are excluded from aggregations
+        exclude_users = get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles)
+        course_avg, queryset = StudentSocialEngagementScore.generate_leaderboard(
+            course_key,
+            org_ids=org_ids,
+            count=count,
+            exclude_users=exclude_users
+        )
+
+        serializer = CourseSocialLeadersSerializer(queryset, many=True)
+        data['leaders'] = serializer.data  # pylint: disable=E1101
+        data['course_avg'] = course_avg
+
+        if user_id:
+            user_data = StudentSocialEngagementScore.get_user_leaderboard_position(
+                course_key, user_id, exclude_users
+            )
+            data.update(user_data)
+
         return Response(data, status=status.HTTP_200_OK)
 
 
@@ -2019,21 +2079,19 @@ class CoursesMetricsCities(SecureListAPIView):
 
     def get_queryset(self):
         course_id = self.kwargs['course_id']
-        city = self.request.query_params.get('city', None)
-        upper_bound = getattr(settings, 'API_LOOKUP_UPPER_BOUND', 100)
+        city = css_param_to_list(self.request, 'city')
         if not course_exists(self.request, self.request.user, course_id):
             raise Http404
         course_key = get_course_key(course_id)
         exclude_users = get_aggregate_exclusion_user_ids(course_key)
-        queryset = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users)
+        queryset = CourseEnrollment.objects.users_enrolled_in(course_key)\
+            .exclude(id__in=exclude_users).exclude(profile__city__isnull=True).exclude(profile__city__iexact='')
         if city:
-            city = city.split(',')[:upper_bound]
             q_list = [Q(profile__city__iexact=item.strip()) for item in city]
             q_list = reduce(lambda a, b: a | b, q_list)
             queryset = queryset.filter(q_list)
 
-        queryset = queryset.values('profile__city').annotate(count=Count('profile__city'))\
-            .filter(count__gt=0).order_by('-count')
+        queryset = queryset.values('profile__city').annotate(count=Count('profile__city')).order_by('-count')
         return queryset
 
 

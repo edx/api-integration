@@ -1724,26 +1724,31 @@ Provides paginated list of course completions for a user. Use content_id paramet
         }
 
 
-## User Social Metrics [/users/{user_id}/courses/{course_id}/metrics/social]
+## User Social Metrics [/users/{user_id}/courses/{course_id}/metrics/social?include_stats=true]
 
 It allows clients to query about the activity of a user in the forums in the specified course
 
 ### User Social Metrics [GET]
 
-Returns a list of social metrics for that user in the specified course
+Returns social engagement score, course average engagement score and list of social metrics for that user in the specified course.
+To get only user's social engagement score and course average engagement score call this api with include_stats parameter.
 
 + Response 200 (application/json)
 
         {
-            "num_threads": 1,
-            "num_thread_followers": 0,
-            "num_replies": 0,
-            "num_flagged": 0,
-            "num_comments": 0,
-            "num_threads_read": 0,
-            "num_downvotes": 0,
-            "num_upvotes": 0,
-            "num_comments_generated": 0
+            "score": 40,
+            "course_avg": 10,
+            "stats": {
+                "num_threads": 1,
+                "num_thread_followers": 0,
+                "num_replies": 0,
+                "num_flagged": 0,
+                "num_comments": 0,
+                "num_threads_read": 0,
+                "num_downvotes": 0,
+                "num_upvotes": 0,
+                "num_comments_generated": 0
+            }
         }
 
 

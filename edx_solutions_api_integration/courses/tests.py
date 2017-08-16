@@ -20,6 +20,7 @@ from requests.exceptions import ConnectionError
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.cache import cache
+from django.core.urlresolvers import reverse
 from django.core.exceptions import ObjectDoesNotExist
 from django.test.utils import override_settings
 from rest_framework import status
@@ -29,6 +30,7 @@ from courseware import module_render
 from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
+from social_engagement.models import StudentSocialEngagementScore
 from instructor.access import allow_access
 from edx_solutions_organizations.models import Organization
 from edx_solutions_projects.models import Workgroup, Project
@@ -2316,7 +2318,11 @@ class CoursesApiTests(
             self.assertEqual(response.status_code, 201)
 
         # get course metrics
-        course_metrics_uri = '{}/{}/metrics/'.format(self.base_courses_uri, self.test_course_id)
+        course_metrics_uri = '{}/{}/metrics/?metrics_required={}'.format(
+            self.base_courses_uri,
+            self.test_course_id,
+            'users_started,modules_completed,users_completed,thread_stats',
+        )
         response = self.do_get(course_metrics_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['users_enrolled'], users_to_add + USER_COUNT)
@@ -2325,11 +2331,11 @@ class CoursesApiTests(
         self.assertEqual(response.data['modules_completed'], users_to_add - 1)
         self.assertEqual(response.data['users_completed'], 0)
         self.assertIsNotNone(response.data['grade_cutoffs'])
-        self.assertEqual(response.data['num_threads'], 5)
-        self.assertEqual(response.data['num_active_threads'], 3)
+        self.assertEqual(response.data['thread_stats']['num_threads'], 5)
+        self.assertEqual(response.data['thread_stats']['num_active_threads'], 3)
 
         # get course metrics by organization
-        course_metrics_uri = '{}/{}/metrics/?organization={}'.format(
+        course_metrics_uri = '{}/{}/metrics/?metrics_required=users_started&organization={}'.format(
             self.base_courses_uri,
             self.test_course_id,
             org_id
@@ -2351,7 +2357,7 @@ class CoursesApiTests(
         group = GroupFactory.create()
 
         # get course metrics for users in group
-        course_metrics_uri = '{}/{}/metrics/?groups={}'.format(
+        course_metrics_uri = '{}/{}/metrics/?metrics_required=users_started&groups={}'.format(
             self.base_courses_uri,
             self.test_course_id,
             group.id
@@ -2389,9 +2395,10 @@ class CoursesApiTests(
                     proforma_grade=0.91,
                 )
 
-        course_metrics_uri = '{}/{}/metrics/?groups={}'.format(
+        course_metrics_uri = '{}/{}/metrics/?metrics_required={}&groups={}'.format(
             self.base_courses_uri,
             self.test_course_id,
+            'users_started,modules_completed,users_completed',
             group.id
         )
         response = self.do_get(course_metrics_uri)
@@ -2422,9 +2429,10 @@ class CoursesApiTests(
             response = self.do_post(completions_uri, completions_data)
             self.assertEqual(response.status_code, 201)
 
-        course_metrics_uri = '{}/{}/metrics/?groups={},{}'.format(
+        course_metrics_uri = '{}/{}/metrics/?metrics_required={}&groups={},{}'.format(
             self.base_courses_uri,
             self.test_course_id,
+            'users_started,modules_completed,users_completed',
             groups[0].id,
             groups[1].id,
         )
@@ -3459,3 +3467,82 @@ class CoursesGradingMetricsTests(
         test_uri = '{}/{}/grades'.format(self.base_courses_uri, self.test_bogus_course_id)
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
+
+
+class CoursesSocialMetricsApiTests(
+    SignalDisconnectTestMixin, SharedModuleStoreTestCase, APIClientMixin
+):
+    """ Test suite for Courses social metrics API views """
+
+    @classmethod
+    def setUpClass(cls):
+        super(CoursesSocialMetricsApiTests, cls).setUpClass()
+
+        cls.course = CourseFactory.create()
+        cls.social_leaders_api = reverse(
+            'course-metrics-social-leaders', kwargs={'course_id': unicode(cls.course.id)}
+        )
+        cls.scores = [10, 20, 30, 40, 50, 60, 70]
+        cls.course_avg = sum(cls.scores) / len(cls.scores)
+        cls.users = []
+        for score in cls.scores:
+            user = UserFactory.create()
+            cls.users.append(user)
+            CourseEnrollmentFactory(user=user, course_id=cls.course.id)
+            StudentSocialEngagementScore.objects.get_or_create(
+                user=user, course_id=cls.course.id, defaults={'score': score}
+            )
+
+    def _create_org_with_users(self, users):
+        data = {
+            'name': 'Test Organization Attributes',
+            'display_name': 'Test Org Display Name Attributes',
+            'users': users
+        }
+        response = self.do_post('/api/server/organizations/', data)
+        self.assertEqual(response.status_code, 201)
+        return response.data['id']
+
+    def test_social_metrics_leader_list(self):
+        """
+        Tests social metrics leader list API
+        """
+        response = self.do_get(self.social_leaders_api)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['course_avg'], self.course_avg)
+        self.assertEqual(len(response.data['leaders']), 3)
+
+    def test_social_metrics_leader_list_with_count(self):
+        """
+        Tests social metrics leader list API with count parameter
+        """
+        leaders_count = 5
+        uri = "{}?count={}".format(self.social_leaders_api, leaders_count)
+        response = self.do_get(uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['course_avg'], self.course_avg)
+        self.assertEqual(len(response.data['leaders']), leaders_count)
+
+    def test_social_metrics_leader_list_with_organizations(self):
+        """
+        Tests social metrics leader list API with organizations parameter
+        """
+        org_users = [self.users[0].id, self.users[1].id]
+        org_id = self._create_org_with_users(org_users)
+        uri = "{}?organizations={}".format(self.social_leaders_api, org_id)
+        response = self.do_get(uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['course_avg'], 4)
+        self.assertEqual(len(response.data['leaders']), len(org_users))
+
+    def test_social_metrics_leader_list_with_user_position(self):
+        """
+        Tests social metrics leader list API with user_id parameter
+        """
+        uri = "{}?user_id={}".format(self.social_leaders_api, self.users[-1].id)
+        response = self.do_get(uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['course_avg'], self.course_avg)
+        self.assertEqual(len(response.data['leaders']), 3)
+        self.assertEqual(response.data['position'], 1)
+        self.assertEqual(response.data['score'], self.scores[-1])

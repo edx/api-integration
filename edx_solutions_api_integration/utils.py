@@ -331,6 +331,20 @@ def get_ids_from_list_param(request, param_name):
     return ids
 
 
+def css_param_to_list(request, param_name):
+    """
+    Converst comma separated string parameter in a request to a list
+    :param request:
+    :param param_name:
+    :return: list of values in param
+    """
+    values = request.query_params.get(param_name, [])
+    if isinstance(values, basestring):
+        upper_bound = getattr(settings, 'API_LOOKUP_UPPER_BOUND', 100)
+        values = [value.strip() for value in filter(None, values.split(',')[:upper_bound])]
+    return values
+
+
 def strip_xblock_wrapper_div(html):
     """
     Removes xblock wrapper div from given html
