@@ -236,10 +236,10 @@ def _make_block_tree(request, blocks_data, course_key, course_block, block=None,
                 )
                 children.append(child_content)
 
-            if data['category'] == 'course':
-                data['content'] = children
-            else:
-                data['children'] = children
+        if data['category'] == 'course':
+            data['content'] = children
+        else:
+            data['children'] = children
 
         if data['category'] and data['category'] == 'course':
             content_id = unicode(course_block.id)

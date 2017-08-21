@@ -502,7 +502,7 @@ class CoursesApiTests(
         self.assertGreater(len(response.data), 0)
         self.assertEqual(response.data['category'], 'course')
         self.assertEqual(response.data['name'], self.course.display_name)
-        self.assertNotIn('content', response.data)
+        self.assertIn('content', response.data)
 
     def test_chapter_list_get(self):
         test_uri = self.base_chapters_uri
