@@ -3,12 +3,15 @@ import logging
 
 from django.conf import settings
 
-from edx_solutions_api_integration.utils import get_client_ip_address, address_exists_in_network
 from rest_framework import permissions, generics, filters, pagination, serializers, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from edx_solutions_api_integration.utils import str2bool
+from openedx.core.lib.api.authentication import OAuth2AuthenticationAllowInactiveUser
+from edx_solutions_api_integration.utils import (
+    get_client_ip_address, address_exists_in_network, str2bool,
+    has_api_key_permission,
+)
 from edx_solutions_api_integration.models import APIUser as User
 
 log = logging.getLogger(__name__)
@@ -21,42 +24,20 @@ class ApiKeyHeaderPermission(permissions.BasePermission):
     """
     def has_permission(self, request, view):
         """
-        If settings.DEBUG is True and settings.EDX_API_KEY is not set or None,
-        then allow the request. Otherwise, allow the request if and only if
-        settings.EDX_API_KEY is set and the X-Edx-Api-Key HTTP header is
-        present in the request and matches the setting.
+        checks if user has api key header permission
         """
+        return has_api_key_permission(request)
 
-        debug_enabled = settings.DEBUG
-        api_key = getattr(settings, "EDX_API_KEY", None)
+class ApiKeyOrOAuth2Permission(permissions.BasePermission):
+    """
+    Check for permissions by matching the configured API key or oAuth2
 
-        # DEBUG mode rules over all else
-        # Including the api_key check here ensures we don't break the feature locally
-        if debug_enabled and api_key is None:
-            log.warn("EDX_API_KEY Override: Debug Mode")
-            return True
-
-        # If we're not DEBUG, we need a local api key
-        if api_key is None:
-            return False
-
-        # The client needs to present the same api key
-        header_key = request.META.get('HTTP_X_EDX_API_KEY')
-        if header_key is None:
-            try:
-                header_key = request.META['headers'].get('X-Edx-Api-Key')
-            except KeyError:
-                return False
-            if header_key is None:
-                return False
-
-        # The api key values need to be the same
-        if header_key != api_key:
-            return False
-
-        # Allow the request to take place
-        return True
-
+    """
+    def has_permission(self, request, view):
+        """
+        checks if user has api key or oauth2 permission
+        """
+        return (request.user and request.user.is_authenticated()) or has_api_key_permission(request)
 
 class IPAddressRestrictedPermission(permissions.BasePermission):
     """
@@ -116,6 +97,16 @@ class HasOrgsFilterBackend(filters.BaseFilterBackend):
                 queryset = queryset.exclude(id__in=User.objects.filter(organizations__id__gt=0).
                                             values_list('id', flat=True))
         return queryset.distinct()
+
+
+class ApiKeyOrOAuth2AuthenticationMixin(object):
+    """
+    Mixin to set OAuth2 or API key header authentication
+    """
+    authentication_classes = (
+        OAuth2AuthenticationAllowInactiveUser,
+    )
+    permission_classes = (ApiKeyOrOAuth2Permission, IPAddressRestrictedPermission)
 
 
 class SecureAPIView(APIView):
@@ -184,6 +175,18 @@ class SecureListAPIView(PermissionMixin,
                         generics.ListAPIView):
     """
     Inherited from ListAPIView
+    """
+    pass
+
+
+class ApiKeyOrOAuth2SecuredListAPIView(
+        ApiKeyOrOAuth2AuthenticationMixin,
+        FilterBackendMixin,
+        PaginationMixin,
+        generics.ListAPIView
+    ):
+    """
+    List API view with OAuth2 or API key header Authentication
     """
     pass
 

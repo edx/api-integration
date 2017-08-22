@@ -7,6 +7,7 @@ Run these tests @ Devstack:
     paver test_system -s lms --fasttest
         --fail_fast --verbose --test_id=lms/djangoapps/edx_solutions_api_integration/users
 """
+import ddt
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from random import randint
@@ -27,6 +28,7 @@ from django.test.utils import override_settings
 from django.utils import timezone
 from django.db import transaction
 from django.utils.translation import ugettext as _
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from courseware import module_render
 from courseware.model_data import FieldDataCache
@@ -50,6 +52,9 @@ from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_st
 
 from django.contrib.auth.models import User
 from notification_prefs import NOTIFICATION_PREF_KEY
+
+from edx_solutions_api_integration.users.views import UsersOrganizationsList
+
 
 MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 
@@ -84,7 +89,7 @@ def _fake_get_service_unavailability(user_id, course_id, end_date=None):
     """
     raise ConnectionError
 
-
+@ddt.ddt
 @override_settings(DEBUG=True)
 @override_settings(MODULESTORE=MODULESTORE_CONFIG)
 @override_settings(PASSWORD_MIN_LENGTH=4)
@@ -124,6 +129,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.sessions_base_uri = '/api/server/sessions'
         self.test_bogus_course_id = 'foo/bar/baz'
         self.test_bogus_content_id = 'i4x://foo/bar/baz/Chapter1'
+        self.request_factory = APIRequestFactory()
 
         self.test_course_data = '<html>{}</html>'.format(str(uuid.uuid4()))
         self.course_start_date = timezone.now() + relativedelta(days=-1)
@@ -1672,32 +1678,60 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         # This one's technically on the user model itself, but can be updated.
         self.assertEqual(response.data['email'], data['email'])
 
-    def test_user_organizations_list(self):
-        user_id = self.user.id
-        anonymous_id = anonymous_id_for_user(self.user, self.course.id)
+    @ddt.data(
+        (True, True, True),
+        (False, True, False),
+        (False, True, True),
+        (False, False, True)
+    )
+    @ddt.unpack
+    def test_user_organizations_list(
+        self, test_with_api_key, is_staff_user, test_with_username
+    ):
+        """
+        Test user organizations list endpoint
+        """
         for i in xrange(1, 7):
             data = {
                 'name': 'Org ' + str(i),
                 'display_name': 'Org display name' + str(i),
-                'users': [user_id]
+                'users': [self.user.id]
             }
             response = self.do_post(self.org_base_uri, data)
             self.assertEqual(response.status_code, 201)
 
-        test_uri = '{}/{}/organizations/'.format(self.users_base_uri, user_id)
-        response = self.do_get(test_uri)
-        self.assertEqual(response.data['count'], 6)
-        self.assertEqual(len(response.data['results']), 6)
-        self.assertEqual(response.data['num_pages'], 1)
+        test_uri = '{}/organizations/'.format(self.users_base_uri)
+        if test_with_username:
+            test_uri = '{}?username={}'.format(
+                test_uri,
+                self.user.username
+            )
 
-        # test with anonymous user id
-        test_uri = '{}/{}/organizations/'.format(self.users_base_uri, anonymous_id)
-        response = self.do_get(test_uri)
-        self.assertEqual(response.data['count'], 6)
+        if test_with_api_key:
+            response = self.do_get(test_uri)
+        else:
+            mock_user = UserFactory(is_staff=is_staff_user)
+            request = self.request_factory.get(test_uri)
+            request.user = mock_user
+            force_authenticate(request, user=mock_user)
+            users_organizations_view = UsersOrganizationsList.as_view()
+            response = users_organizations_view(request)
 
-        # test with invalid user
-        response = self.do_get('{}/4356340/organizations/'.format(self.users_base_uri))
-        self.assertEqual(response.status_code, 404)
+        # if user is staff, they can view origanizations for any user
+        if is_staff_user:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.data['num_pages'], 1)
+
+            # if username not given return organizations for logged in user
+            if test_with_username:
+                self.assertEqual(response.data['count'], 6)
+                self.assertEqual(len(response.data['results']), 6)
+            else:
+                self.assertEqual(response.data['count'], 0)
+                self.assertEqual(len(response.data['results']), 0)
+        else:
+            # if user is not staff and trying to access someone elses organization
+            self.assertEqual(response.status_code, 403)
 
     def test_user_workgroups_list(self):
         test_workgroups_uri = self.workgroups_base_uri  # pylint: disable=W0612
