@@ -751,6 +751,55 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.user = User.objects.get(id=self.user.id)
         self.assertEqual(self.user.email, new_email)
 
+    def test_user_detail_updated_as_null(self):
+        """
+        Test scenario where city, country and gender can be set to null regardless of the previous value.
+        """
+        test_uri = '{}/{}'.format(self.users_base_uri, self.user.id)
+        data = {
+            'country': None,
+            'city': None,
+            'gender': None,
+        }
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 200)
+        self.user = User.objects.get(id=self.user.id)
+
+        self.assertEqual(self.user.profile.country, None)
+        self.assertEqual(self.user.profile.city, None)
+        self.assertEqual(self.user.profile.gender, None)
+
+    def test_user_detail_missing_attributes_not_updated(self):
+        """
+        Test scenario where if city, country, gender and title is missing in the params, they should not be updated.
+        """
+        test_uri = self.users_base_uri
+        local_username = self.test_username + str(randint(111, 999))
+        user_data = {
+            'email': self.test_email, 'username': local_username, 'password': self.test_password,
+            'first_name': self.test_first_name, 'last_name': self.test_last_name, 'city': self.test_city,
+            'country': 'US', 'level_of_education': 'b', 'year_of_birth': '1991',
+            'gender': 'male', 'title': 'Software Engineer', 'avatar_url': None
+        }
+        response = self.do_post(test_uri, user_data)
+        self.assertEqual(response.status_code, 201)
+        user_id = response.data['id']
+        updated_year_of_birth = 1992
+
+        data = {
+            'year_of_birth': updated_year_of_birth,
+        }
+        response = self.do_post(test_uri + '/' + str(user_id), data)
+        self.assertEqual(response.status_code, 200)
+
+        self.user = User.objects.get(id=user_id)
+
+        self.assertEqual(self.user.profile.country, user_data['country'])
+        self.assertEqual(self.user.profile.city, user_data['city'])
+        self.assertEqual(self.user.profile.gender, user_data['gender'])
+        self.assertEqual(self.user.profile.title, user_data['title'])
+        self.assertEqual(self.user.profile.year_of_birth, updated_year_of_birth)
+
     def test_user_detail_post_duplicate_username(self):
         """
         Create two users, then pass the same first username in request in order to update username of second user.

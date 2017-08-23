@@ -636,33 +636,27 @@ class UsersDetail(SecureAPIView):
         if existing_user_profile:
             if first_name and last_name:
                 existing_user_profile.name = u'{} {}'.format(first_name, last_name)
-            city = request.data.get('city')
-            if city:
-                existing_user_profile.city = city
-            country = request.data.get('country')
-            if country:
-                existing_user_profile.country = country
-            level_of_education = request.data.get('level_of_education')
-            if level_of_education:
-                existing_user_profile.level_of_education = level_of_education
-            year_of_birth = request.data.get('year_of_birth')
-            try:
-                year_of_birth = int(year_of_birth)
-            except (ValueError, TypeError):
-                # If they give us garbage, just ignore it instead
-                # of asking them to put an integer.
-                year_of_birth = None
-            if year_of_birth:
-                existing_user_profile.year_of_birth = year_of_birth
-            gender = request.data.get('gender')
-            if gender:
-                existing_user_profile.gender = gender
-            # Empty title is also allowed
-            title = request.data.get('title', existing_user_profile.title)
-            existing_user_profile.title = title
+
+            # nullable attributes
+            existing_user_profile.title = request.data.get('title', existing_user_profile.title)
+            existing_user_profile.city = request.data.get('city', existing_user_profile.city)
+            existing_user_profile.country = request.data.get('country', existing_user_profile.country)
+            existing_user_profile.gender = request.data.get('gender', existing_user_profile.gender)
+
             avatar_url = request.data.get('avatar_url')
             if avatar_url:
                 existing_user_profile.avatar_url = avatar_url
+            level_of_education = request.data.get('level_of_education')
+            if level_of_education:
+                existing_user_profile.level_of_education = level_of_education
+            birth_year = request.data.get('year_of_birth')
+            try:
+                birth_year = int(birth_year)
+            except (ValueError, TypeError):
+                # If they give us garbage, just ignore it instead
+                # of asking them to put an integer.
+                birth_year = None
+            existing_user_profile.year_of_birth = birth_year if birth_year else existing_user_profile.year_of_birth
 
             existing_user_profile.save()
         return Response(response_data, status=status.HTTP_200_OK)
