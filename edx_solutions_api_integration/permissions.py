@@ -9,7 +9,9 @@ from rest_framework.response import Response
 
 from openedx.core.lib.api.authentication import OAuth2AuthenticationAllowInactiveUser
 from edx_solutions_api_integration.utils import (
-    get_client_ip_address, address_exists_in_network, str2bool,
+    str2bool,
+    get_client_ip_address,
+    address_exists_in_network,
     has_api_key_permission,
 )
 from edx_solutions_api_integration.models import APIUser as User
