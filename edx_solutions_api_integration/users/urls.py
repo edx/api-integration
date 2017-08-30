@@ -38,7 +38,7 @@ urlpatterns = patterns(
         users_views.UsersPreferences.as_view(), name='users-preferences-list'),
     url(r'^(?P<user_id>[a-zA-Z0-9]+)/preferences/(?P<preference_id>[a-zA-Z0-9_]+)$',
         users_views.UsersPreferencesDetail.as_view(), name='users-preferences-detail'),
-    url(r'^(?P<user_id>[a-zA-Z0-9]+)/organizations/$',
+    url(r'^organizations/$',
         users_views.UsersOrganizationsList.as_view(), name='users-organizations-list'),
     url(r'^(?P<user_id>[a-zA-Z0-9]+)/roles/(?P<role>[a-z_]+)/courses/{0}$'.format(COURSE_ID_PATTERN),
         users_views.UsersRolesCoursesDetail.as_view(), name='users-roles-courses-detail'),

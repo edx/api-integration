@@ -12,9 +12,11 @@ from django.core.validators import validate_email, validate_slug, ValidationErro
 from django.conf import settings
 from django.http import Http404
 from django.utils.translation import get_language, ugettext_lazy as _
+from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework import filters
 from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
 
 from courseware import module_render
 from course_blocks.api import get_course_blocks
@@ -56,7 +58,7 @@ from xmodule.modulestore import InvalidLocationError, EdxJSONEncoder
 from progress.serializers import CourseModuleCompletionSerializer
 from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
 from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView, IdsInFilterBackend, \
-    HasOrgsFilterBackend
+    HasOrgsFilterBackend, ApiKeyOrOAuth2SecuredListAPIView
 from edx_solutions_api_integration.models import GroupProfile, APIUser as User
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from edx_solutions_api_integration.users.serializers import CourseProgressSerializer
@@ -1242,22 +1244,27 @@ class UsersPreferencesDetail(SecureAPIView):
         return Response({}, status=status.HTTP_204_NO_CONTENT)
 
 
-class UsersOrganizationsList(SecureListAPIView):
+class UsersOrganizationsList(ApiKeyOrOAuth2SecuredListAPIView):
     """
     ### The UserOrganizationsList view allows clients to retrieve a list of organizations a user
     belongs to
-    - URI: ```/api/users/{user_id}/organizations/```
+    - URI: ```/api/users/organizations/?username={username}```
     - GET: Provides paginated list of organizations for a user
     """
 
     serializer_class = BasicOrganizationSerializer
 
     def get_queryset(self):
-        user_id = self.kwargs['user_id']
-        try:
-            user = User.objects.get(id=user_id)
-        except ObjectDoesNotExist:
-            raise Http404
+        username = self.request.query_params.get('username', None)
+        if self.request.user.is_authenticated():
+            user = self.request.user
+            if username is not None:
+                if user.username != username and not user.is_staff:
+                    raise PermissionDenied
+
+                user = get_object_or_404(User, username=username)
+        else:
+            user = get_object_or_404(User, username=username)
 
         return user.organizations.all()
 

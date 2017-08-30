@@ -1612,13 +1612,16 @@ Removes the specified preference from the user's record
 + Response 204 (application/json)
 
 
-## User Organization List [/users/{user_id}/organizations]
+## User Organization List [/users/organizations/{?username}]
 
 It allows clients to retrieve a list of organizations a user belongs to
 
 ### User Organization List [GET]
 
 Returns a JSON representation of the paginated list of organizations for a user
+
++ Parameters
+    + username (required)
 
 + Response 200 (application/json)
 
