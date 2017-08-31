@@ -63,7 +63,8 @@ from edx_solutions_api_integration.models import (
     GroupProfile,
 )
 from progress.models import CourseModuleCompletion
-from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView
+from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView, \
+    ApiKeyOrOAuth2SecuredListAPIView
 from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer, \
     SimpleUserSerializer
 from edx_solutions_api_integration.utils import (
@@ -1944,6 +1945,8 @@ class CoursesMetricsSocial(SecureListAPIView):
     forums
     - URI: ```/api/users/{course_id}/metrics/social/?organization={org_id}```
     - GET: Returns a list of social metrics for users in the specified course. Results can be filtered by organization
+
+    DEPRECATED: Use CoursesMetricsDiscussion instead.
     """
 
     def get(self, request, course_id):  # pylint: disable=arguments-differ
@@ -1997,6 +2000,115 @@ class CoursesMetricsSocial(SecureListAPIView):
                 'total_enrollments': total_enrollments,
                 'users': data
             }
+            http_status = status.HTTP_200_OK
+
+        return Response(data, http_status)
+
+
+class CoursesMetricsDiscussion(ApiKeyOrOAuth2SecuredListAPIView):
+    """
+    ### The CoursesMetricsDiscussion view allows clients to query about the activity of all users in the
+    forums
+    - URI: ```/api/courses/discussion_metrics/?course_id={course_id}&organization={org_id}```
+    - GET: Returns a list of discussion metrics for users in the specified course. Results can be filtered by organization
+    """
+
+    def get(self, request):
+        course_id = request.query_params.get('course_id', None)
+        organization = request.query_params.get('organization', None)
+        per_user = request.query_params.get('per_user', None) in ['True', 'true']
+
+        course_key = get_course_key(course_id)
+
+        if request.user.is_authenticated():
+            user = self.request.user
+            if not user.is_staff:
+                # Only staff users can access per-user info.
+                if per_user:
+                    raise PermissionDenied
+                # Regular users can only access courses they are enrolled in.
+                if not CourseEnrollment.is_enrolled(request.user, course_key):
+                    raise PermissionDenied
+                # Regular users cannot access organizations other than their own.
+                if organization and not request.user.organizations.filter(pk=organization).exists():
+                    raise PermissionDenied
+
+        total_enrollments = 0
+        users_data = {}
+
+        try:
+            slash_course_id = get_course_key(course_id, slashseparated=True)
+            # the forum service expects the legacy slash separated string format
+
+            # load the course so that we can see when the course end date is
+            course_descriptor, course_key, course_content = get_course(self.request, self.request.user, course_id)  # pylint: disable=W0612,C0301
+            if not course_descriptor:
+                raise Http404
+
+            # get the course social stats, passing along a course end date to remove any activity after the course
+            # closure from the stats
+            users_data = get_course_social_stats(slash_course_id, end_date=course_descriptor.end)
+
+            # remove any excluded users from the aggregate
+            exclude_users = get_aggregate_exclusion_user_ids(course_key)
+
+            for user_id in exclude_users:
+                if str(user_id) in users_data:
+                    del users_data[str(user_id)]
+            enrollment_qs = CourseEnrollment.objects.users_enrolled_in(course_key).filter(is_active=True)\
+                .exclude(id__in=exclude_users)
+            actual_users_data = {}
+            if organization:
+                enrollment_qs = enrollment_qs.filter(organizations=organization)
+
+            actual_users = enrollment_qs.values_list('id', flat=True)
+            for user_id in actual_users:
+                if str(user_id) in users_data:
+                    actual_users_data.update({str(user_id): users_data[str(user_id)]})
+
+            users_data = actual_users_data
+            total_enrollments = enrollment_qs.count()
+
+            # Calculate the average.
+            metric_sums = {
+                'num_threads': 0,
+                'num_thread_followers': 0,
+                'num_replies': 0,
+                'num_flagged': 0,
+                'num_comments': 0,
+                'num_threads_read': 0,
+                'num_downvotes': 0,
+                'num_upvotes': 0,
+                'num_comments_generated': 0,
+            }
+            if total_enrollments == 0:
+                metric_averages = metric_sums
+            else:
+                metric_names = metric_sums.keys()
+                for user_metrics in users_data.itervalues():
+                    for name in metric_names:
+                        metric_sums[name] += user_metrics[name]
+                metric_averages = {}
+                for name in metric_names:
+                    metric_averages[name] = float(metric_sums[name]) / total_enrollments
+
+            data = {
+                'total_enrollments': total_enrollments,
+                'averages': metric_averages,
+            }
+            if per_user:
+                data['users'] = users_data
+
+            http_status = status.HTTP_200_OK
+        except (CommentClientMaintenanceError, CommentClientRequestError, ConnectionError), e:  # pylint: disable=C0103
+            logging.error("Forum service returned an error: %s", str(e))
+
+            data = {
+                "err_msg": str(e),
+                'total_enrollments': total_enrollments,
+            }
+            if per_user:
+                data['users'] = users_data
             http_status = status.HTTP_200_OK
 
         return Response(data, http_status)

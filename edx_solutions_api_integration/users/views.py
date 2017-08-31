@@ -12,9 +12,11 @@ from django.core.validators import validate_email, validate_slug, ValidationErro
 from django.conf import settings
 from django.http import Http404
 from django.utils.translation import get_language, ugettext_lazy as _
+from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework import filters
 from rest_framework.response import Response
+from rest_framework.exceptions import PermissionDenied
 
 from courseware import module_render
 from course_blocks.api import get_course_blocks
@@ -56,7 +58,7 @@ from xmodule.modulestore import InvalidLocationError, EdxJSONEncoder
 from progress.serializers import CourseModuleCompletionSerializer
 from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
 from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView, IdsInFilterBackend, \
-    HasOrgsFilterBackend
+    HasOrgsFilterBackend, ApiKeyOrOAuth2SecuredListAPIView
 from edx_solutions_api_integration.models import GroupProfile, APIUser as User
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from edx_solutions_api_integration.users.serializers import CourseProgressSerializer
@@ -1242,22 +1244,27 @@ class UsersPreferencesDetail(SecureAPIView):
         return Response({}, status=status.HTTP_204_NO_CONTENT)
 
 
-class UsersOrganizationsList(SecureListAPIView):
+class UsersOrganizationsList(ApiKeyOrOAuth2SecuredListAPIView):
     """
     ### The UserOrganizationsList view allows clients to retrieve a list of organizations a user
     belongs to
-    - URI: ```/api/users/{user_id}/organizations/```
+    - URI: ```/api/users/organizations/?username={username}```
     - GET: Provides paginated list of organizations for a user
     """
 
     serializer_class = BasicOrganizationSerializer
 
     def get_queryset(self):
-        user_id = self.kwargs['user_id']
-        try:
-            user = User.objects.get(id=user_id)
-        except ObjectDoesNotExist:
-            raise Http404
+        username = self.request.query_params.get('username', None)
+        if self.request.user.is_authenticated():
+            user = self.request.user
+            if username is not None:
+                if user.username != username and not user.is_staff:
+                    raise PermissionDenied
+
+                user = get_object_or_404(User, username=username)
+        else:
+            user = get_object_or_404(User, username=username)
 
         return user.organizations.all()
 
@@ -1320,12 +1327,56 @@ class UsersCoursesCompletionsList(SecureListAPIView):
         return queryset
 
 
+def _get_user_discussion_metrics(request, user, course_id):
+    """ Fetches discussion metrics from the forums client."""
+    # load the course so that we can see when the course end date is
+    course_descriptor, course_key, course_content = get_course(request, request.user, course_id)  # pylint: disable=W0612,C0301
+    if not course_descriptor:
+        raise Http404
+
+    # be robust to the try of course_id we get from caller
+    try:
+        # assume new style
+        course_key = CourseKey.from_string(course_id)
+        slash_course_id = course_key.to_deprecated_string()
+    except:  # pylint: disable=W0702
+        # assume course_id passed in is legacy format
+        slash_course_id = course_id
+
+    try:
+        # get the course social stats, passing along a course end date to remove any activity after the course
+        # closure from the stats
+        user_id = str(user.id)
+        data = (get_user_social_stats(user_id, slash_course_id, end_date=course_descriptor.end))[user_id]
+        http_status = status.HTTP_200_OK
+    except (CommentClientRequestError, CommentClientMaintenanceError, ConnectionError), error:
+        logging.error("Forum service returned an error: %s", str(error))
+
+        data = {
+            'err_msg': str(error),
+            'num_threads': 0,
+            'num_thread_followers': 0,
+            'num_replies': 0,
+            'num_flagged': 0,
+            'num_comments': 0,
+            'num_threads_read': 0,
+            'num_downvotes': 0,
+            'num_upvotes': 0,
+            'num_comments_generated': 0
+        }
+        http_status = status.HTTP_200_OK
+
+    return Response(data, http_status)
+
+
 class UsersSocialMetrics(SecureListAPIView):
     """
     ### The UsersSocialMetrics view allows clients to query about the activity of a user in the
     forums
     - URI: ```/api/users/{user_id}/courses/{course_id}/metrics/social/```
     - GET: Returns a list of social metrics for that user in the specified course
+
+    DEPRECATED: Use UsersDiscussionMetrics instead.
     """
 
     def get(self, request, user_id, course_id):  # pylint: disable=W0613,W0221
@@ -1334,43 +1385,31 @@ class UsersSocialMetrics(SecureListAPIView):
         except ObjectDoesNotExist:
             return Response({}, status.HTTP_404_NOT_FOUND)
 
-        # load the course so that we can see when the course end date is
-        course_descriptor, course_key, course_content = get_course(self.request, self.request.user, course_id)  # pylint: disable=W0612,C0301
-        if not course_descriptor:
-            raise Http404
+        return _get_user_discussion_metrics(request, user, course_id)
 
-        # be robust to the try of course_id we get from caller
-        try:
-            # assume new style
-            course_key = CourseKey.from_string(course_id)
-            slash_course_id = course_key.to_deprecated_string()
-        except:  # pylint: disable=W0702
-            # assume course_id passed in is legacy format
-            slash_course_id = course_id
 
-        try:
-            # get the course social stats, passing along a course end date to remove any activity after the course
-            # closure from the stats
-            data = (get_user_social_stats(user_id, slash_course_id, end_date=course_descriptor.end))[user_id]
-            http_status = status.HTTP_200_OK
-        except (CommentClientRequestError, CommentClientMaintenanceError, ConnectionError), error:
-            logging.error("Forum service returned an error: %s", str(error))
+class UsersDiscussionMetrics(ApiKeyOrOAuth2SecuredListAPIView):
+    """
+    ### The UsersDiscussionMetrics view allows clients to query about the activity of a user in the
+    forums
+    - URI: ```/api/users/discussion_metrics/?course={course}&username={username}```
+    - GET: Returns a list of discussion metrics for that user in the specified course
+    """
 
-            data = {
-                'err_msg': str(error),
-                'num_threads': 0,
-                'num_thread_followers': 0,
-                'num_replies': 0,
-                'num_flagged': 0,
-                'num_comments': 0,
-                'num_threads_read': 0,
-                'num_downvotes': 0,
-                'num_upvotes': 0,
-                'num_comments_generated': 0
-            }
-            http_status = status.HTTP_200_OK
+    def get(self, request):
+        course_id = self.request.query_params.get('course_id', None)
+        username = self.request.query_params.get('username', None)
 
-        return Response(data, http_status)
+        if self.request.user.is_authenticated():
+            user = self.request.user
+            if username is not None:
+                if user.username != username and not user.is_staff:
+                    raise PermissionDenied
+                user = get_object_or_404(User, username=username)
+        else:
+            user = get_object_or_404(User, username=username)
+
+        return _get_user_discussion_metrics(request, user, course_id)
 
 
 class UsersMetricsCitiesList(SecureListAPIView):
