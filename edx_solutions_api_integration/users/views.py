@@ -11,6 +11,7 @@ from django.db.models import Count, Q
 from django.core.validators import validate_email, validate_slug, ValidationError
 from django.conf import settings
 from django.http import Http404
+from django.shortcuts import get_object_or_404
 from django.utils.translation import get_language, ugettext_lazy as _
 from rest_framework import status
 from rest_framework import filters
@@ -1253,11 +1254,14 @@ class UsersOrganizationsList(SecureListAPIView):
     serializer_class = BasicOrganizationSerializer
 
     def get_queryset(self):
-        user_id = self.kwargs['user_id']
-        try:
-            user = User.objects.get(id=user_id)
-        except ObjectDoesNotExist:
-            raise Http404
+        user_id = self.kwargs.get('user_id', None)
+        username = self.request.query_params.get('username', None)
+        if not user_id and not username:
+            return []
+        if user_id:
+            user = get_object_or_404(User, id=user_id)
+        elif username:
+            user = get_object_or_404(User, username=username)
 
         return user.organizations.all()
 

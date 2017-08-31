@@ -27,6 +27,7 @@ urlpatterns = patterns(
     url(r'^sessions/*', include('edx_solutions_api_integration.sessions.urls')),
     url(r'^courses/', include('edx_solutions_api_integration.courses.urls')),
     url(r'^organizations/*', include('edx_solutions_organizations.urls')),
+    url(r'^mobile/v1/', include('edx_solutions_api_integration.mobile_api.urls')),
     # we have to explicitly define url for workgroup users detail view
     # to wrap it around non_atomic_requests decorator
     url(
