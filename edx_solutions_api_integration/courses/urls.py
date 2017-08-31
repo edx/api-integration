@@ -62,6 +62,7 @@ urlpatterns = patterns(
         courses_views.CourseNavView.as_view()),
     url(r'^{0}$'.format(COURSE_ID_PATTERN), courses_views.CoursesDetail.as_view(), name='course-detail'),
     url(r'/*$^', courses_views.CoursesList.as_view()),
+    url(r'^discussion_metrics/$', courses_views.CoursesMetricsDiscussion.as_view(), name='courses-discussion-metrics'),
 )
 
 urlpatterns = format_suffix_patterns(urlpatterns)
