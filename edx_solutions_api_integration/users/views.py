@@ -11,7 +11,6 @@ from django.db.models import Count, Q
 from django.core.validators import validate_email, validate_slug, ValidationError
 from django.conf import settings
 from django.http import Http404
-from django.shortcuts import get_object_or_404
 from django.utils.translation import get_language, ugettext_lazy as _
 from rest_framework import status
 from rest_framework import filters
@@ -61,8 +60,13 @@ from edx_solutions_api_integration.permissions import SecureAPIView, SecureListA
 from edx_solutions_api_integration.models import GroupProfile, APIUser as User
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from edx_solutions_api_integration.users.serializers import CourseProgressSerializer
-from edx_solutions_api_integration.utils import str2bool
-from edx_solutions_api_integration.utils import generate_base_uri, dict_has_items, extract_data_params
+from edx_solutions_api_integration.utils import (
+    str2bool,
+    generate_base_uri,
+    dict_has_items,
+    extract_data_params,
+    get_user_from_request_params,
+)
 from edx_solutions_projects.serializers import BasicWorkgroupSerializer
 from .serializers import UserSerializer, UserCountByCitySerializer, UserRolesSerializer
 
@@ -1254,14 +1258,9 @@ class UsersOrganizationsList(SecureListAPIView):
     serializer_class = BasicOrganizationSerializer
 
     def get_queryset(self):
-        user_id = self.kwargs.get('user_id', None)
-        username = self.request.query_params.get('username', None)
-        if not user_id and not username:
+        user = get_user_from_request_params(self.request, self.kwargs)
+        if not user:
             return []
-        if user_id:
-            user = get_object_or_404(User, id=user_id)
-        elif username:
-            user = get_object_or_404(User, username=username)
 
         return user.organizations.all()
 

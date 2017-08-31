@@ -11,11 +11,11 @@ from django.utils.timezone import now
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta, MO
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 
 from rest_framework.exceptions import ParseError
 
 from student.roles import CourseRole, CourseObserverRole
-
 
 USER_METRICS_CACHE_TTL = 60 * 60
 COURSE_METRICS_CACHE_TTL = 60 * 60
@@ -294,6 +294,26 @@ def get_time_series_data(queryset, start, end, interval='days', date_field='crea
         dt_key += relativedelta(**{interval: 1})
 
     return series
+
+
+def get_user_from_request_params(request, url_params):
+    """
+    Retrieve user either by user_id parsed from request url or by username given
+    in request querystring
+    :param request: http request object
+     :param url_params: dict of url params
+    :return: User object
+    """
+    from edx_solutions_api_integration.models import APIUser as User
+    user_id = url_params.get('user_id', None) if url_params else None
+    username = request.query_params.get('username', None)
+    if not user_id and not username:
+        return None
+    if user_id:
+        user = get_object_or_404(User, id=user_id)
+    elif username:
+        user = get_object_or_404(User, username=username)
+    return user
 
 
 def get_ids_from_list_param(request, param_name):

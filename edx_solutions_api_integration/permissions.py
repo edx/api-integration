@@ -136,6 +136,18 @@ class PermissionMixin(object):
     permission_classes = (ApiKeyHeaderPermission, IPAddressRestrictedPermission)
 
 
+class MobilePermissionMixin(object):
+    """
+    Mixin to set custom permission_classes
+    """
+    authentication_classes = (
+        JwtAuthentication,
+        OAuth2AuthenticationAllowInactiveUser,
+        SessionAuthenticationAllowInactiveUser,
+    )
+    permission_classes = (permissions.IsAuthenticated, )
+
+
 class FilterBackendMixin(object):
     """
     Mixin to set custom filter_backends
@@ -192,16 +204,10 @@ class SecureListAPIView(PermissionMixin,
     pass
 
 
-class MobileListAPIView(FilterBackendMixin, PaginationMixin, generics.ListAPIView):
+class MobileListAPIView(MobilePermissionMixin, FilterBackendMixin, PaginationMixin, generics.ListAPIView):
     """
     Base view for mobile list view APIs
     """
-    authentication_classes = (
-        JwtAuthentication,
-        OAuth2AuthenticationAllowInactiveUser,
-        SessionAuthenticationAllowInactiveUser,
-    )
-    permission_classes = (permissions.IsAuthenticated, )
 
 
 class SecureModelViewSet(PermissionMixin, viewsets.ModelViewSet):
