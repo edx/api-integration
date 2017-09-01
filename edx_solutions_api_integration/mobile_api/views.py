@@ -12,6 +12,7 @@ from edx_solutions_api_integration.permissions import (
     IsStaffOrEnrolled,
 )
 from edx_solutions_api_integration.users.views import (
+    UsersSocialMetrics,
     UsersOrganizationsList,
     UsersCourseProgressList,
     UsersCoursesDetail,
@@ -44,7 +45,7 @@ class MobileCoursesOverview(MobileSecureAPIView, CoursesOverview):
     """
 
     def __init__(self):
-        self.permission_classes += (IsStaffOrEnrolled, )
+        self.permission_classes += (IsStaffOrOwner, IsStaffOrEnrolled, )
 
 
 class MobileUsersCoursesDetail(MobileSecureAPIView, UsersCoursesDetail):
@@ -53,7 +54,7 @@ class MobileUsersCoursesDetail(MobileSecureAPIView, UsersCoursesDetail):
     """
 
     def __init__(self):
-        self.permission_classes += (IsStaffOrEnrolled, )
+        self.permission_classes += (IsStaffOrOwner, IsStaffOrEnrolled, )
 
 
 class MobileCoursesStaticTabsList(MobileSecureAPIView, CoursesStaticTabsList):
@@ -64,7 +65,7 @@ class MobileCoursesStaticTabsList(MobileSecureAPIView, CoursesStaticTabsList):
     """
 
     def __init__(self):
-        self.permission_classes += (IsStaffOrEnrolled, )
+        self.permission_classes += (IsStaffOrOwner, IsStaffOrEnrolled, )
 
 
 class MobileCoursesStaticTabsDetail(MobileSecureAPIView, CoursesStaticTabsDetail):
@@ -73,4 +74,13 @@ class MobileCoursesStaticTabsDetail(MobileSecureAPIView, CoursesStaticTabsDetail
     """
 
     def __init__(self):
-        self.permission_classes += (IsStaffOrEnrolled, )
+        self.permission_classes += (IsStaffOrOwner, IsStaffOrEnrolled, )
+
+
+class MobileUsersDiscussionMetrics(MobileSecureAPIView, UsersSocialMetrics):
+    """
+    View to return user discussion metrics and engagement score.
+    """
+
+    def __init__(self):
+        self.permission_classes += (IsStaffOrOwner, IsStaffOrEnrolled, )
