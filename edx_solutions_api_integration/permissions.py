@@ -7,7 +7,11 @@ from edx_solutions_api_integration.utils import get_client_ip_address, address_e
 from rest_framework import permissions, generics, filters, pagination, serializers, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
-
+from edx_rest_framework_extensions.authentication import JwtAuthentication
+from openedx.core.lib.api.authentication import (
+    SessionAuthenticationAllowInactiveUser,
+    OAuth2AuthenticationAllowInactiveUser,
+)
 from edx_solutions_api_integration.utils import str2bool
 from edx_solutions_api_integration.models import APIUser as User
 
@@ -132,6 +136,18 @@ class PermissionMixin(object):
     permission_classes = (ApiKeyHeaderPermission, IPAddressRestrictedPermission)
 
 
+class MobilePermissionMixin(object):
+    """
+    Mixin to set custom permission_classes
+    """
+    authentication_classes = (
+        JwtAuthentication,
+        OAuth2AuthenticationAllowInactiveUser,
+        SessionAuthenticationAllowInactiveUser,
+    )
+    permission_classes = (permissions.IsAuthenticated, )
+
+
 class FilterBackendMixin(object):
     """
     Mixin to set custom filter_backends
@@ -186,6 +202,12 @@ class SecureListAPIView(PermissionMixin,
     Inherited from ListAPIView
     """
     pass
+
+
+class MobileListAPIView(MobilePermissionMixin, FilterBackendMixin, PaginationMixin, generics.ListAPIView):
+    """
+    Base view for mobile list view APIs
+    """
 
 
 class SecureModelViewSet(PermissionMixin, viewsets.ModelViewSet):

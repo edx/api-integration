@@ -60,8 +60,13 @@ from edx_solutions_api_integration.permissions import SecureAPIView, SecureListA
 from edx_solutions_api_integration.models import GroupProfile, APIUser as User
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from edx_solutions_api_integration.users.serializers import CourseProgressSerializer
-from edx_solutions_api_integration.utils import str2bool
-from edx_solutions_api_integration.utils import generate_base_uri, dict_has_items, extract_data_params
+from edx_solutions_api_integration.utils import (
+    str2bool,
+    generate_base_uri,
+    dict_has_items,
+    extract_data_params,
+    get_user_from_request_params,
+)
 from edx_solutions_projects.serializers import BasicWorkgroupSerializer
 from .serializers import UserSerializer, UserCountByCitySerializer, UserRolesSerializer
 
@@ -1253,11 +1258,9 @@ class UsersOrganizationsList(SecureListAPIView):
     serializer_class = BasicOrganizationSerializer
 
     def get_queryset(self):
-        user_id = self.kwargs['user_id']
-        try:
-            user = User.objects.get(id=user_id)
-        except ObjectDoesNotExist:
-            raise Http404
+        user = get_user_from_request_params(self.request, self.kwargs)
+        if not user:
+            return []
 
         return user.organizations.all()
 
