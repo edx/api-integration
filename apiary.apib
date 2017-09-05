@@ -4658,3 +4658,88 @@ Progress here is in percentage.
                 "progress": 21.67
             }
         ]
+
+# Mobile
+Resources related to Mobile APIs.
+
+## User Progress List [/mobile/v1/users/courses/progress?username={username}&mobile_only=true]
+
+It allows clients to get a list of courses user enrolled in and the progress of the user in that course
+
+### User Progress List [GET]
+
+Returns a list of courses user enrolled in and the progress of the user in that course.
+Progress here is in percentage.
+
++ Response 200 (application/json)
+
+        [
+            {
+                "created": "2017-05-16 10:52:08.545346+00:00",
+                "is_active": true,
+                "course": {
+                    "start": "2017-04-06T00:00:00Z",
+                    "course_image_url": "/asset-v1:edX+DemoX+Demo_Course+type@asset+block@images_course_image.jpg",
+                    "end": null,
+                    "id": "course-v1:edX+DemoX+Demo_Course",
+                    "display_name": "edX Demonstration Course"
+                },
+                "progress": 1.0
+            },
+            {
+                "created": "2017-05-16 08:09:03.294214+00:00",
+                "is_active": true,
+                "course": {
+                    "start": "2015-10-29T01:00:00Z",
+                    "course_image_url": "/c4x/OrganizationX/cs202/asset/McKA_course_tile_BusStrat.png",
+                    "end": "2019-02-09T23:00:00Z",
+                    "id": "OrganizationX/cs202/2017_S1",
+                    "display_name": "[Test] Business Strategy Jan 2016"
+                },
+                "progress": 21.67
+            }
+        ]
+
+## User Organization List [/mobile/v1/users/organizations/?username={username}]
+
+It allows clients to retrieve a list of organizations a user belongs to
+
+### User Organization List [GET]
+
+Returns a JSON representation of the paginated list of organizations for a user
+
++ Response 200 (application/json)
+
+        {
+            "count": 2,
+            "previous": null,
+            "num_pages": 1,
+            "results": [
+                {
+                    "url": "http://lms.mcka.local/api/server/organizations/1/",
+                    "id": 1,
+                    "name": "mckinsey_and_company",
+                    "display_name": "McKinsey and Company",
+                    "contact_name": "McKinsey and Company",
+                    "contact_email": "company@mckinseyacademy.com",
+                    "contact_phone": "",
+                    "logo_url": null,
+                    "created": "2017-05-11T12:37:16.581940Z",
+                    "modified": "2017-05-11T12:37:17.248873Z"
+                },
+                {
+                    "url": "http://lms.mcka.local/api/server/organizations/2/",
+                    "id": 2,
+                    "name": "edx",
+                    "display_name": "edX",
+                    "contact_name": "edx",
+                    "contact_email": "company@edx.com",
+                    "contact_phone": "",
+                    "logo_url": null,
+                    "created": "2017-05-11T12:37:16.581940Z",
+                    "modified": "2017-05-11T12:37:17.248873Z"
+                }
+            ],
+            "next": null
+        }
+
