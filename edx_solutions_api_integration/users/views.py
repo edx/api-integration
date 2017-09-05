@@ -1568,13 +1568,10 @@ class UsersCourseProgressList(SecureListAPIView):
     """
     pagination_class = None
 
-    def get(self, request, user_id):  # pylint: disable=unused-argument
-        mobile_only = self.request.query_params.get('mobile_only', None)
+    def get(self, request, *args, **kwargs):  # pylint: disable=unused-argument
+        user = get_user_from_request_params(self.request, self.kwargs)
 
-        try:
-            user = User.objects.get(id=user_id)
-        except ObjectDoesNotExist:
-            raise Http404
+        mobile_only = self.request.query_params.get('mobile_only', None)
         enrollments = CourseEnrollment.objects.filter(user=user).values('course_id', 'created', 'is_active')
 
         course_keys = []
