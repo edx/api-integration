@@ -2,9 +2,10 @@
 import logging
 
 from django.conf import settings
-
+from student.models import CourseEnrollment
+from edx_solutions_api_integration.courseware_access import get_course_key
 from edx_solutions_api_integration.utils import get_client_ip_address, address_exists_in_network
-from rest_framework import permissions, generics, filters, pagination, serializers, viewsets
+from rest_framework import permissions, generics, filters, pagination, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from edx_rest_framework_extensions.authentication import JwtAuthentication
@@ -84,6 +85,21 @@ class IPAddressRestrictedPermission(permissions.BasePermission):
             return False
         else:
             return True
+
+
+class IsStaffOrEnrolled(permissions.BasePermission):
+    """
+    Permission that allows access to staff users or the enrolled users of a course.
+    """
+    def has_permission(self, request, view):
+        user = request.user
+        course_id = request.parser_context.get('kwargs', {}).get('course_id', None)
+        course_key = get_course_key(course_id)
+        if course_key:
+            return (user.is_staff or CourseEnrollment.is_enrolled(request.user, course_key)) \
+                    and (user.username == request.GET.get('username') or
+                         user.username == getattr(request, 'data', {}).get('username'))
+        return False
 
 
 class IdsInFilterBackend(filters.BaseFilterBackend):
@@ -207,6 +223,12 @@ class SecureListAPIView(PermissionMixin,
 class MobileListAPIView(MobilePermissionMixin, FilterBackendMixin, PaginationMixin, generics.ListAPIView):
     """
     Base view for mobile list view APIs
+    """
+
+
+class MobileSecureAPIView(MobilePermissionMixin):
+    """
+    Base view for mobile secure view APIs
     """
 
 
