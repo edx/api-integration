@@ -572,9 +572,17 @@ class CoursesDetail(SecureAPIView):
         """
         GET /api/courses/{course_id}
         """
+        if 'username' in request.GET:
+            try:
+                user = User.objects.get(username=request.GET['username'])
+            except User.DoesNotExist:
+                raise Http404()
+        else:
+            user = request.user  # Usually this is AnonymousUser since this is a server-to-server API
+
         depth = request.query_params.get('depth', 0)
         depth_int = int(depth)
-        course_descriptor, course_key, course_content = get_course(request, request.user, course_id, depth=depth_int)  # pylint: disable=W0612
+        course_descriptor, course_key, course_content = get_course(request, user, course_id, depth=depth_int)  # pylint: disable=W0612
         if not course_descriptor:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
 
@@ -584,6 +592,7 @@ class CoursesDetail(SecureAPIView):
             data_blocks = get_blocks(
                 request,
                 usage_key,
+                user=user,
                 depth=depth_int,
                 requested_fields=BLOCK_DATA_FIELDS
             )
