@@ -17,7 +17,6 @@ from rest_framework import filters
 from rest_framework.response import Response
 
 from courseware import module_render
-from course_blocks.api import get_course_blocks
 from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
@@ -51,7 +50,7 @@ from util.password_policy_validators import (
     validate_password_length, validate_password_complexity,
     validate_password_dictionary
 )
-from xmodule.modulestore import InvalidLocationError, EdxJSONEncoder
+from xmodule.modulestore import InvalidLocationError
 
 from progress.serializers import CourseModuleCompletionSerializer
 from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
@@ -144,7 +143,7 @@ def _save_child_position(parent_descriptor, target_child_location):
     Faster version than what is in the LMS since we don't need to load/traverse children descriptors,
     we just compare id's from the array of children
     """
-    for position, child_location in enumerate(parent_descriptor.children, start=1):
+    for position, child_location in enumerate(getattr(parent_descriptor, 'children', []), start=1):
         if unicode(child_location) == unicode(target_child_location):
             # Only save if position changed
             if position != parent_descriptor.position:
