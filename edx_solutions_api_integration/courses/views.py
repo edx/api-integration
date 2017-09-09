@@ -577,6 +577,7 @@ class CoursesDetail(SecureAPIView):
             data_blocks = get_blocks(
                 request,
                 usage_key,
+                user=request.user,
                 depth=depth_int,
                 requested_fields=BLOCK_DATA_FIELDS
             )
