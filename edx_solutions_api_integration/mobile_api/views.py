@@ -10,6 +10,7 @@ from edx_solutions_api_integration.permissions import (
 from edx_solutions_api_integration.users.views import (
     UsersOrganizationsList,
     UsersCourseProgressList,
+    UsersCoursesDetail,
 )
 from openedx.core.lib.api.permissions import IsStaffOrOwner
 
@@ -36,6 +37,15 @@ class MobileCoursesOverview(MobileSecureAPIView, CoursesOverview):
 
     **Optional Params**
         parse: when TRUE returns a collection of JSON objects representing parts of the course overview.
+    """
+
+    def __init__(self):
+        self.permission_classes += (IsStaffOrEnrolled, )
+
+
+class MobileUsersCoursesDetail(MobileSecureAPIView, UsersCoursesDetail):
+    """
+    View that allow clients to interact with a specific User-Course relationship (aka, enrollment)
     """
 
     def __init__(self):
