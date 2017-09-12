@@ -13,4 +13,6 @@ urlpatterns = patterns(
         name='mobile-users-courses-progress'),
     url(r'^courses/{0}/overview'.format(COURSE_ID_PATTERN), mobile_views.MobileCoursesOverview.as_view(),
         name='mobile-courses-overview'),
+    url(r'^users/courses/{0}'.format(COURSE_ID_PATTERN), mobile_views.MobileUsersCoursesDetail.as_view(),
+        name='mobile-users-courses-detail'),
 )

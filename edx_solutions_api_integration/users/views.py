@@ -916,13 +916,14 @@ class UsersCoursesDetail(SecureAPIView):
         ** parent_content_id, normally the Course identifier
         ** child_content_id, normally the Chapter identifier
     - POST Example:
-
-            {
-                "position" : {
-                    "parent_content_id" : "edX/Open_DemoX/edx_demo_course",
-                    "child_content_id" : "i4x://edX/Open_DemoX/chapter/d8a6192ade314473a78242dfeedfbf5b"
+        {
+            "positions" : [
+                {
+                    "parent_content_id" : "edX/CS301/2017_T1",
+                    "child_content_id" : "i4x://edX/CS301/chapter/64f24c3c2d16492ba566f296ee0726a7"
                 }
-            }
+            ]
+        }
     - GET: Returns a JSON representation of the specified User-Course relationship
     - DELETE: Inactivates (but does not remove) a Course relationship for the specified User
     ### Use Cases/Notes:
@@ -933,17 +934,17 @@ class UsersCoursesDetail(SecureAPIView):
     * Note: To create a new Course enrollment, see UsersCoursesList
     """
 
-    def post(self, request, user_id, course_id):
+    def post(self, request, course_id, *args, **kwargs):
         """
         POST /api/users/{user_id}/courses/{course_id}
         """
+        user = get_user_from_request_params(self.request, self.kwargs)
+        if not user:
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
         base_uri = generate_base_uri(request)
+
         response_data = {}
         response_data['uri'] = base_uri
-        try:
-            user = User.objects.get(id=user_id)
-        except ObjectDoesNotExist:
-            return Response({}, status=status.HTTP_404_NOT_FOUND)
         if not course_exists(request, user, course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         response_data['user_id'] = user.id
@@ -967,17 +968,17 @@ class UsersCoursesDetail(SecureAPIView):
             response_data['positions'].append(content_position)
         return Response(response_data, status=status.HTTP_200_OK)
 
-    def get(self, request, user_id, course_id):
+    def get(self, request, course_id, *args, **kwargs):
         """
         GET /api/users/{user_id}/courses/{course_id}
         """
         response_data = {}
         base_uri = generate_base_uri(request)
-        try:
-            user = User.objects.get(id=user_id, is_active=True)
-            course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612
-        except (ObjectDoesNotExist, ValueError):
+
+        user = get_user_from_request_params(self.request, self.kwargs)
+        if not user:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
+        course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612
         if not CourseEnrollment.is_enrolled(user, course_key):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         response_data['user_id'] = user.id
@@ -1009,14 +1010,13 @@ class UsersCoursesDetail(SecureAPIView):
                 parent_module = None
         return Response(response_data, status=status.HTTP_200_OK)
 
-    def delete(self, request, user_id, course_id):
+    def delete(self, request, course_id, *args, **kwargs):
         """
         DELETE /api/users/{user_id}/courses/{course_id}
         """
-        try:
-            user = User.objects.get(id=user_id)
-        except ObjectDoesNotExist:
-            return Response({}, status=status.HTTP_204_NO_CONTENT)
+        user = get_user_from_request_params(self.request, self.kwargs)
+        if not user:
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
         if not course_exists(request, user, course_id):
             return Response({}, status=status.HTTP_204_NO_CONTENT)
         course_key = get_course_key(course_id)

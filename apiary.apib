@@ -4760,3 +4760,73 @@ Returns a JSON representation of course overview for a specified course
             "course_video": ""
         }
 
+## Users Courses Detail [/mobile/v1/users/courses/{course_id}?username={username}]
+
+It allows clients to interact with a specific User-Course relationship (aka, enrollment)
+
+### Users Courses Detail [GET]
+
+Returns a JSON representation of the specified User-Course relationship
+
++ Response 200 (application/json)
+
+        {
+            "course_id": "edX/CS301/2017_T1",
+            "position": null,
+            "user_id": 2,
+            "uri": "http://lms.mcka.local/api/server/users/2/courses/edX/CS301/2017_T1",
+            "position_tree": {
+                "chapter": {
+                    "id": "i4x://edX/CS301/chapter/64f24c3c2d16492ba566f296ee0726a7"
+                },
+                "problem": {
+                    "id": "i4x://edX/CS301/problem/990c0db4262b431fa5b89d8662b71e0f"
+                },
+                "sequential": {
+                    "id": "i4x://edX/CS301/sequential/2c28b99079304fc4ac23f65942b2b9ad"
+                },
+                "vertical": {
+                    "id": "i4x://edX/CS301/vertical/f17a07d973ad484487875d374c5e5a20"
+                }
+            }
+        }
+
+
+### Store last-known location for Course, for User [POST]
+
+It Stores the last-known location for the Course, for the specified User (aka bookmark)
+
++ Attributes
+    + positions (required)
+        + parent_content_id (required)
+        + child_content_id (required)
+
++ Request (application/json)
+
+        {
+            "positions" : [
+                {
+                    "parent_content_id" : "edX/CS301/2017_T1",
+                    "child_content_id" : "i4x://edX/CS301/chapter/64f24c3c2d16492ba566f296ee0726a7"
+                }
+            ]
+        }
+
++ Response 200 (application/json)
+
+        {
+            "course_id": "edX/CS301/2017_T1",
+            "positions": [
+                "i4x://edX/CS301/chapter/64f24c3c2d16492ba566f296ee0726a7"
+            ],
+            "user_id": 2,
+            "uri": "http://lms.mcka.local/api/server/users/2/courses/edX/CS301/2017_T1"
+        }
+
+
+### Unenroll a User from a Course [DELETE]
+
+Unenrolls a User from a Course
+
++ Response 204 (application/json)
+
