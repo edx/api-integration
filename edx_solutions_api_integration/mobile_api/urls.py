@@ -15,4 +15,8 @@ urlpatterns = patterns(
         name='mobile-courses-overview'),
     url(r'^users/courses/{0}'.format(COURSE_ID_PATTERN), mobile_views.MobileUsersCoursesDetail.as_view(),
         name='mobile-users-courses-detail'),
+    url(r'^courses/{0}/static_tabs/*$'.format(COURSE_ID_PATTERN), mobile_views.MobileCoursesStaticTabsList.as_view(),
+        name='mobile-courses-static-tabs-list'),
+    url(r'^courses/{0}/static_tabs/(?P<tab_id>[a-zA-Z0-9_+\s\/:-]+)$'.format(COURSE_ID_PATTERN),
+        mobile_views.MobileCoursesStaticTabsDetail.as_view(), name='mobile-courses-static-tabs-details'),
 )
