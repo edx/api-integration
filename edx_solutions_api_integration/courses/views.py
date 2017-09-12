@@ -77,6 +77,7 @@ from edx_solutions_api_integration.utils import (
     cache_course_data,
     cache_course_user_data,
     get_aggregate_exclusion_user_ids,
+    get_user_from_request_params,
 )
 from .serializers import CourseSerializer
 from .serializers import GradeSerializer, CourseLeadersSerializer, CourseCompletionsLeadersSerializer
@@ -890,7 +891,8 @@ class CoursesStaticTabsList(SecureAPIView):
         """
         GET /api/courses/{course_id}/static_tabs
         """
-        course_descriptor, course_key, course_content = get_course(request, request.user, course_id)  # pylint: disable=W0612
+        user = get_user_from_request_params(self.request, self.kwargs)
+        course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612
         if not course_descriptor:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         strip_wrapper_div = str2bool(self.request.query_params.get('strip_wrapper_div', 'true'))
@@ -940,7 +942,8 @@ class CoursesStaticTabsDetail(SecureAPIView):
         """
         GET /api/courses/{course_id}/static_tabs/{tab_id}
         """
-        course_descriptor, course_key, course_content = get_course(request, request.user, course_id)  # pylint: disable=W0612
+        user = get_user_from_request_params(self.request, self.kwargs)
+        course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612
         if not course_descriptor:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         strip_wrapper_div = str2bool(self.request.query_params.get('strip_wrapper_div', 'true'))

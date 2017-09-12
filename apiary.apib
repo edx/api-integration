@@ -4830,3 +4830,46 @@ Unenrolls a User from a Course
 
 + Response 204 (application/json)
 
+## Course Static Tabs List [/mobile/v1/courses/{course_id}/static_tabs?username={username}]
+
+It returns a collection of custom pages in the course. Course Static Tabs List has an optional detail parameter that when true includes the custom page content in the response.
+
+### Course Static Tabs List [GET]
+
++ Parameters
+    + detail (optional)
+
++ Response 200 (application/json)
+
+        {
+            "tabs": [
+                {
+                    "id": "d15fe2e326094e12a2a338c04ddfaaf8",
+                    "name": "Lesson1"
+                },
+                {
+                    "id": "1ebbd598c08d4b93872528066edf8605",
+                    "name": "Lesson2"
+                },
+                {
+                    "id": "5d41a4b7e88740dc9c4cf3ee03372508",
+                    "name": "Lesson3"
+                }
+            ]
+        }
+
+
+## Course Static Tabs Detail [/mobile/v1/courses/{course_id}/static_tabs/{tab_id}?username={username}]
+
+It returns a custom page in the course, including the page content.
+
+### Course Static Tabs Detail [GET]
+
++ Response 200 (application/json)
+
+        {
+            "id": "d15fe2e326094e12a2a338c04ddfaaf8",
+            "name": "Lesson1",
+            "content": "<p>&ldquo;It really is just the discomfort in anticipation but also during the conversation&hellip;&rdquo;</p>"
+        }
+

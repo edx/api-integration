@@ -1,7 +1,11 @@
 """
 Views for mobile APIs
 """
-from edx_solutions_api_integration.courses.views import CoursesOverview
+from edx_solutions_api_integration.courses.views import (
+    CoursesOverview,
+    CoursesStaticTabsList,
+    CoursesStaticTabsDetail,
+)
 from edx_solutions_api_integration.permissions import (
     MobileListAPIView,
     MobileSecureAPIView,
@@ -46,6 +50,26 @@ class MobileCoursesOverview(MobileSecureAPIView, CoursesOverview):
 class MobileUsersCoursesDetail(MobileSecureAPIView, UsersCoursesDetail):
     """
     View that allow clients to interact with a specific User-Course relationship (aka, enrollment)
+    """
+
+    def __init__(self):
+        self.permission_classes += (IsStaffOrEnrolled, )
+
+
+class MobileCoursesStaticTabsList(MobileSecureAPIView, CoursesStaticTabsList):
+    """
+    View that returns a collection of custom pages in the course.
+    CoursesStaticTabsList has an optional detail parameter that when
+    true includes the custom page content in the response.
+    """
+
+    def __init__(self):
+        self.permission_classes += (IsStaffOrEnrolled, )
+
+
+class MobileCoursesStaticTabsDetail(MobileSecureAPIView, CoursesStaticTabsDetail):
+    """
+    View that returns a custom page in the course, including the page content.
     """
 
     def __init__(self):
