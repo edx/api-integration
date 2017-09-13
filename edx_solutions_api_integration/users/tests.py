@@ -1524,7 +1524,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         user_id = '2134234'
         test_uri = '{}/{}/courses/{}'.format(self.users_base_uri, user_id, course.id)
         response = self.do_delete(test_uri)
-        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response.status_code, 404)
 
     def test_user_courses_detail_delete_undefined_course(self):
         test_uri = '{}/{}/courses/{}'.format(self.users_base_uri, self.user.id, self.test_bogus_course_id)
