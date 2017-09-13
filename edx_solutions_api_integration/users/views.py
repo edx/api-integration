@@ -43,6 +43,7 @@ from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from edx_notifications.lib.consumer import mark_notification_read
 from course_metadata.models import CourseAggregatedMetaData
 from progress.models import StudentProgress
+from social_engagement.models import StudentSocialEngagementScore
 from student.models import CourseEnrollment, PasswordHistory, UserProfile
 from student.roles import CourseAccessRole, CourseInstructorRole, CourseObserverRole, CourseStaffRole, \
     CourseAssistantRole, UserBasedRole
@@ -66,6 +67,7 @@ from edx_solutions_api_integration.utils import (
     dict_has_items,
     extract_data_params,
     get_user_from_request_params,
+    get_aggregate_exclusion_user_ids,
 )
 from edx_solutions_projects.serializers import BasicWorkgroupSerializer
 from .serializers import UserSerializer, UserCountByCitySerializer, UserRolesSerializer
@@ -1331,14 +1333,28 @@ class UsersSocialMetrics(SecureListAPIView):
     - GET: Returns a list of social metrics for that user in the specified course
     """
 
-    def get(self, request, user_id, course_id):  # pylint: disable=W0613,W0221
-        try:
-            user = User.objects.get(id=user_id)  # pylint: disable=W0612
-        except ObjectDoesNotExist:
-            return Response({}, status.HTTP_404_NOT_FOUND)
+    def get(self, request, *args, **kwargs):  # pylint: disable=unused-arguments
+        user = get_user_from_request_params(self.request, self.kwargs)
+        course_id = kwargs.get('course_id', None)
+        if course_id is None:
+            course_id = self.request.query_params.get('course_id', None)
 
+        course_key = get_course_key(course_id)
+
+        if not course_exists(request, self.request.user, course_id):
+            raise Http404
+
+        data = self._get_user_discussion_metrics(request, user, course_id)
+        data['score'] = self._get_user_score(course_key, user)
+        data['course_avg_score'] = self._get_course_average_score(course_key)
+
+        return Response(data, status.HTTP_200_OK)
+
+    @staticmethod
+    def _get_user_discussion_metrics(request, user, course_id):
+        """ Fetches discussion metrics from the forums client."""
         # load the course so that we can see when the course end date is
-        course_descriptor, course_key, course_content = get_course(self.request, self.request.user, course_id)  # pylint: disable=W0612,C0301
+        course_descriptor, course_key, course_content = get_course(request, request.user, course_id)  # pylint: disable=W0612,C0301
         if not course_descriptor:
             raise Http404
 
@@ -1354,8 +1370,8 @@ class UsersSocialMetrics(SecureListAPIView):
         try:
             # get the course social stats, passing along a course end date to remove any activity after the course
             # closure from the stats
+            user_id = str(user.id)
             data = (get_user_social_stats(user_id, slash_course_id, end_date=course_descriptor.end))[user_id]
-            http_status = status.HTTP_200_OK
         except (CommentClientRequestError, CommentClientMaintenanceError, ConnectionError), error:
             logging.error("Forum service returned an error: %s", str(error))
 
@@ -1371,9 +1387,20 @@ class UsersSocialMetrics(SecureListAPIView):
                 'num_upvotes': 0,
                 'num_comments_generated': 0
             }
-            http_status = status.HTTP_200_OK
 
-        return Response(data, http_status)
+        return data
+
+    @staticmethod
+    def _get_user_score(course_key, user):
+        score = StudentSocialEngagementScore.get_user_engagement_score(course_key, user.id)
+        if score is None:
+            return 0
+        return score
+
+    @staticmethod
+    def _get_course_average_score(course_key):
+        exclude_users = get_aggregate_exclusion_user_ids(course_key)
+        return StudentSocialEngagementScore.get_course_average_engagement_score(course_key, exclude_users)
 
 
 class UsersMetricsCitiesList(SecureListAPIView):

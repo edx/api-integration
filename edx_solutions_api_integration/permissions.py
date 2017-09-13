@@ -93,12 +93,11 @@ class IsStaffOrEnrolled(permissions.BasePermission):
     """
     def has_permission(self, request, view):
         user = request.user
-        course_id = request.parser_context.get('kwargs', {}).get('course_id', None)
+        course_id = request.GET.get('course_id') \
+                    or request.parser_context.get('kwargs', {}).get('course_id', None)
         course_key = get_course_key(course_id)
         if course_key:
-            return (user.is_staff or CourseEnrollment.is_enrolled(request.user, course_key)) \
-                    and (user.username == request.GET.get('username') or
-                         user.username == getattr(request, 'data', {}).get('username'))
+            return user.is_staff or CourseEnrollment.is_enrolled(request.user, course_key)
         return False
 
 

@@ -40,6 +40,7 @@ from edx_solutions_api_integration.test_utils import (
     APIClientMixin,
     SignalDisconnectTestMixin,
 )
+from social_engagement.models import StudentSocialEngagementScore
 from student.tests.factories import UserFactory, CourseEnrollmentFactory, GroupFactory
 from student.models import anonymous_id_for_user
 
@@ -1893,6 +1894,25 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         test_uri = '{}/{}/courses/{}/metrics/social/'.format(self.users_base_uri, self.user.id, course.id)
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
+
+    def test_user_social_metrics_engagement_scores(self):
+        other_user = UserFactory()
+
+        CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
+        CourseEnrollmentFactory.create(user=other_user, course_id=self.course.id)
+
+        user_score = StudentSocialEngagementScore(user=self.user, course_id=self.course.id, score=75)
+        user_score.save()
+        other_score = StudentSocialEngagementScore(user=other_user, course_id=self.course.id, score=125)
+        other_score.save()
+        course_avg_score = (user_score.score + other_score.score) / 2
+
+        test_uri = '{}/{}/courses/{}/metrics/social/'.format(self.users_base_uri, self.user.id, self.course.id)
+        response = self.do_get(test_uri)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['score'], user_score.score)
+        self.assertEqual(response.data['course_avg_score'], course_avg_score)
 
     def test_users_roles_list_get(self):
         allow_access(self.course, self.user, 'staff')
