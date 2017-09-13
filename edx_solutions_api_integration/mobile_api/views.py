@@ -8,6 +8,7 @@ from edx_solutions_api_integration.courses.views import (
 )
 from edx_solutions_api_integration.permissions import (
     MobileListAPIView,
+    MobilePermissionMixin,
     MobileSecureAPIView,
     IsStaffOrEnrolled,
 )
@@ -16,6 +17,7 @@ from edx_solutions_api_integration.users.views import (
     UsersCourseProgressList,
     UsersCoursesDetail,
 )
+from edx_solutions_api_integration.courses.views import CourseModuleCompletionList
 from openedx.core.lib.api.permissions import IsStaffOrOwner
 
 
@@ -74,3 +76,9 @@ class MobileCoursesStaticTabsDetail(MobileSecureAPIView, CoursesStaticTabsDetail
 
     def __init__(self):
         self.permission_classes += (IsStaffOrEnrolled, )
+
+
+class MobileCourseModuleCompletion(MobilePermissionMixin, CourseModuleCompletionList, ):
+     """
+     Mimics CourseModuleCompletionList view but has mobile permissions.
+     """
