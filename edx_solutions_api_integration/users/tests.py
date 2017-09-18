@@ -54,8 +54,6 @@ from xmodule.modulestore.tests.django_utils import (
     ModuleStoreTestCase,
     TEST_DATA_SPLIT_MODULESTORE
 )
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_store_config, SharedModuleStoreTestCase
-
 from django.contrib.auth.models import User
 from notification_prefs import NOTIFICATION_PREF_KEY
 
