@@ -9,9 +9,7 @@ import urllib
 
 from mobile_api.testutils import MobileAPITestCase
 from edx_solutions_organizations.models import Organization
-from openedx.core.djangoapps.course_groups.cohorts import add_cohort, add_user_to_cohort
 from openedx.core.djangolib.testing.utils import get_mock_request
-from openedx.core.djangoapps.course_groups.cohorts import migrate_cohort_settings
 from student.tests.factories import UserFactory, CourseEnrollmentFactory
 from lms.djangoapps.grades.new.course_grade import CourseGradeFactory
 from lms.djangoapps.grades.tests.utils import answer_problem
@@ -278,32 +276,25 @@ class TestUserCourseGradesApi(MobileAPITestCase):
         )
         self.user2 = UserFactory.create(username='user2', password='user2')
         self.user3 = UserFactory.create(username='user3', password='user3')
-        CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
-        CourseEnrollmentFactory.create(user=self.user2, course_id=self.course.id)
-        CourseEnrollmentFactory.create(user=self.user3, course_id=self.course.id)
-        course_cohort_settings = migrate_cohort_settings(self.course)
-        course_cohort_settings.is_cohorted = True
-        course_cohort_settings.save()
-        self.cohort = add_cohort(self.course.id, name='cohort', assignment_type='random')
         self.request = get_mock_request(self.user)
 
-    def test_user_course_grades_and_cohort_average(self):
+    def test_user_course_grades_and_course_average(self):
         self.users_and_problem_setup()
 
-        # Leave out the third user for now
-        add_user_to_cohort(self.cohort, self.user.username)
-        add_user_to_cohort(self.cohort, self.user2.username)
+        # Just two users for now
+        CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
+        CourseEnrollmentFactory.create(user=self.user2, course_id=self.course.id)
 
         self.request.user = self.user
         answer_problem(self.course, self.request, self.problem, score=1, max_value=1)
         self.request.user = self.user2
         answer_problem(self.course, self.request, self.problem, score=1, max_value=5)
 
-        # Calculate the expected cohort average
+        # Calculate the expected course average
         user_grade = CourseGradeFactory().create(self.user, self.course)
         user2_grade = CourseGradeFactory().create(self.user2, self.course)
-        cohort_avg_grade = (user_grade.percent + user2_grade.percent) / float(2)
-        self.assertTrue(cohort_avg_grade > 0)
+        course_avg_grade = (user_grade.percent + user2_grade.percent) / float(2)
+        self.assertTrue(course_avg_grade > 0)
 
         self.login_and_enroll()
         response = self.api_response(
@@ -313,15 +304,15 @@ class TestUserCourseGradesApi(MobileAPITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['course_grade'], user_grade.percent)
-        self.assertEqual(response.data['cohort_average_grade'], cohort_avg_grade)
+        self.assertEqual(response.data['course_average_grade'], course_avg_grade)
 
-        # Add another user, with a hgiher grade, to the cohort
-        # and check that the average cohort grade is updated
-        add_user_to_cohort(self.cohort, self.user3.username)
+        # Enroll another user, with a higher grade,
+        # and check that the average grade is updated
         self.request.user = self.user3
+        CourseEnrollmentFactory.create(user=self.user3, course_id=self.course.id)
         answer_problem(self.course, self.request, self.problem, score=10, max_value=1)
         user3_grade = CourseGradeFactory().create(self.user3, self.course)
-        new_cohort_avg_grade = (user_grade.percent + user2_grade.percent + user3_grade.percent) / float(3)
+        new_course_avg_grade = (user_grade.percent + user2_grade.percent + user3_grade.percent) / float(3)
 
         response = self.api_response(
             expected_response_code=None,
@@ -329,14 +320,15 @@ class TestUserCourseGradesApi(MobileAPITestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['course_grade'], user_grade.percent)
-        self.assertEqual(response.data['cohort_average_grade'], new_cohort_avg_grade)
-        self.assertTrue(new_cohort_avg_grade > cohort_avg_grade)
+        self.assertEqual(response.data['course_average_grade'], new_course_avg_grade)
+        self.assertTrue(new_course_avg_grade > course_avg_grade)
 
     def test_grades_view_oauth2(self):
         """
         Test the grades view using OAuth2 Authentication
         """
         self.users_and_problem_setup()
+        CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
         query_string = urllib.urlencode({'course_id': self.course.id, 'username': self.user.username})
         url = '/api/server/mobile/v1/users/courses/grades/?{}'.format(query_string)
         self.request.user = self.user
