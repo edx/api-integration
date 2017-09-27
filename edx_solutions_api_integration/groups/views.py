@@ -111,7 +111,7 @@ class GroupsList(SecureListAPIView):
         returns queryset filter by group type
         """
         group_type = self.request.query_params.get('type', None)
-        groups = Group.objects.filter(groupprofile__group_type=group_type)
+        groups = Group.objects.select_related("groupprofile").filter(groupprofile__group_type=group_type)
         return groups
 
 

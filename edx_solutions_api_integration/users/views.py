@@ -336,7 +336,7 @@ class UsersList(SecureListAPIView):
 
         if courses is None:
             queryset = queryset.annotate(courses_enrolled=Count('courseenrollment'))
-        queryset = queryset.prefetch_related('organizations').select_related('profile')
+        queryset = queryset.prefetch_related('organizations', 'courseaccessrole_set').select_related('profile')
 
         return queryset
 
@@ -754,10 +754,10 @@ class UsersGroupsList(SecureAPIView):
         if data_params:
             groups = [group for group in groups if dict_has_items(group.groupprofile.data, data_params)]
         response_data['groups'] = []
-        for group in groups:
-            group_profile = GroupProfile.objects.get(group_id=group.id)
+        group_profiles = GroupProfile.objects.filter(group__in=groups)
+        for group_profile in group_profiles:
             group_data = {}
-            group_data['id'] = group.id
+            group_data['id'] = group_profile.group_id
             group_data['name'] = group_profile.name
             response_data['groups'].append(group_data)
         return Response(response_data, status=status.HTTP_200_OK)

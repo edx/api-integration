@@ -708,9 +708,11 @@ class CoursesGroupsList(SecureAPIView):
         if group_type:
             course_groups = course_groups.filter(group__groupprofile__group_type=group_type)
         response_data = []
-        for course_group in course_groups:
-            group_profile = GroupProfile.objects.get(group_id=course_group.group_id)
-            group_data = {'id': course_group.group_id, 'name': group_profile.name}
+        group_profiles = GroupProfile.objects.filter(
+            group_id__in=[course_group.group_id for course_group in course_groups]
+        )
+        for group_profile in group_profiles:
+            group_data = {'id': group_profile.group_id, 'name': group_profile.name}
             response_data.append(group_data)
         response_status = status.HTTP_200_OK
         return Response(response_data, status=response_status)
