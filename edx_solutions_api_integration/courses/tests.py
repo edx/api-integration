@@ -2513,28 +2513,28 @@ class CoursesApiTests(
 
         response = self.do_get('{}/{}/metrics/cities/'.format(self.base_courses_uri, test_course_id))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data['results']), 4)
-        self.assertEqual(response.data['results'][0]['city'], 'San Francisco')
-        self.assertEqual(response.data['results'][0]['count'], 9)
+        self.assertEqual(len(response.data), 4)
+        self.assertEqual(response.data[0]['city'], 'San Francisco')
+        self.assertEqual(response.data[0]['count'], 9)
 
         # filter counts by city
         sf_uri = '{}/{}/metrics/cities/?city=new york city, San Francisco'.format(self.base_courses_uri,
                                                                                   test_course_id)
         response = self.do_get(sf_uri)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data['results']), 2)
-        self.assertEqual(response.data['results'][0]['city'], 'San Francisco')
-        self.assertEqual(response.data['results'][0]['count'], 9)
-        self.assertEqual(response.data['results'][1]['city'], 'New York City')
-        self.assertEqual(response.data['results'][1]['count'], 6)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]['city'], 'San Francisco')
+        self.assertEqual(response.data[0]['count'], 9)
+        self.assertEqual(response.data[1]['city'], 'New York City')
+        self.assertEqual(response.data[1]['count'], 6)
 
         # filter counts by city
         dnv_uri = '{}/{}/metrics/cities/?city=Denver'.format(self.base_courses_uri, test_course_id)
         response = self.do_get(dnv_uri)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data['results']), 1)
-        self.assertEqual(response.data['results'][0]['city'], 'Denver')
-        self.assertEqual(response.data['results'][0]['count'], 5)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['city'], 'Denver')
+        self.assertEqual(response.data[0]['count'], 5)
 
         # Do a get with a bogus course to hit the 404 case
         response = self.do_get('{}/{}/metrics/cities/'.format(self.base_courses_uri, self.test_bogus_course_id))

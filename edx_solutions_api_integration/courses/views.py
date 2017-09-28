@@ -1597,22 +1597,29 @@ class CoursesMetrics(SecureAPIView):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         course_descriptor, course_key, course_content = get_course(request, request.user, course_id)  # pylint: disable=W0612
         slash_course_id = get_course_key(course_id, slashseparated=True)
-        exclude_users = get_aggregate_exclusion_user_ids(course_key)
-        users_enrolled_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users)
         organization = request.query_params.get('organization', None)
-        metrics_required = css_param_to_list(request, 'metrics_required')
-        org_ids = None
-        if organization:
-            users_enrolled_qs = users_enrolled_qs.filter(organizations=organization)
-            org_ids = [organization]
-
+        org_ids = [organization] if organization else None
         group_ids = get_ids_from_list_param(self.request, 'groups')
-        if group_ids:
-            users_enrolled_qs = users_enrolled_qs.filter(groups__in=group_ids)
+        metrics_required = css_param_to_list(request, 'metrics_required')
+        exclude_users = get_aggregate_exclusion_user_ids(course_key)
+        cached_enrollments_data = get_cached_data('course_enrollments', course_id)
+        if cached_enrollments_data and not len(request.query_params):
+            enrollment_count = cached_enrollments_data.get('enrollment_count')
+        else:
+            users_enrolled_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users)
+
+            if organization:
+                users_enrolled_qs = users_enrolled_qs.filter(organizations=organization).distinct()
+
+            if group_ids:
+                users_enrolled_qs = users_enrolled_qs.filter(groups__in=group_ids).distinct()
+            enrollment_count = users_enrolled_qs.count()
+            if not len(request.query_params):
+                cache_course_data('course_enrollments', course_id, {'enrollment_count': enrollment_count})
 
         data = {
             'grade_cutoffs': course_descriptor.grading_policy['GRADE_CUTOFFS'],
-            'users_enrolled': users_enrolled_qs.distinct().count()
+            'users_enrolled': enrollment_count
         }
 
         if 'users_started' in metrics_required:
@@ -2048,7 +2055,7 @@ class CoursesMetricsSocial(SecureListAPIView):
                     actual_data.update({str(user_id): data[str(user_id)]})
 
             data = actual_data
-            total_enrollments = enrollment_qs.count()
+            total_enrollments = len(actual_users)
 
             data = {'total_enrollments': total_enrollments, 'users': data}
             http_status = status.HTTP_200_OK
@@ -2076,6 +2083,7 @@ class CoursesMetricsCities(SecureListAPIView):
     """
 
     serializer_class = UserCountByCitySerializer
+    pagination_class = None
 
     def get_queryset(self):
         course_id = self.kwargs['course_id']
@@ -2084,14 +2092,20 @@ class CoursesMetricsCities(SecureListAPIView):
             raise Http404
         course_key = get_course_key(course_id)
         exclude_users = get_aggregate_exclusion_user_ids(course_key)
-        queryset = CourseEnrollment.objects.users_enrolled_in(course_key)\
-            .exclude(id__in=exclude_users).exclude(profile__city__isnull=True).exclude(profile__city__iexact='')
-        if city:
-            q_list = [Q(profile__city__iexact=item.strip()) for item in city]
-            q_list = reduce(lambda a, b: a | b, q_list)
-            queryset = queryset.filter(q_list)
+        cached_cities_data = get_cached_data('cities_count', course_id)
+        if cached_cities_data and not len(self.request.query_params):
+            queryset = cached_cities_data
+        else:
+            queryset = CourseEnrollment.objects.users_enrolled_in(course_key)\
+                .exclude(id__in=exclude_users).exclude(profile__city__isnull=True).exclude(profile__city__iexact='')
+            if city:
+                q_list = [Q(profile__city__iexact=item.strip()) for item in city]
+                q_list = reduce(lambda a, b: a | b, q_list)
+                queryset = queryset.filter(q_list)
 
-        queryset = queryset.values('profile__city').annotate(count=Count('profile__city')).order_by('-count')
+            queryset = queryset.values('profile__city').annotate(count=Count('profile__city')).order_by('-count')
+            if not len(self.request.query_params):
+                cache_course_data('cities_count', course_id, queryset)
         return queryset
 
 
