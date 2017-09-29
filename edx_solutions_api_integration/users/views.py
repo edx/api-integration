@@ -1630,7 +1630,9 @@ class UsersCourseProgressList(SecureListAPIView):
         course_overview = CourseOverview.objects.filter(id__in=course_keys)
         if str2bool(mobile_only):
             course_overview = course_overview.filter(mobile_available=True)
-        course_overview = course_overview.values('id', 'start', 'end', 'course_image_url', 'display_name')
+        course_overview = course_overview.values(
+            'id', 'start', 'end', 'course_image_url', 'display_name', 'mobile_available'
+        )
 
         filtered_course_overview = [overview["id"] for overview in course_overview]
 
