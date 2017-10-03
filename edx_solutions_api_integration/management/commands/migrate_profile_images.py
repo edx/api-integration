@@ -79,9 +79,13 @@ class Command(BaseCommand):
         try:
             log.info("Starting Migration of Profile Images from %s", bucket_name)
             bucket = Command.get_bucket_connection(aws_access_key, aws_access_secret, bucket_name)
-            for user in User.objects.exclude(profile__avatar_url__isnull=True):
-                image_key = (user.profile.avatar_url.split('/')[-2]) + '/' + (user.profile.avatar_url.split('/')[-1])
-                image_url = Command.get_file_url(bucket, image_key)
+            for user in User.objects.exclude(profile__avatar_url__isnull=True).exclude(profile__avatar_url__exact=''):
+                try:
+                    image_key = (user.profile.avatar_url.split('/')[-2]) + '/' + (user.profile.avatar_url.split('/')[-1])
+                    image_url = Command.get_file_url(bucket, image_key)
+                except IndexError:
+                    log.info('Unknown avatar url(%s) for %s', user.profile.avatar_url, user.username)
+                    continue
 
                 log.info("Get image_url %s of %s", image_url, user.username)
                 if image_url:
