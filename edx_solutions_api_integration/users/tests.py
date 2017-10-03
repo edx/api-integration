@@ -7,20 +7,20 @@ Run these tests @ Devstack:
     paver test_system -s lms --fasttest
         --fail_fast --verbose --test_id=lms/djangoapps/edx_solutions_api_integration/users
 """
+
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from random import randint
-import uuid
 from urllib import urlencode
-from edx_notifications.data import NotificationType, NotificationMessage
-from edx_notifications.lib.consumer import get_notifications_count_for_user
-from edx_notifications.lib.publisher import register_notification_type, publish_notification_to_user
+import uuid
 import mock
-import before_after
 
+import before_after
 from requests.exceptions import ConnectionError
+import six
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.test.utils import override_settings
@@ -31,16 +31,13 @@ from django.utils.translation import ugettext as _
 from courseware import module_render
 from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR, ForumsConfig
-from instructor.access import allow_access
+from edx_notifications.data import NotificationType, NotificationMessage
+from edx_notifications.lib.consumer import get_notifications_count_for_user
+from edx_notifications.lib.publisher import register_notification_type, publish_notification_to_user
 from edx_solutions_organizations.models import Organization
-from social_engagement.models import StudentSocialEngagementScore
 from edx_solutions_projects.models import Project, Workgroup
-from edx_solutions_api_integration.test_utils import (
-    get_non_atomic_database_settings,
-    CourseGradingMixin,
-    APIClientMixin,
-    SignalDisconnectTestMixin,
-)
+from instructor.access import allow_access
+from social_engagement.models import StudentSocialEngagementScore
 from social_engagement.models import StudentSocialEngagementScore
 from student.tests.factories import UserFactory, CourseEnrollmentFactory, GroupFactory
 from student.models import anonymous_id_for_user
@@ -50,7 +47,13 @@ from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_store_config, SharedModuleStoreTestCase
 
-from django.contrib.auth.models import User
+from edx_solutions_api_integration.test_utils import (
+    get_non_atomic_database_settings,
+    CourseGradingMixin,
+    APIClientMixin,
+    SignalDisconnectTestMixin,
+)
+
 from notification_prefs import NOTIFICATION_PREF_KEY
 
 MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
@@ -2213,18 +2216,38 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         data = {'username': self.test_username, 'password': self.test_password}
         response = self.do_post(self.users_base_uri, data)
         self.assertEqual(response.status_code, 400)
+        self.assertFalse(User.objects.filter(username=self.test_username).exists())
 
     def test_users_list_post_missing_username(self):
         # Test with missing username in the request data
         data = {'email': self.test_email, 'password': self.test_password}
         response = self.do_post(self.users_base_uri, data)
         self.assertEqual(response.status_code, 400)
+        self.assertFalse(User.objects.filter(username=self.test_username).exists())
 
     def test_users_list_post_missing_password(self):
         # Test with missing password in the request data
         data = {'email': self.test_email, 'username': self.test_username}
         response = self.do_post(self.users_base_uri, data)
         self.assertEqual(response.status_code, 400)
+        self.assertFalse(User.objects.filter(username=self.test_username).exists())
+
+    def test_create_integration_test_user(self):
+        data = {
+            'email': self.test_email,
+            'username': self.test_username,
+            'password': self.test_password,
+            'courses': [six.text_type(self.course.id), 'course-v1:non+existent+course'],
+        }
+        response = self.do_post('{}/integration-test-users/'.format(self.users_base_uri), data)
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(User.objects.filter(username=self.test_username).exists())
+        self.assertEqual(response.data['courses'], [six.text_type(self.course.id)])
+        enrollment = CourseEnrollment.objects.get(
+            user__username=name=self.test_username,
+            course_id=self.course.id
+        )
+        self.assertTrue(enrollment.is_active)
 
     def test_users_groups_list_missing_group_id(self):
         # Test with missing group_id in request data

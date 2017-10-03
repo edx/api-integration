@@ -3,25 +3,26 @@
 import json
 import logging
 
-from requests.exceptions import ConnectionError
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.validators import validate_email, validate_slug, ValidationError
 from django.db import IntegrityError
 from django.db.models import Count, Q
-from django.core.validators import validate_email, validate_slug, ValidationError
 from django.conf import settings
 from django.http import Http404
 from django.utils.translation import get_language, ugettext_lazy as _
-from rest_framework import status
+from requests.exceptions import ConnectionError
 from rest_framework import filters
 from rest_framework.response import Response
+from rest_framework import status
+import six
 
 from courseware import module_render
 from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
-from social_engagement.models import StudentSocialEngagementScore
 from gradebook.utils import generate_user_gradebook
+from social_engagement.models import StudentSocialEngagementScore
 from instructor.access import revoke_access, update_forum_role
 from openedx.core.djangoapps.lang_pref import LANGUAGE_KEY
 from lms.lib.comment_client.utils import CommentClientRequestError, CommentClientMaintenanceError
@@ -43,7 +44,7 @@ from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from edx_notifications.lib.consumer import mark_notification_read
 from course_metadata.models import CourseAggregatedMetaData
 from progress.models import StudentProgress
-from student.models import CourseEnrollment, PasswordHistory, UserProfile
+from student.models import CourseEnrollment, CourseEnrollmentException, PasswordHistory, UserProfile
 from student.roles import (
     CourseAccessRole,
     CourseInstructorRole,
@@ -1643,3 +1644,41 @@ class UsersCourseProgressList(SecureListAPIView):
         })
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UsersListWithEnrollment(UsersList):
+    """
+    View to create Users and enroll them in a list of courses.  In addition to
+    the options provided by UsersList.post, this view accepts an optional
+    "courses" attribute in the request body, which is a list of course keys to
+    enroll in.  
+    
+    The response will be annotated with a "courses" attribute which reflects
+    the list of courses the user was successfully enrolled in.  Failure to
+    enroll in a given course will not propagate an error to the caller, it will
+    just cause that course's key to be omitted from the response.
+    """
+
+    def post(self, request):
+        """
+        POST /api/users/integration_test_users/
+        """
+        AUDIT_LOG.warning(
+            "API::Creating and enrolling user with UsersListWithEnrollment. "
+            "This should not be used in production"
+        )
+        response = super(UsersListWithEnrollment, self).post(request)
+        if response.status_code == status.HTTP_201_CREATED:
+            user = User.objects.get(username=request.data['username'])
+            response.data['courses'] = []
+            course_key_gen = (CourseKey.from_string(course) for course in request.data['courses'])
+            for course_key in course_key_gen:
+                try: 
+                    CourseEnrollment.enroll(user=user, course_key=course_key, check_access=True)
+                except CourseEnrollmentException as exc:
+                    AUDIT_LOG.warning(
+                        "API::Could not enroll {} in {} because of {}".format(user, course_key, exc)
+                    )
+                else:
+                    response.data['courses'].append(six.text_type(course_key))
+        return response
