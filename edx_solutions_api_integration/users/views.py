@@ -877,21 +877,15 @@ class UsersCoursesList(SecureAPIView):
         enrollments = CourseEnrollment.enrollments_for_user(user=user)
         response_data = []
         for enrollment in enrollments:
-            course_descriptor, course_key, course_content = get_course(request, user, unicode(enrollment.course_id))  # pylint: disable=W0612,C0301
-            # NOTE: It is possible that a course has been hard deleted from the courseware
-            # database, but the enrollment row in the SQL database still exists
-            if course_descriptor:
-                course_data = {
-                    "id": unicode(course_key),
-                    "uri": '{}/{}'.format(base_uri, unicode(course_key)),
-                    "is_active": enrollment.is_active,
-                    "name": course_descriptor.display_name,
-                    "start": getattr(course_descriptor, 'start', None),
-                    "end": getattr(course_descriptor, 'end', None)
-                }
-                response_data.append(course_data)
-            else:
-                log.warning("User {0} enrolled in course_id {1}, but course could not be found.".format(user_id, unicode(enrollment.course_id)))  # pylint: disable=C0301,W1202
+            course_data = {
+                "id": unicode(enrollment.course_overview.id),
+                "uri": '{}/{}'.format(base_uri, unicode(enrollment.course_overview.id)),
+                "is_active": enrollment.is_active,
+                "name": enrollment.course_overview.display_name,
+                "start": enrollment.course_overview.start,
+                "end": enrollment.course_overview.end
+            }
+            response_data.append(course_data)
 
         return Response(response_data, status=status.HTTP_200_OK)
 
