@@ -40,7 +40,7 @@ from instructor.access import allow_access
 from social_engagement.models import StudentSocialEngagementScore
 from social_engagement.models import StudentSocialEngagementScore
 from student.tests.factories import UserFactory, CourseEnrollmentFactory, GroupFactory
-from student.models import anonymous_id_for_user
+from student.models import anonymous_id_for_user, CourseEnrollment
 
 from openedx.core.djangoapps.user_api.models import UserPreference
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
@@ -2232,6 +2232,21 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 400)
         self.assertFalse(User.objects.filter(username=self.test_username).exists())
 
+    def test_create_integration_test_user_no_courses(self):
+        data = {
+            'email': self.test_email,
+            'username': self.test_username,
+            'password': self.test_password,
+        }
+        response = self.do_post('{}/integration-test-users/'.format(self.users_base_uri), data)
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(User.objects.filter(username=self.test_username).exists())
+        self.assertEqual(response.data['courses'], [])
+        self.assertEqual(
+            CourseEnrollment.objects.filter(user__username=self.test_username, course_id=self.course.id).count(),
+            0
+        )
+
     def test_create_integration_test_user(self):
         data = {
             'email': self.test_email,
@@ -2244,7 +2259,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertTrue(User.objects.filter(username=self.test_username).exists())
         self.assertEqual(response.data['courses'], [six.text_type(self.course.id)])
         enrollment = CourseEnrollment.objects.get(
-            user__username=name=self.test_username,
+            user__username=self.test_username,
             course_id=self.course.id
         )
         self.assertTrue(enrollment.is_active)

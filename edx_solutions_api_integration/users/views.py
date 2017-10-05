@@ -1646,13 +1646,13 @@ class UsersCourseProgressList(SecureListAPIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class UsersListWithEnrollment(UsersList):
+class UsersListWithEnrollment(UsersList):  # pylint: disable=too-many-ancestors
     """
     View to create Users and enroll them in a list of courses.  In addition to
     the options provided by UsersList.post, this view accepts an optional
     "courses" attribute in the request body, which is a list of course keys to
-    enroll in.  
-    
+    enroll in.
+
     The response will be annotated with a "courses" attribute which reflects
     the list of courses the user was successfully enrolled in.  Failure to
     enroll in a given course will not propagate an error to the caller, it will
@@ -1671,14 +1671,17 @@ class UsersListWithEnrollment(UsersList):
         if response.status_code == status.HTTP_201_CREATED:
             user = User.objects.get(username=request.data['username'])
             response.data['courses'] = []
-            course_key_gen = (CourseKey.from_string(course) for course in request.data['courses'])
-            for course_key in course_key_gen:
-                try: 
+            for course_key_string in request.data.get('courses', []):
+                try:
+                    course_key = CourseKey.from_string(course_key_string)
                     CourseEnrollment.enroll(user=user, course_key=course_key, check_access=True)
-                except CourseEnrollmentException as exc:
+                except (InvalidKeyError, CourseEnrollmentException) as exc:
                     AUDIT_LOG.warning(
-                        "API::Could not enroll {} in {} because of {}".format(user, course_key, exc)
+                        "API::Could not enroll %s in %s because of %s",
+                        user,
+                        course_key,
+                        exc
                     )
                 else:
-                    response.data['courses'].append(six.text_type(course_key))
+                    response.data['courses'].append(course_key_string)
         return response
