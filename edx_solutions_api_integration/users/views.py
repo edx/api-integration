@@ -1679,7 +1679,7 @@ class UsersListWithEnrollment(UsersList):  # pylint: disable=too-many-ancestors
                     AUDIT_LOG.warning(
                         "API::Could not enroll %s in %s because of %s",
                         user,
-                        course_key,
+                        course_key_string,
                         exc
                     )
                 else:

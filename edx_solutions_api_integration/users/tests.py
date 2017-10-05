@@ -2252,7 +2252,11 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             'email': self.test_email,
             'username': self.test_username,
             'password': self.test_password,
-            'courses': [six.text_type(self.course.id), 'course-v1:non+existent+course'],
+            'courses': [
+                six.text_type(self.course.id),
+                'course-v1:non+existent+course',
+                'course-v2:doesnt+exist',
+            ],
         }
         response = self.do_post('{}/integration-test-users/'.format(self.users_base_uri), data)
         self.assertEqual(response.status_code, 201)
