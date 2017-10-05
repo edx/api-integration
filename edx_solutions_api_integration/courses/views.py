@@ -596,7 +596,14 @@ class CoursesDetail(SecureAPIView):
                 depth=depth_int,
                 requested_fields=BLOCK_DATA_FIELDS
             )
-            root_block = data_blocks['blocks'][data_blocks['root']]
+            root_block = data_blocks.get('blocks', {}).get(
+                data_blocks['root'],
+                {
+                    'id': unicode(course_descriptor.id),
+                    'display_name': course_descriptor.display_name,
+                    'type': course_descriptor.category
+                }
+            )
             response_data = _make_block_tree(
                 request,
                 data_blocks['blocks'],
