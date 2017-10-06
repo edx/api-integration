@@ -878,15 +878,16 @@ class UsersCoursesList(SecureAPIView):
         enrollments = CourseEnrollment.enrollments_for_user(user=user)
         response_data = []
         for enrollment in enrollments:
-            course_data = {
-                "id": unicode(enrollment.course_overview.id),
-                "uri": '{}/{}'.format(base_uri, unicode(enrollment.course_overview.id)),
-                "is_active": enrollment.is_active,
-                "name": enrollment.course_overview.display_name,
-                "start": enrollment.course_overview.start,
-                "end": enrollment.course_overview.end
-            }
-            response_data.append(course_data)
+            if enrollment.course_overview:
+                course_data = {
+                    "id": unicode(enrollment.course_overview.id),
+                    "uri": '{}/{}'.format(base_uri, unicode(enrollment.course_overview.id)),
+                    "is_active": enrollment.is_active,
+                    "name": enrollment.course_overview.display_name,
+                    "start": enrollment.course_overview.start,
+                    "end": enrollment.course_overview.end
+                }
+                response_data.append(course_data)
 
         return Response(response_data, status=status.HTTP_200_OK)
 
