@@ -1855,19 +1855,33 @@ class CoursesMetricsGradesLeadersList(SecureListAPIView):
             else:
                 data.update(cached_grade_data)
         else:
-            leaderboard_data = StudentGradebook.generate_leaderboard(course_key,
-                                                                     user_id=user_id,
-                                                                     group_ids=group_ids,
-                                                                     count=count,
-                                                                     exclude_users=exclude_users)
+            cached_leader_board_data = get_cached_data('grade_leaderboard', course_id)
+            cached_grade_data = get_cached_data('grade', course_id, user_id)
+            if cached_leader_board_data and cached_grade_data and 'user_position' in cached_grade_data and not \
+                    (group_ids or exclude_roles):
+                data.update(cached_grade_data)
+                data.update(cached_leader_board_data)
+            else:
+                leaderboard_data = StudentGradebook.generate_leaderboard(course_key,
+                                                                         user_id=user_id,
+                                                                         group_ids=group_ids,
+                                                                         count=count,
+                                                                         exclude_users=exclude_users)
 
-            serializer = CourseProficiencyLeadersSerializer(leaderboard_data['queryset'], many=True)
-            data['leaders'] = serializer.data  # pylint: disable=E1101
-            data['course_avg'] = leaderboard_data['course_avg']
-            if 'user_position' in leaderboard_data:
-                data['user_position'] = leaderboard_data['user_position']
-            if 'user_grade' in leaderboard_data:
-                data['user_grade'] = leaderboard_data['user_grade']
+                serializer = CourseProficiencyLeadersSerializer(leaderboard_data['queryset'], many=True)
+                data['leaders'] = serializer.data  # pylint: disable=E1101
+                data['course_avg'] = leaderboard_data['course_avg']
+                if 'user_position' in leaderboard_data:
+                    data['user_position'] = leaderboard_data['user_position']
+                if 'user_grade' in leaderboard_data:
+                    data['user_grade'] = leaderboard_data['user_grade']
+                leader_boards_cache_cohort_size = getattr(settings, 'LEADER_BOARDS_CACHE_COHORT_SIZE', 5000)
+                if user_id and leaderboard_data['enrollment_count'] > leader_boards_cache_cohort_size:
+                    cache_course_data('grade', course_id, {'course_avg': leaderboard_data['course_avg']})
+                    cache_course_data('grade_leaderboard', course_id, {'leaders': data['leaders']})
+                    cache_course_user_data('grade', course_id, user_id, {
+                        'user_grade': data.get('user_grade', 0), 'user_position': data['user_position']
+                    })
 
         return Response(data, status=status.HTTP_200_OK)
 
@@ -1903,24 +1917,29 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
         user_id = self.request.query_params.get('user_id', None)
         count = self.request.query_params.get('count', None)
         exclude_roles = css_param_to_list(self.request, 'exclude_roles')
+        orgs_filter = get_ids_from_list_param(self.request, 'organizations')
+        group_ids = get_ids_from_list_param(self.request, 'groups')
         skipleaders = str2bool(self.request.query_params.get('skipleaders', 'false'))
         data = {}
         course_avg = 0
         if not course_exists(request, request.user, course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
-        if user_id and skipleaders:  # for single user's progress fetch from cache if available
+        if user_id:  # for single user's progress fetch from cache if available
             cached_progress_data = get_cached_data('progress', course_id, user_id)
             if cached_progress_data:
                 data.update(cached_progress_data)
-                return Response(data, status=status.HTTP_200_OK)
+                if skipleaders:
+                    return Response(data, status=status.HTTP_200_OK)
+
+                cached_leader_board_data = get_cached_data('progress_leaderboard', course_id)
+                if cached_leader_board_data and not (orgs_filter or group_ids or exclude_roles):
+                    data.update(cached_leader_board_data)
+                    return Response(data, status=status.HTTP_200_OK)
 
         course_key = get_course_key(course_id)
         course_metadata = CourseAggregatedMetaData.get_from_id(course_key)
         total_possible_completions = float(course_metadata.total_assessments)
         exclude_users = get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles)
-        orgs_filter = get_ids_from_list_param(self.request, 'organizations')
-        group_ids = get_ids_from_list_param(self.request, 'groups')
-
         total_actual_completions = StudentProgress.get_total_completions(course_key, exclude_users=exclude_users,
                                                                          org_ids=orgs_filter, group_ids=group_ids)
         if user_id:
@@ -1943,15 +1962,20 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
             course_avg = min(100 * (course_avg / total_possible_completions), 100)  # avg in percentage
         data['course_avg'] = course_avg
 
-        if not skipleaders:
+        if not skipleaders and 'leaders' not in data:
             queryset = StudentProgress.generate_leaderboard(course_key, count=count, exclude_users=exclude_users,
                                                             org_ids=orgs_filter, group_ids=group_ids)
             serializer = CourseCompletionsLeadersSerializer(queryset, many=True,
                                                             context={'total_completions': total_possible_completions})
             data['leaders'] = serializer.data  # pylint: disable=E1101
+            leader_boards_cache_cohort_size = getattr(settings, 'LEADER_BOARDS_CACHE_COHORT_SIZE', 5000)
+            if total_users > leader_boards_cache_cohort_size:
+                cache_course_data('progress_leaderboard', course_id, {'leaders': data['leaders']})
         else:
             cache_course_data('progress', course_id, {'course_avg': data['course_avg']})
-            cache_course_user_data('progress', course_id, user_id, {'completions': data['completions']})
+            cache_course_user_data('progress', course_id, user_id, {
+                'completions': data['completions'], 'position': data['position']
+            })
         return Response(data, status=status.HTTP_200_OK)
 
 
@@ -1983,10 +2007,19 @@ class CoursesMetricsSocialLeadersList(SecureListAPIView):
         data = {}
         if not course_exists(request, request.user, course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
+
+        cached_social_data = get_cached_data('social', course_id, user_id)
+        cached_leader_board_data = get_cached_data('social_leaderboard', course_id)
+        if cached_leader_board_data and cached_social_data and 'position' in cached_social_data and \
+                not (org_ids or exclude_roles):
+            data.update(cached_social_data)
+            data.update(cached_leader_board_data)
+            return Response(data, status=status.HTTP_200_OK)
+
         course_key = get_course_key(course_id)
         # Users having certain roles (such as an Observer) are excluded from aggregations
         exclude_users = get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles)
-        course_avg, queryset = StudentSocialEngagementScore.generate_leaderboard(
+        course_avg, enrollment_count, queryset = StudentSocialEngagementScore.generate_leaderboard(
             course_key,
             org_ids=org_ids,
             count=count,
@@ -2002,6 +2035,11 @@ class CoursesMetricsSocialLeadersList(SecureListAPIView):
                 course_key, user_id, exclude_users
             )
             data.update(user_data)
+            leader_boards_cache_cohort_size = getattr(settings, 'LEADER_BOARDS_CACHE_COHORT_SIZE', 5000)
+            if enrollment_count > leader_boards_cache_cohort_size:
+                cache_course_user_data('social', course_id, user_id, user_data)
+                cache_course_data('social', course_id, {'course_avg': data['course_avg']})
+                cache_course_data('social_leaderboard', course_id, {'leaders': data['leaders']})
 
         return Response(data, status=status.HTTP_200_OK)
 

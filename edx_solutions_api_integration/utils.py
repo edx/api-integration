@@ -25,7 +25,7 @@ from openedx.core.djangoapps.user_api.accounts.serializers import PROFILE_IMAGE_
 from student.roles import CourseRole, CourseObserverRole
 
 USER_METRICS_CACHE_TTL = 60 * 60
-COURSE_METRICS_CACHE_TTL = 60 * 60
+COURSE_METRICS_CACHE_TTL = 30 * 60
 
 
 def address_exists_in_network(ip_address, net_n_bits):
