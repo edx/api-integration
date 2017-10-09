@@ -15,6 +15,13 @@ from django.shortcuts import get_object_or_404
 
 from rest_framework.exceptions import ParseError
 
+from openedx.core.djangoapps.user_api.accounts.image_helpers import (
+    _get_profile_image_urls,
+    _make_profile_image_name,
+    get_profile_image_storage,
+    _get_default_profile_image_urls,
+)
+from openedx.core.djangoapps.user_api.accounts.serializers import PROFILE_IMAGE_KEY_PREFIX
 from student.roles import CourseRole, CourseObserverRole
 
 USER_METRICS_CACHE_TTL = 60 * 60
@@ -365,3 +372,32 @@ def strip_whitespaces_and_newlines(string):
     string = string.replace('\n', '')
     return string.strip()
 
+
+def get_profile_image_urls_by_username(username, profile_image_uploaded_at):
+    """
+    Return a dict {size:url} for each profile image for a given user.
+
+    Arguments:
+        username  username of user for whom we are getting urls.
+        profile_image_uploaded_at datetime when profile image uploaded
+
+    Returns:
+        dictionary of {size_display_name: url} for each image.
+
+    """
+
+    if profile_image_uploaded_at:
+        urls = _get_profile_image_urls(
+            _make_profile_image_name(username),
+            get_profile_image_storage(),
+            version=profile_image_uploaded_at.strftime("%s"),
+        )
+    else:
+        urls = _get_default_profile_image_urls()
+
+    data = {'has_image': True if profile_image_uploaded_at else False}
+    data.update({
+        '{image_key_prefix}_{size}'.format(image_key_prefix=PROFILE_IMAGE_KEY_PREFIX, size=size_display_name): url
+        for size_display_name, url in urls.items()
+    })
+    return data

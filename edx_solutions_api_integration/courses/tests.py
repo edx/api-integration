@@ -247,7 +247,6 @@ class CoursesApiTests(
         for user in cls.users:
             CourseEnrollmentFactory.create(user=user, course_id=cls.course.id)
             user_profile = user.profile
-            user_profile.avatar_url = 'http://example.com/{}.png'.format(user.id)
             user_profile.title = 'Software Engineer {}'.format(user.id)
             user_profile.city = 'Cambridge'
             user_profile.save()
@@ -2494,7 +2493,7 @@ class CoursesApiTests(
                 'password': 'test.me!',
                 'first_name': '{} {}'.format('John', i), 'last_name': '{} {}'.format('Doe', i), 'city': city,
                 'country': 'PK', 'level_of_education': 'b', 'year_of_birth': '2000', 'gender': 'male',
-                'title': 'Software Engineer', 'avatar_url': 'http://example.com/avatar.png'
+                'title': 'Software Engineer'
             }
 
             response = self.do_post(test_uri, data)

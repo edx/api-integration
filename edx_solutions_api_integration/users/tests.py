@@ -225,7 +225,6 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
                 'password': self.test_password,
                 'first_name': 'John{}'.format(i),
                 'last_name': 'Doe{}'.format(i),
-                'avatar_url': 'http://avatar.com/{}.jpg'.format(i),
                 'city': 'Boston',
                 'title': "The King",
             }
@@ -290,10 +289,19 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 0)
         # add some additional fields and filter the response to only these fields
-        response = self.do_get('{}?email=test2@example.com&fields=avatar_url,city,title'.format(test_uri))
+        response = self.do_get('{}?email=test2@example.com&fields=profile_image,city,title'.format(test_uri))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 1)
-        self.assertEqual(response.data['results'][0]['avatar_url'], 'http://avatar.com/2.jpg')
+        self.assertEqual(
+            response.data['results'][0]['profile_image'],
+            {
+                'image_url_full': '/static/default_500.png',
+                'image_url_large': '/static/default_120.png',
+                'image_url_medium': '/static/default_50.png',
+                'image_url_small': '/static/default_30.png',
+                'has_image': False
+            }
+        )
         self.assertEqual(response.data['results'][0]['city'], 'Boston')
         self.assertEqual(response.data['results'][0]['title'], 'The King')
         if 'id' in response.data['results'][0]:
@@ -864,7 +872,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             'email': self.test_email, 'username': local_username, 'password': self.test_password,
             'first_name': self.test_first_name, 'last_name': self.test_last_name, 'city': self.test_city,
             'country': 'PK', 'level_of_education': 'b', 'year_of_birth': '2000',
-            'gender': 'male', 'title': 'Software Engineer', 'avatar_url': 'http://example.com/avatar.png'
+            'gender': 'male', 'title': 'Software Engineer'
         }
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
@@ -894,7 +902,6 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         """
         Create a user, then add the user profile with invalid year of birth
         Profile Must be added with year_of_birth will be none
-        and avatar_url None
         """
         test_uri = self.users_base_uri
         local_username = self.test_username + str(randint(11, 99))
@@ -902,7 +909,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             'email': self.test_email, 'username': local_username, 'password': self.test_password,
             'first_name': self.test_first_name, 'last_name': self.test_last_name, 'city': self.test_city,
             'country': 'PK', 'level_of_education': 'b', 'year_of_birth': 'abcd',
-            'gender': 'male', 'title': 'Software Engineer', 'avatar_url': None
+            'gender': 'male', 'title': 'Software Engineer'
         }
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
@@ -1669,7 +1676,6 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['country'], data["country"])
         self.assertEqual(response.data['gender'], data["gender"])
         self.assertEqual(response.data['title'], data["title"])
-        self.assertEqual(response.data['avatar_url'], data["avatar_url"])
         self.assertEqual(
             response.data['level_of_education'], data["level_of_education"])
         self.assertEqual(
@@ -1847,7 +1853,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
                 'password': self.test_password,
                 'first_name': self.test_first_name, 'last_name': self.test_last_name, 'city': city,
                 'country': 'PK', 'level_of_education': 'b', 'year_of_birth': '2000', 'gender': 'male',
-                'title': 'Software Engineer', 'avatar_url': 'http://example.com/avatar.png'
+                'title': 'Software Engineer'
             }
 
             response = self.do_post(test_uri, data)
