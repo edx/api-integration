@@ -7,20 +7,18 @@ Run these tests @ Devstack:
     paver test_system -s lms --fasttest
         --fail_fast --verbose --test_id=lms/djangoapps/edx_solutions_api_integration/users
 """
+import ddt
+import uuid
+import mock
+import before_after
+import six
 
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from random import randint
 from urllib import urlencode
-import uuid
-import mock
 
-import before_after
 from requests.exceptions import ConnectionError
-import six
-
-from django.conf import settings
-from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.test.utils import override_settings
@@ -38,7 +36,6 @@ from edx_solutions_organizations.models import Organization
 from edx_solutions_projects.models import Project, Workgroup
 from instructor.access import allow_access
 from social_engagement.models import StudentSocialEngagementScore
-from social_engagement.models import StudentSocialEngagementScore
 from student.tests.factories import UserFactory, CourseEnrollmentFactory, GroupFactory
 from student.models import anonymous_id_for_user, CourseEnrollment
 
@@ -47,6 +44,13 @@ from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_store_config, SharedModuleStoreTestCase
 
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.django_utils import (
+    ModuleStoreTestCase,
+    TEST_DATA_SPLIT_MODULESTORE
+)
+from django.contrib.auth.models import User
 from edx_solutions_api_integration.test_utils import (
     get_non_atomic_database_settings,
     CourseGradingMixin,
@@ -55,8 +59,6 @@ from edx_solutions_api_integration.test_utils import (
 )
 
 from notification_prefs import NOTIFICATION_PREF_KEY
-
-MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 
 
 def _fake_get_user_social_stats(user_id, course_id, end_date=None):  # pylint: disable=W0613
@@ -91,11 +93,13 @@ def _fake_get_service_unavailability(user_id, course_id, end_date=None):
 
 
 @override_settings(DEBUG=True)
-@override_settings(MODULESTORE=MODULESTORE_CONFIG)
 @override_settings(PASSWORD_MIN_LENGTH=4)
 @mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': True})
+@ddt.ddt
 class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolationTestCase, APIClientMixin):
     """ Test suite for Users API views """
+
+    MODULESTORE = TEST_DATA_SPLIT_MODULESTORE
 
     def get_module_for_user(self, user, course, problem):
         """Helper function to get useful module at self.location in self.course_id for user"""
@@ -133,35 +137,40 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.test_course_data = '<html>{}</html>'.format(str(uuid.uuid4()))
         self.course_start_date = timezone.now() + relativedelta(days=-1)
         self.course_end_date = timezone.now() + relativedelta(days=60)
-        self.course = CourseFactory.create(
-            display_name="TEST COURSE",
-            start=self.course_start_date,
-            end=self.course_end_date,
-            org='USERTEST',
-            run='USERTEST1'
-        )
-        self.course_content = ItemFactory.create(
-            category="videosequence",
-            parent_location=self.course.location,
-            data=self.test_course_data,
-            due=self.course_end_date,
-            display_name="View_Sequence"
-        )
-        self.course2 = CourseFactory.create(display_name="TEST COURSE2", org='TESTORG2', run='USERTEST2')
-        self.course2_content = ItemFactory.create(
-            category="videosequence",
-            parent_location=self.course2.location,
-            data=self.test_course_data,
-            due=self.course_end_date,
-            display_name="View_Sequence2"
-        )
 
         self.user = UserFactory()
         cache.clear()
 
-        Role.objects.get_or_create(
-            name=FORUM_ROLE_MODERATOR,
-            course_id=self.course.id)
+        self._create_courses()
+
+
+    def _create_courses(self, store=ModuleStoreEnum.Type.split):
+        with modulestore().default_store(store):
+            self.course = CourseFactory.create(
+                display_name="TEST COURSE",
+                start=self.course_start_date,
+                end=self.course_end_date,
+                org='USERTEST',
+                run='USERTEST1',
+            )
+            self.course_content = ItemFactory.create(
+                category="videosequence",
+                parent_location=self.course.location,
+                due=self.course_end_date,
+                display_name="View_Sequence",
+            )
+            self.course2 = CourseFactory.create(display_name="TEST COURSE2", org='TESTORG2', run='USERTEST2')
+            self.course2_content = ItemFactory.create(
+                category="videosequence",
+                parent_location=self.course2.location,
+                due=self.course_end_date,
+                display_name="View_Sequence2",
+            )
+
+            Role.objects.get_or_create(
+                name=FORUM_ROLE_MODERATOR,
+                course_id=self.course.id)
+
 
     def _create_test_user(self):
         """Helper method to create a new test user"""
@@ -307,15 +316,16 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         if 'id' in response.data['results'][0]:
             self.fail("Dynamic field filtering error in UserSerializer")
 
-    def test_user_list_get_filters(self):
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_user_list_get_filters(self, store):
         test_uri = self.users_base_uri
 
         organizations = []
         organizations.append(Organization.objects.create(display_name='ABC Organization'))
         organizations.append(Organization.objects.create(display_name='XYZ Organization'))
 
-        course1 = CourseFactory.create(org='edX', number='CS101', run='2016_Q1')
-        course2 = CourseFactory.create(org='mit', number='CS101', run='2016_Q2')
+        course1 = CourseFactory.create(org='edX', number='CS101', run='2016_Q1', default_store=store)
+        course2 = CourseFactory.create(org='mit', number='CS101', run='2016_Q2', default_store=store)
 
         users = []
         users.append(UserFactory.create(first_name='John', last_name='Doe', email='john.doe@example.com'))
@@ -364,7 +374,9 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['results'][1]['full_name'], 'Micheal Mcdonald')
 
         # fetch user data by exact course id match
-        response = self.do_get('{}?courses={}'.format(test_uri, 'mit/CS101/2016_Q2'))
+        course2_id = {'courses': '{}'.format(unicode(course2.id))}
+        course2_filter_uri = '{}?{}'.format(test_uri, urlencode(course2_id))
+        response = self.do_get(course2_filter_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(response.data['results'][0]['full_name'], 'Steve Jobs')
@@ -376,15 +388,16 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['results'][0]['full_name'], 'John Doe')
         self.assertEqual(response.data['results'][1]['full_name'], 'Micheal Mcdonald')
 
-    def test_user_list_get_multiple_filters(self):
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_user_list_get_multiple_filters(self, store):
         test_uri = self.users_base_uri
 
         organizations = []
         organizations.append(Organization.objects.create(display_name='ABC Organization'))
         organizations.append(Organization.objects.create(display_name='XYZ Organization'))
 
-        course1 = CourseFactory.create(org='edX', number='CS101', run='2016_Q1')
-        course2 = CourseFactory.create(org='mit', number='CS101', run='2016_Q2')
+        course1 = CourseFactory.create(org='edX', number='CS101', run='2016_Q1', default_store=store)
+        course2 = CourseFactory.create(org='mit', number='CS101', run='2016_Q2', default_store=store)
 
         users = []
         users.append(UserFactory.create(first_name='John', last_name='Doe', email='john.doe@example.com'))
@@ -439,7 +452,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         response = self.do_get('{}/{}/courses'.format(test_uri, response.data['results'][0]['id']))
         self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['id'], 'edX/CS101/2016_Q1')
+        self.assertEqual(response.data[0]['id'], unicode(course1.id))
 
     def test_user_list_get_courses_enrolled_per_course(self):
         test_uri = self.users_base_uri
@@ -452,14 +465,18 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         CourseEnrollmentFactory.create(user=users[1], course_id=self.course2.id)
 
         # fetch enrollments for first course
-        response = self.do_get('{}?courses={}'.format(test_uri, unicode(self.course.id)))
+        course_id = {'courses': '{}'.format(unicode(self.course.id))}
+        course_filter_uri = '{}?{}'.format(test_uri, urlencode(course_id))
+        response = self.do_get(course_filter_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 2)
         self.assertEqual(response.data['results'][0]['courses_enrolled'], 1)
         self.assertEqual(response.data['results'][1]['courses_enrolled'], 2)
 
         # fetch enrollments for second course
-        response = self.do_get('{}?courses={}'.format(test_uri, unicode(self.course2.id)))
+        course2_id = {'courses': '{}'.format(unicode(self.course2.id))}
+        course2_filter_uri = '{}?{}'.format(test_uri, urlencode(course2_id))
+        response = self.do_get(course2_filter_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(response.data['results'][0]['courses_enrolled'], 2)
@@ -587,13 +604,17 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             CourseEnrollmentFactory.create(user=user, course_id=self.course2.id)
 
         # fetch users enrolled in course 1
-        response = self.do_get('{}?courses={}'.format(test_uri, self.course.id))
+        course_id = {'courses': '{}'.format(unicode(self.course.id))}
+        course_filter_uri = '{}?{}'.format(test_uri, urlencode(course_id))
+        response = self.do_get(course_filter_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 4)
         self.assertIsNotNone(response.data['results'][0]['is_active'])
 
         # fetch users enrolled in course 1 and 2
-        response = self.do_get('{}?courses={},{}'.format(test_uri, self.course.id, self.course2.id))
+        course_id = {'courses': '{},{}'.format(unicode(self.course.id), unicode(self.course2.id))}
+        course_filter_uri = '{}?{}'.format(test_uri, urlencode(course_id))
+        response = self.do_get(course_filter_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 8)
         self.assertIsNotNone(response.data['results'][0]['is_active'])
@@ -1197,8 +1218,9 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 409)
         self.assertIn("already added to cohort", response.data['message'])
 
-    def test_user_courses_list_post_undefined_user(self):
-        course = CourseFactory.create(org='TUCLPUU', run='TUCLPUU1')
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_user_courses_list_post_undefined_user(self, store):
+        course = CourseFactory.create(org='TUCLPUU', run='TUCLPUU1', default_store=store)
         test_uri = self.users_base_uri
         user_id = '234234'
         test_uri = '{}/{}/courses'.format(test_uri, str(user_id))
@@ -1222,7 +1244,8 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 404)
 
     @override_settings(DATABASES=get_non_atomic_database_settings())
-    def test_user_courses_list_get(self):
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_user_courses_list_get(self, store):
         test_uri = self.users_base_uri
         local_username = self.test_username + str(randint(11, 99))
         data = {'email': self.test_email, 'username': local_username, 'password':
@@ -1235,7 +1258,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
 
-        course_with_out_date_values = CourseFactory.create(org='TUCLG', run='TUCLG1')
+        course_with_out_date_values = CourseFactory.create(org='TUCLG', run='TUCLG1', default_store=store)
         data = {'course_id': unicode(course_with_out_date_values.id)}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
@@ -1263,57 +1286,50 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
 
-    def test_user_courses_detail_post_position_course_as_descriptor(self):
-        course = CourseFactory.create(org='TUCDPPCAD', run='TUCDPPCAD1')
-        test_data = '<html>{}</html>'.format(str(uuid.uuid4()))
-        chapter1 = ItemFactory.create(  # pylint: disable=W0612
-            category="chapter",
-            parent_location=course.location,
-            data=test_data,
-            display_name="Chapter 1"
-        )
-        chapter2 = ItemFactory.create(  # pylint: disable=W0612
-            category="chapter",
-            parent_location=course.location,
-            data=test_data,
-            display_name="Chapter 2"
-        )
-        chapter3 = ItemFactory.create(
-            category="chapter",
-            parent_location=course.location,
-            data=test_data,
-            display_name="Chapter 3"
-        )
-        sequential1 = ItemFactory.create(  # pylint: disable=W0612
-            category="sequential",
-            parent_location=chapter3.location,
-            data=test_data,
-            display_name="Sequential 1"
-        )
-        sequential2 = ItemFactory.create(
-            category="sequential",
-            parent_location=chapter3.location,
-            data=test_data,
-            display_name="Sequential 2"
-        )
-        vertical1 = ItemFactory.create(  # pylint: disable=W0612
-            category="vertical",
-            parent_location=sequential2.location,
-            data=test_data,
-            display_name="Vertical 1"
-        )
-        vertical2 = ItemFactory.create(  # pylint: disable=W0612
-            category="vertical",
-            parent_location=sequential2.location,
-            data=test_data,
-            display_name="Vertical 2"
-        )
-        vertical3 = ItemFactory.create(
-            category="vertical",
-            parent_location=sequential2.location,
-            data=test_data,
-            display_name="Vertical 3"
-        )
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_user_courses_detail_post_position_course_as_descriptor(self, store):
+        with modulestore().default_store(store):
+            course = CourseFactory.create(org='TUCDPPCAD', run='TUCDPPCAD1')
+            chapter1 = ItemFactory.create(  # pylint: disable=W0612
+                category="chapter",
+                parent_location=course.location,
+                display_name="Chapter 1"
+            )
+            chapter2 = ItemFactory.create(  # pylint: disable=W0612
+                category="chapter",
+                parent_location=course.location,
+                display_name="Chapter 2"
+            )
+            chapter3 = ItemFactory.create(
+                category="chapter",
+                parent_location=course.location,
+                display_name="Chapter 3"
+            )
+            sequential1 = ItemFactory.create(  # pylint: disable=W0612
+                category="sequential",
+                parent_location=chapter3.location,
+                display_name="Sequential 1"
+            )
+            sequential2 = ItemFactory.create(
+                category="sequential",
+                parent_location=chapter3.location,
+                display_name="Sequential 2"
+            )
+            vertical1 = ItemFactory.create(  # pylint: disable=W0612
+                category="vertical",
+                parent_location=sequential2.location,
+                display_name="Vertical 1"
+            )
+            vertical2 = ItemFactory.create(  # pylint: disable=W0612
+                category="vertical",
+                parent_location=sequential2.location,
+                display_name="Vertical 2"
+            )
+            vertical3 = ItemFactory.create(
+                category="vertical",
+                parent_location=sequential2.location,
+                display_name="Vertical 3"
+            )
 
         test_uri = self.users_base_uri
         local_username = self.test_username + str(randint(11, 99))
@@ -1358,15 +1374,15 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_post(test_uri, data={})
         self.assertEqual(response.status_code, 404)
 
-    def test_user_courses_detail_post_position_invalid_user(self):
-        course = CourseFactory.create(org='TUCDPPIU', run='TUCDPPIU1')
-        test_data = '<html>{}</html>'.format(str(uuid.uuid4()))
-        chapter1 = ItemFactory.create(
-            category="chapter",
-            parent_location=course.location,
-            data=test_data,
-            display_name="Chapter 1"
-        )
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_user_courses_detail_post_position_invalid_user(self, store):
+        with modulestore().default_store(store):
+            course = CourseFactory.create(org='TUCDPPIU', run='TUCDPPIU1')
+            chapter1 = ItemFactory.create(
+                category="chapter",
+                parent_location=course.location,
+                display_name="Chapter 1"
+            )
         user_id = 2342334
         course_id = 'asd/fa/9sd8fasdf'
         test_uri = '{}/{}/courses/{}'.format(self.users_base_uri, user_id, course_id)
@@ -1382,15 +1398,15 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_post(test_uri, data=position_data)
         self.assertEqual(response.status_code, 404)
 
-    def test_user_courses_detail_post_position_course_as_content(self):
-        course = CourseFactory.create(org='TUCDPPCAS', run='TUCDPPCAS1')
-        test_data = '<html>{}</html>'.format(str(uuid.uuid4()))
-        chapter1 = ItemFactory.create(
-            category="chapter",
-            parent_location=course.location,
-            data=test_data,
-            display_name="Chapter 1"
-        )
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_user_courses_detail_post_position_course_as_content(self, store):
+        with modulestore().default_store(store):
+            course = CourseFactory.create(org='TUCDPPCAS', run='TUCDPPCAS1')
+            chapter1 = ItemFactory.create(
+                category="chapter",
+                parent_location=course.location,
+                display_name="Chapter 1"
+            )
         test_uri = self.users_base_uri
         local_username = self.test_username + str(randint(11, 99))
         data = {'email': self.test_email, 'username': local_username, 'password':
@@ -1431,21 +1447,21 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_post(test_uri, data=position_data)
         self.assertEqual(response.status_code, 400)
 
-    def test_user_courses_detail_get(self):
-        course = CourseFactory.create(
-            display_name="UserCoursesDetailTestCourse",
-            start=self.course_start_date,
-            end=self.course_end_date,
-            org='TUCDG',
-            run='TUCDG1'
-        )
-        test_data = '<html>{}</html>'.format(str(uuid.uuid4()))
-        chapter1 = ItemFactory.create(
-            category="chapter",
-            parent_location=course.location,
-            data=test_data,
-            display_name="Overview"
-        )
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_user_courses_detail_get(self, store):
+        with modulestore().default_store(store):
+            course = CourseFactory.create(
+                display_name="UserCoursesDetailTestCourse",
+                start=self.course_start_date,
+                end=self.course_end_date,
+                org='TUCDG',
+                run='TUCDG1',
+            )
+            chapter1 = ItemFactory.create(
+                category="chapter",
+                parent_location=course.location,
+                display_name="Overview"
+            )
         test_uri = self.users_base_uri
         local_username = self.test_username + str(randint(11, 99))
         data = {'email': self.test_email, 'username': local_username, 'password':
@@ -1489,8 +1505,9 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
 
-    def test_user_courses_detail_get_undefined_enrollment(self):
-        course = CourseFactory.create(org='TUCDGUE', run='TUCDGUE1')
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_user_courses_detail_get_undefined_enrollment(self, store):
+        course = CourseFactory.create(org='TUCDGUE', run='TUCDGUE1', default_store=store)
         test_uri = self.users_base_uri
         local_username = self.test_username + str(randint(11, 99))
         data = {'email': self.test_email, 'username': local_username, 'password':
@@ -1501,8 +1518,9 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
 
-    def test_user_courses_detail_delete(self):
-        course = CourseFactory.create(org='TUCDD', run='TUCDD1')
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_user_courses_detail_delete(self, store):
+        course = CourseFactory.create(org='TUCDD', run='TUCDD1', default_store=store)
         test_uri = self.users_base_uri
         local_username = self.test_username + str(randint(11, 99))
         data = {'email': self.test_email, 'username': local_username, 'password':
@@ -1531,8 +1549,9 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
 
-    def test_user_courses_detail_delete_undefined_user(self):
-        course = CourseFactory.create(org='TUCDDUU', run='TUCDDUU1')
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_user_courses_detail_delete_undefined_user(self, store):
+        course = CourseFactory.create(org='TUCDDUU', run='TUCDDUU1', default_store=store)
         user_id = '2134234'
         test_uri = '{}/{}/courses/{}'.format(self.users_base_uri, user_id, course.id)
         response = self.do_delete(test_uri)
@@ -1548,14 +1567,16 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
 
-    def test_user_course_grades_user_not_found(self):
-        course = CourseFactory.create(org='TUCGUNF', run='TUCGUNF1')
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_user_course_grades_user_not_found(self, store):
+        course = CourseFactory.create(org='TUCGUNF', run='TUCGUNF1', default_store=store)
         test_uri = '{}/99999999/courses/{}/grades'.format(self.users_base_uri, course.id)
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
 
-    def test_user_course_grades_user_not_enrolled(self):
-        course = CourseFactory.create(org='TUCGUNF', run='TUCGUNF1')
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_user_course_grades_user_not_enrolled(self, store):
+        course = CourseFactory.create(org='TUCGUNF', run='TUCGUNF1', default_store=store)
         test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, course.id)
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
@@ -1783,7 +1804,6 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             local_content = ItemFactory.create(
                 category="videosequence",
                 parent_location=self.course_content.location,
-                data=str(uuid.uuid4()),
                 display_name=local_content_name
             )
             completions_data = {'content_id': unicode(local_content.scope_ids.usage_id), 'user_id': course_user_id}
@@ -1934,14 +1954,16 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['score'], user_score.score)
         self.assertEqual(response.data['course_avg'], course_avg_score)
 
-    def test_users_roles_list_get(self):
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_users_roles_list_get(self, store):
         allow_access(self.course, self.user, 'staff')
         course2 = CourseFactory.create(
             display_name="TEST COURSE2",
             start=datetime(2014, 6, 16, 14, 30),
             end=datetime(2020, 1, 16, 14, 30),
             org='TURLG',
-            run='TURLG1'
+            run='TURLG1',
+            default_store=store,
         )
         allow_access(course2, self.user, 'instructor')
         course3 = CourseFactory.create(
@@ -1949,7 +1971,8 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             start=datetime(2014, 6, 16, 14, 30),
             end=datetime(2020, 1, 16, 14, 30),
             org='TURLG2',
-            run='TURLG2'
+            run='TURLG2',
+            default_store=store,
         )
         allow_access(course3, self.user, 'staff')
         test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
@@ -2024,13 +2047,15 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 400)
 
-    def test_users_roles_list_put(self):
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_users_roles_list_put(self, store):
         course2 = CourseFactory.create(
             display_name="TEST COURSE2",
             start=datetime(2014, 6, 16, 14, 30),
             end=datetime(2020, 1, 16, 14, 30),
             org='TURLP2',
-            run='TURLP2'
+            run='TURLP2',
+            default_store=store,
         )
         Role.objects.get_or_create(
             name=FORUM_ROLE_MODERATOR,
@@ -2041,7 +2066,8 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             start=datetime(2014, 6, 16, 14, 30),
             end=datetime(2020, 1, 16, 14, 30),
             org='TURLP3',
-            run='TURLP3'
+            run='TURLP3',
+            default_store=store,
         )
         Role.objects.get_or_create(
             name=FORUM_ROLE_MODERATOR,
@@ -2052,7 +2078,8 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             start=datetime(2014, 6, 16, 14, 30),
             end=datetime(2020, 1, 16, 14, 30),
             org='TURLP4',
-            run='TURLP4'
+            run='TURLP4',
+            default_store=store,
         )
 
         test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
@@ -2376,7 +2403,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['full_name'], u'{} {}'.format(test_first_name, test_last_name))
 
 
-@override_settings(MODULESTORE=MODULESTORE_CONFIG)
+@ddt.ddt
 class UsersGradesApiTests(
     SignalDisconnectTestMixin,
     ModuleStoreTestCase,
@@ -2384,6 +2411,8 @@ class UsersGradesApiTests(
     APIClientMixin,
     CourseGradingMixin,
 ):
+
+    MODULESTORE = TEST_DATA_SPLIT_MODULESTORE
 
     def setUp(self):
         super(UsersGradesApiTests, self).setUp()
@@ -2482,11 +2511,13 @@ class UsersGradesApiTests(
         self.assertEqual(response.data[0]['complete_status'], False)
 
 
-@override_settings(MODULESTORE=MODULESTORE_CONFIG)
+@ddt.ddt
 class UsersProgressApiTests(
     SignalDisconnectTestMixin, SharedModuleStoreTestCase, APIClientMixin, CourseGradingMixin
 ):
     """ Test suite for User Progress API views """
+
+    MODULESTORE = TEST_DATA_SPLIT_MODULESTORE
 
     @classmethod
     def setUpClass(cls):
@@ -2505,7 +2536,6 @@ class UsersProgressApiTests(
         cls.chapter = ItemFactory.create(
             category="chapter",
             parent_location=cls.course.location,
-            data=cls.test_data,
             due=cls.course_end_date,
             display_name="Overview",
         )
@@ -2513,49 +2543,42 @@ class UsersProgressApiTests(
         cls.course_project = ItemFactory.create(
             category="chapter",
             parent_location=cls.course.location,
-            data=cls.test_data,
-            display_name="Group Project"
+            display_name="Group Project",
         )
 
         cls.course_project2 = ItemFactory.create(
             category="chapter",
             parent_location=cls.course.location,
-            data=cls.test_data,
             display_name="Group Project2"
         )
 
         cls.course_content2 = ItemFactory.create(
             category="sequential",
             parent_location=cls.chapter.location,
-            data=cls.test_data,
             display_name="Sequential",
         )
 
         cls.content_child2 = ItemFactory.create(
             category="vertical",
             parent_location=cls.course_content2.location,
-            data=cls.test_data,
-            display_name="Vertical Sequence"
+            display_name="Vertical Sequence",
         )
 
         cls.course_content = ItemFactory.create(
             category="videosequence",
             parent_location=cls.content_child2.location,
-            data=cls.test_data,
             display_name="Video_Sequence",
         )
 
         cls.content_child = ItemFactory.create(
             category="video",
             parent_location=cls.course_content.location,
-            data=cls.test_data,
-            display_name="Video"
+            display_name="Video",
         )
 
         cls.content_subchild = ItemFactory.create(
             category="video",
             parent_location=cls.content_child2.location,
-            data=cls.test_data,
             display_name="Child Video",
         )
 
@@ -2612,17 +2635,19 @@ class UsersProgressApiTests(
 
         self.assertEqual(response.data[0]['progress'], 0.0)
 
-    def test_users_progress_in_mobile_only_courses(self):
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_users_progress_in_mobile_only_courses(self, store):
         """ 
         Test progress value returned by users progress list api 
         Only the mobile available courses will be returned if the flag has been set in the params. 
         """
-        mobile_course = CourseFactory.create(mobile_available=True)
-        mobile_course_content = ItemFactory.create(
-            category="chapter",
-            parent_location=mobile_course.location,
-            display_name="Overview"
-        )
+        with modulestore().default_store(store):
+            mobile_course = CourseFactory.create(mobile_available=True)
+            mobile_course_content = ItemFactory.create(
+                category="chapter",
+                parent_location=mobile_course.location,
+                display_name="Overview"
+            )
 
         CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
         CourseEnrollmentFactory.create(user=self.user, course_id=mobile_course.id)

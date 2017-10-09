@@ -93,60 +93,51 @@ class CourseGradingMixin(object):
         chapter1 = ItemFactory.create(
             category="chapter",
             parent_location=grading_course.location,
-            data=test_data,
-            display_name="Chapter 1"
+            display_name="Chapter 1",
         )
         chapter2 = ItemFactory.create(
             category="chapter",
             parent_location=grading_course.location,
-            data=test_data,
-            display_name="Chapter 2"
+            display_name="Chapter 2",
         )
         ItemFactory.create(
             category="sequential",
             parent_location=chapter1.location,
-            data=test_data,
             display_name="Sequence 1",
         )
         sequential2 = ItemFactory.create(
             category="sequential",
             parent_location=chapter2.location,
-            data=test_data,
             display_name="Sequence 2",
             graded=True,
-            metadata={'rerandomize': 'always', 'graded': True, 'format': "Homework"}
+            metadata={'rerandomize': 'always', 'graded': True, 'format': "Homework"},
         )
         vertical1 = ItemFactory.create(
             category="vertical",
             parent_location=sequential2.location,
-            data=test_data,
             display_name="Vertical 1",
         )
         sequential3 = ItemFactory.create(
             category="sequential",
             parent_location=chapter2.location,
-            data=test_data,
             display_name="Sequence 3",
             graded=True,
-            metadata={'rerandomize': 'always', 'graded': True, 'format': "Midterm Exam"}
+            metadata={'rerandomize': 'always', 'graded': True, 'format': "Midterm Exam"},
         )
         vertical2 = ItemFactory.create(
             category="vertical",
             parent_location=sequential3.location,
-            data=test_data,
             display_name="Vertical 2",
         )
         item = ItemFactory.create(
             parent_location=vertical1.location,
             category='mentoring',
-            data=StringResponseXMLFactory().build_xml(answer='foo'),
             display_name=u"test mentoring homework",
 
         )
         item2 = ItemFactory.create(
             parent_location=vertical2.location,
             category='mentoring',
-            data=StringResponseXMLFactory().build_xml(answer='bar'),
             display_name=u"test mentoring midterm",
         )
 
