@@ -373,6 +373,15 @@ def strip_whitespaces_and_newlines(string):
     return string.strip()
 
 
+def prefix_with_lms_base(url):
+    """
+    :param url:
+    :return: a url prefixed with LMS_BASE
+    """
+    base_url = getattr(settings, 'LMS_ROOT_URL', '//{}'.format(getattr(settings, 'LMS_BASE', 'localhost')))
+    return '{lms_base_url}{url}'.format(lms_base_url=base_url, url=url)
+
+
 def get_profile_image_urls_by_username(username, profile_image_uploaded_at):
     """
     Return a dict {size:url} for each profile image for a given user.
@@ -394,6 +403,7 @@ def get_profile_image_urls_by_username(username, profile_image_uploaded_at):
         )
     else:
         urls = _get_default_profile_image_urls()
+        urls = {size_display_name: prefix_with_lms_base(url) for size_display_name, url in urls.items()}
 
     data = {'has_image': True if profile_image_uploaded_at else False}
     data.update({
