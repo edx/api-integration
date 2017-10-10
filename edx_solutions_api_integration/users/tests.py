@@ -19,6 +19,7 @@ from random import randint
 from urllib import urlencode
 
 from requests.exceptions import ConnectionError
+from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.test.utils import override_settings
@@ -304,10 +305,10 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(
             response.data['results'][0]['profile_image'],
             {
-                'image_url_full': '/static/default_500.png',
-                'image_url_large': '/static/default_120.png',
-                'image_url_medium': '/static/default_50.png',
-                'image_url_small': '/static/default_30.png',
+                'image_url_full': '{}/static/default_500.png'.format(settings.LMS_ROOT_URL),
+                'image_url_large': '{}/static/default_120.png'.format(settings.LMS_ROOT_URL),
+                'image_url_medium': '{}/static/default_50.png'.format(settings.LMS_ROOT_URL),
+                'image_url_small': '{}/static/default_30.png'.format(settings.LMS_ROOT_URL),
                 'has_image': False
             }
         )
