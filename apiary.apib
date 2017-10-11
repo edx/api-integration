@@ -2679,7 +2679,7 @@ Returns a JSON representation of paginated list of projects for a course
         }
 
 
-## Courses Metrics List [/courses/{course_id}/metrics{?organization}{?groups}]
+## Courses Metrics List [/courses/{course_id}/metrics{?organization}{?groups}{?metrics_required}]
 
 It allows clients to retrieve a list of Metrics for the specified Course
 
@@ -2689,6 +2689,7 @@ Returns a JSON representation of the set of course metrics, metrics can be filte
 + Parameters
     + organization (optional)
     + groups (optional)
+    + metrics_required (optional)
 
 + Response 200 (application/json)
 
@@ -2697,9 +2698,14 @@ Returns a JSON representation of the set of course metrics, metrics can be filte
             "num_active_threads": 0,
             "users_not_started": 0,
             "users_completed": 0,
+            "users_passed": 0,
             "users_enrolled": 1,
             "grade_cutoffs": {
                 "Pass": 0.6
+            },
+            "thread_stats": {
+                "num_threads": 24,
+                "num_active_threads": 0
             },
             "modules_completed": 11,
             "users_started": 1
