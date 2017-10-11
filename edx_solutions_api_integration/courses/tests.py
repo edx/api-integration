@@ -2395,12 +2395,13 @@ class CoursesApiTests(
                     course_id=self.course.id,
                     grade=0.9,
                     proforma_grade=0.91,
+                    is_passed=i > 1,
                 )
 
         course_metrics_uri = '{}/{}/metrics/?metrics_required={}&groups={}'.format(
             self.base_courses_uri,
             self.test_course_id,
-            'users_started,modules_completed,users_completed',
+            'users_started,modules_completed,users_completed,users_passed',
             group.id
         )
         response = self.do_get(course_metrics_uri)
@@ -2410,6 +2411,7 @@ class CoursesApiTests(
         self.assertEqual(response.data['users_not_started'], 0)
         self.assertEqual(response.data['modules_completed'], 3)
         self.assertEqual(response.data['users_completed'], 2)
+        self.assertEqual(response.data['users_passed'], 1)
 
     def test_course_data_metrics_user_group_filter_for_multiple_groups_having_members(self):
         groups = GroupFactory.create_batch(2)

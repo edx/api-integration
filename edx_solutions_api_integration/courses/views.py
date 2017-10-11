@@ -1601,7 +1601,7 @@ class CoursesMetrics(SecureAPIView):
     - metrics can be filtered by organization by adding organization parameter to GET request
     - metrics_required param should be comma separated list of metrics required
     - possible values for metrics_required param are
-    - ``` users_started,modules_completed,users_completed,thread_stats ```
+    - ``` users_started,modules_completed,users_completed,thread_stats,users_passed ```
     ### Use Cases/Notes:
     * Example: Display number of users enrolled in a given course
     """
@@ -1660,6 +1660,12 @@ class CoursesMetrics(SecureAPIView):
                 course_key, exclude_users=exclude_users, org_ids=org_ids, group_ids=group_ids
             )
             data['users_completed'] = users_completed
+
+        if 'users_passed' in metrics_required:
+            users_passed = StudentGradebook.get_passed_users_gradebook(
+                course_key, exclude_users=exclude_users, org_ids=org_ids, group_ids=group_ids
+            ).count()
+            data['users_passed'] = users_passed
 
         if 'thread_stats' in metrics_required:
             try:
