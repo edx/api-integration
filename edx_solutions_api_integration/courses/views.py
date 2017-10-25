@@ -306,6 +306,45 @@ def _cache_static_tab_contents(cache_key, contents):
         cache.set(cache_key, contents, cache_expiration)
 
 
+def _get_course_progress_metrics(course_key, user_id=None, exclude_users=None, org_ids=None, group_ids=None):
+    """
+    returns a dict containing these course progress metrics
+    `course_avg`: average progress in course
+    `completions`: given user's progress percentage
+    `position`: given user's position in progress leaderboard
+    `total_users`: total user's enrolled
+    `total_possible_completions`: total possible modules to be completed
+    """
+    course_avg = 0
+    data = {'course_avg': course_avg}
+    course_metadata = CourseAggregatedMetaData.get_from_id(course_key)
+    total_possible_completions = float(course_metadata.total_assessments)
+    total_actual_completions = StudentProgress.get_total_completions(course_key, exclude_users=exclude_users,
+                                                                     org_ids=org_ids, group_ids=group_ids)
+    if user_id:
+        user_data = StudentProgress.get_user_position(course_key, user_id, exclude_users=exclude_users)
+        data['position'] = user_data['position']
+        user_completions = user_data['completions']
+        completion_percentage = 0
+        if total_possible_completions > 0:
+            completion_percentage = min(100 * (user_completions / total_possible_completions), 100)
+        data['completions'] = completion_percentage
+
+    total_users_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users)
+    if org_ids:
+        total_users_qs = total_users_qs.filter(organizations__in=org_ids)
+    if group_ids:
+        total_users_qs = total_users_qs.filter(groups__in=group_ids).distinct()
+    total_users = total_users_qs.count()
+    if total_users and total_actual_completions and total_possible_completions:
+        course_avg = total_actual_completions / float(total_users)
+        course_avg = min(100 * (course_avg / total_possible_completions), 100)  # avg in percentage
+    data['course_avg'] = course_avg
+    data['total_users'] = total_users
+    data['total_possible_completions'] = total_possible_completions
+    return data
+
+
 class CourseContentList(SecureAPIView):
     """
     **Use Case**
@@ -1667,6 +1706,17 @@ class CoursesMetrics(SecureAPIView):
             ).count()
             data['users_passed'] = users_passed
 
+        if 'avg_progress' in metrics_required:
+            progress_metrics = _get_course_progress_metrics(
+                course_key, exclude_users=exclude_users, org_ids=org_ids, group_ids=group_ids
+            )
+            data['avg_progress'] = progress_metrics['course_avg']
+
+        if 'avg_grade' in metrics_required:
+            data['avg_grade'] = StudentGradebook.course_grade_avg(
+                course_key, exclude_users=exclude_users, org_ids=org_ids, group_ids=group_ids
+            )
+
         if 'thread_stats' in metrics_required:
             try:
                 data['thread_stats'] = get_course_thread_stats(slash_course_id)
@@ -1923,7 +1973,7 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
         user_id = self.request.query_params.get('user_id', None)
         count = self.request.query_params.get('count', None)
         exclude_roles = css_param_to_list(self.request, 'exclude_roles')
-        orgs_filter = get_ids_from_list_param(self.request, 'organizations')
+        org_ids = get_ids_from_list_param(self.request, 'organizations')
         group_ids = get_ids_from_list_param(self.request, 'groups')
         skipleaders = str2bool(self.request.query_params.get('skipleaders', 'false'))
         data = {}
@@ -1938,39 +1988,21 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
                     return Response(data, status=status.HTTP_200_OK)
 
                 cached_leader_board_data = get_cached_data('progress_leaderboard', course_id)
-                if cached_leader_board_data and not (orgs_filter or group_ids or exclude_roles):
+                if cached_leader_board_data and not (org_ids or group_ids or exclude_roles):
                     data.update(cached_leader_board_data)
                     return Response(data, status=status.HTTP_200_OK)
 
         course_key = get_course_key(course_id)
-        course_metadata = CourseAggregatedMetaData.get_from_id(course_key)
-        total_possible_completions = float(course_metadata.total_assessments)
         exclude_users = get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles)
-        total_actual_completions = StudentProgress.get_total_completions(course_key, exclude_users=exclude_users,
-                                                                         org_ids=orgs_filter, group_ids=group_ids)
-        if user_id:
-            user_data = StudentProgress.get_user_position(course_key, user_id, exclude_users=exclude_users)
-            data['position'] = user_data['position']
-            user_completions = user_data['completions']
-            completion_percentage = 0
-            if total_possible_completions > 0:
-                completion_percentage = min(100 * (user_completions / total_possible_completions), 100)
-            data['completions'] = completion_percentage
-
-        total_users_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users)
-        if orgs_filter:
-            total_users_qs = total_users_qs.filter(organizations__in=orgs_filter)
-        if group_ids:
-            total_users_qs = total_users_qs.filter(groups__in=group_ids).distinct()
-        total_users = total_users_qs.count()
-        if total_users and total_actual_completions and total_possible_completions:
-            course_avg = total_actual_completions / float(total_users)
-            course_avg = min(100 * (course_avg / total_possible_completions), 100)  # avg in percentage
-        data['course_avg'] = course_avg
+        data = _get_course_progress_metrics(
+            course_key, user_id=user_id, exclude_users=exclude_users, org_ids=org_ids, group_ids=group_ids
+        )
+        total_users = data['total_users']
+        total_possible_completions = data['total_possible_completions']
 
         if not skipleaders and 'leaders' not in data:
             queryset = StudentProgress.generate_leaderboard(course_key, count=count, exclude_users=exclude_users,
-                                                            org_ids=orgs_filter, group_ids=group_ids)
+                                                            org_ids=org_ids, group_ids=group_ids)
             serializer = CourseCompletionsLeadersSerializer(queryset, many=True,
                                                             context={'total_completions': total_possible_completions})
             data['leaders'] = serializer.data  # pylint: disable=E1101

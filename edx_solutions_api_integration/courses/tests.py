@@ -26,11 +26,12 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.test.utils import override_settings
 from rest_framework import status
 
-from capa.tests.response_xml_factory import StringResponseXMLFactory
 from courseware import module_render
 from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
+from progress.models import StudentProgress
+from course_metadata.models import CourseAggregatedMetaData
 from social_engagement.models import StudentSocialEngagementScore
 from instructor.access import allow_access
 from edx_solutions_organizations.models import Organization
@@ -2278,26 +2279,37 @@ class CoursesApiTests(
         self.assertEqual(response.data['num_pages'], 3)
 
     def test_courses_data_metrics(self):
-        test_uri = self.base_courses_uri + '/' + self.test_course_id + '/users'
-        completion_uri = '{}/{}/completions/'.format(self.base_courses_uri, unicode(self.course.id))
-        test_user_uri = self.base_users_uri
-        users_to_add = 5
-        for i in xrange(0, users_to_add):  # pylint: disable=C7620
-            data = {
-                'email': 'test{}@example.com'.format(i), 'username': 'tcdm_user{}'.format(i),
-                'password': 'test_password'
-            }
-            # create a new user
-            response = self.do_post(test_user_uri, data)
-            self.assertEqual(response.status_code, 201)
-            created_user_id = response.data['id']
+        users_to_add, user_grade, user_completions, total_assessments = 5, 0.6, 10, 20
+        course = CourseFactory()
+        CourseAggregatedMetaData.objects.update_or_create(
+            id=course.id, defaults={'total_assessments': total_assessments}
+        )
+        for idx in xrange(0, users_to_add):
+            user = UserFactory()
+            created_user_id = user.id
+            CourseEnrollmentFactory(user=user, course_id=course.id)
 
-            # now enroll this user in the course
-            post_data = {'user_id': created_user_id}
-            response = self.do_post(test_uri, post_data)
-            self.assertEqual(response.status_code, 201)
+            # add grades for users
+            StudentGradebook.objects.update_or_create(
+                user=user,
+                course_id=course.id,
+                defaults={
+                    'grade': user_grade,
+                    'proforma_grade': user_grade if idx % 2 == 0 else 0.95,
+                    'is_passed': True,
+                }
+            )
 
-        #create an organization
+            # add progress for users
+            StudentProgress.objects.update_or_create(
+                user=user,
+                course_id=course.id,
+                defaults={
+                    'completions': user_completions,
+                }
+            )
+
+        # create an organization and add last created user in it
         data = {
             'name': 'Test Organization',
             'display_name': 'Test Org Display Name',
@@ -2307,45 +2319,39 @@ class CoursesApiTests(
         self.assertEqual(response.status_code, 201)
         org_id = response.data['id']
 
-        for i in xrange(1, users_to_add):
-            local_content_name = 'Video_Sequence_course_metrics{}'.format(i)
-            local_content = ItemFactory.create(
-                category="videosequence",
-                parent_location=self.content_child2.location,
-                display_name=local_content_name
-            )
-            content_id = unicode(local_content.scope_ids.usage_id)
-            completions_data = {'content_id': content_id, 'user_id': created_user_id, 'stage': None}
-            response = self.do_post(completion_uri, completions_data)
-            self.assertEqual(response.status_code, 201)
-
         # get course metrics
-        course_metrics_uri = '{}/{}/metrics/?metrics_required={}'.format(
-            self.base_courses_uri,
-            self.test_course_id,
-            'users_started,modules_completed,users_completed,thread_stats',
+        course_metrics_uri = reverse(
+            'course-metrics', kwargs={'course_id': unicode(course.id)}
+        )
+        course_metrics_uri = '{}/?metrics_required={}'.format(
+            course_metrics_uri,
+            'users_started,modules_completed,users_completed,thread_stats,avg_grade,avg_progress',
         )
         response = self.do_get(course_metrics_uri)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['users_enrolled'], users_to_add + USER_COUNT)
-        self.assertGreaterEqual(response.data['users_started'], 1)
-        self.assertEqual(response.data['users_not_started'], users_to_add + USER_COUNT - 1)
-        self.assertEqual(response.data['modules_completed'], users_to_add - 1)
-        self.assertEqual(response.data['users_completed'], 0)
+        self.assertEqual(response.data['users_enrolled'], users_to_add)
+        self.assertGreaterEqual(response.data['users_started'], users_to_add)
+        self.assertEqual(response.data['users_not_started'], 0)
+        self.assertEqual(response.data['modules_completed'], user_completions * users_to_add)
+        self.assertEqual(response.data['users_completed'], 3)
+        self.assertEqual(round(response.data['avg_progress']), round(user_completions/float(total_assessments) * 100))
+        self.assertEqual(response.data['avg_grade'], user_grade)
         self.assertIsNotNone(response.data['grade_cutoffs'])
         self.assertEqual(response.data['thread_stats']['num_threads'], 5)
         self.assertEqual(response.data['thread_stats']['num_active_threads'], 3)
 
-        # get course metrics by organization
-        course_metrics_uri = '{}/{}/metrics/?metrics_required=users_started&organization={}'.format(
-            self.base_courses_uri,
-            self.test_course_id,
+        # get course metrics by valid organization
+        course_metrics_uri = '{}/?metrics_required={}&organization={}'.format(
+            course_metrics_uri,
+            'users_started,avg_grade,avg_progress',
             org_id
         )
         response = self.do_get(course_metrics_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['users_enrolled'], 1)
         self.assertGreaterEqual(response.data['users_started'], 1)
+        self.assertEqual(round(response.data['avg_progress']), round(user_completions/float(total_assessments) * 100))
+        self.assertEqual(response.data['avg_grade'], user_grade)
 
         # test with bogus course
         course_metrics_uri = '{}/{}/metrics/'.format(
