@@ -713,6 +713,7 @@ class CoursesGroupsList(SecureAPIView):
     * Example: Display all of the courses for a particular academic series/program
     * If a relationship already exists between a Course and a particular group, the system returns 409 Conflict
     * The 'type' parameter filters groups by their 'group_type' field ('workgroup', 'series', etc.)
+    * The 'type' parameter can be a single value or comma separated list of values ('workgroup,series')
     """
 
     def post(self, request, course_id):
@@ -756,11 +757,11 @@ class CoursesGroupsList(SecureAPIView):
         """
         if not course_exists(request, request.user, course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
-        group_type = request.query_params.get('type', None)
+        group_type = css_param_to_list(request, 'type')
         course_key = get_course_key(course_id)
         course_groups = CourseGroupRelationship.objects.filter(course_id=course_key)
         if group_type:
-            course_groups = course_groups.filter(group__groupprofile__group_type=group_type)
+            course_groups = course_groups.filter(group__groupprofile__group_type__in=group_type)
         response_data = []
         group_profiles = GroupProfile.objects.filter(
             group_id__in=[course_group.group_id for course_group in course_groups]
@@ -1640,7 +1641,7 @@ class CoursesMetrics(SecureAPIView):
     - metrics can be filtered by organization by adding organization parameter to GET request
     - metrics_required param should be comma separated list of metrics required
     - possible values for metrics_required param are
-    - ``` users_started,modules_completed,users_completed,thread_stats,users_passed ```
+    - ``` users_started,modules_completed,users_completed,thread_stats,users_passed,avg_grade,avg_progress ```
     ### Use Cases/Notes:
     * Example: Display number of users enrolled in a given course
     """

@@ -643,9 +643,10 @@ class CoursesApiTests(
     def test_courses_groups_list_get(self):
         test_uri = '{}/{}/groups'.format(self.base_courses_uri, self.test_course_id)
         course_fail_uri = '{}/{}/groups'.format(self.base_courses_uri, 'ed/Open_DemoX/edx_demo_course')
-        for i in xrange(2):
+        group_types = ['Programming', 'Programming', 'Calculus']
+        for i in range(len(group_types)):
             data_dict = {
-                'name': 'Alpha Group {}'.format(i), 'type': 'Programming',
+                'name': 'Alpha Group {}'.format(i), 'type': group_types[i],
             }
             response = self.do_post(self.base_groups_uri, data_dict)
             group_id = response.data['id']
@@ -653,14 +654,6 @@ class CoursesApiTests(
             self.assertEqual(response.status_code, 201)
             response = self.do_post(test_uri, data)
             self.assertEqual(response.status_code, 201)
-
-        data_dict['type'] = 'Calculus'
-        response = self.do_post(self.base_groups_uri, data_dict)
-        group_id = response.data['id']
-        data = {'group_id': group_id}
-        self.assertEqual(response.status_code, 201)
-        response = self.do_post(test_uri, data)
-        self.assertEqual(response.status_code, 201)
 
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
@@ -675,6 +668,12 @@ class CoursesApiTests(
         response = self.do_get(group_type_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
+
+        # filter by more than one group type
+        group_type_uri = '{}?type={}'.format(test_uri, 'Calculus,Programming')
+        response = self.do_get(group_type_uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 3)
 
         error_group_type_uri = '{}?type={}'.format(test_uri, 'error_type')
         response = self.do_get(error_group_type_uri)
