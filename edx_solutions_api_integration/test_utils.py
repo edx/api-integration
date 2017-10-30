@@ -16,7 +16,6 @@ from xmodule.modulestore.django import SignalHandler
 from courseware import module_render
 from courseware.model_data import FieldDataCache
 from lms.djangoapps.grades.signals.signals import PROBLEM_WEIGHTED_SCORE_CHANGED
-
 from course_metadata.signals import (
     course_publish_handler_in_course_metadata as listener_in_course_metadata
 )
@@ -190,6 +189,16 @@ class APIClientMixin(Client):
         json_data = json.dumps(data)
 
         return self.client.put(
+            uri, headers=headers, content_type='application/json', data=json_data)
+
+    def do_patch(self, uri, data):
+        """Submit an HTTP PATCH request"""
+        headers = {
+            'X-Edx-Api-Key': str(self.TEST_API_KEY),
+        }
+        json_data = json.dumps(data)
+
+        return self.client.patch(
             uri, headers=headers, content_type='application/json', data=json_data)
 
     def do_get(self, uri, secure=True, query_parameters=None):

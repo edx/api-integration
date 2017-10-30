@@ -137,13 +137,6 @@ class HasOrgsFilterBackend(filters.BaseFilterBackend):
         return queryset.distinct()
 
 
-class SecureAPIView(APIView):
-    """
-    View used for protecting access to specific workflows
-    """
-    permission_classes = (ApiKeyHeaderPermission, )
-
-
 class PermissionMixin(object):
     """
     Mixin to set custom permission_classes
@@ -209,12 +202,50 @@ class PaginationMixin(object):
     pagination_class = CustomPagination
 
 
+class SecureAPIView(PermissionMixin, APIView):
+    """
+    View used for protecting access to specific workflows
+    """
+    pass
+
+
 class SecureListAPIView(PermissionMixin,
                         FilterBackendMixin,
                         PaginationMixin,
                         generics.ListAPIView):
     """
     Inherited from ListAPIView
+    """
+    pass
+
+
+class SecureListCreateAPIView(PermissionMixin,
+                        FilterBackendMixin,
+                        PaginationMixin,
+                        generics.ListCreateAPIView):
+    """
+    Inherited from ListCreateAPIView
+    """
+    pass
+
+
+class SecureRetrieveUpdateDestroyAPIView(PermissionMixin, generics.RetrieveUpdateDestroyAPIView):
+    """
+    Inherited from RetrieveUpdateDestroyAPIView
+    """
+    pass
+
+
+class SecureRetrieveUpdateAPIView(PermissionMixin, generics.RetrieveUpdateAPIView):
+    """
+    Inherited from RetrieveUpdateAPIView
+    """
+    pass
+
+
+class SecureCreateAPIView(PermissionMixin, generics.CreateAPIView):
+    """
+    Inherited from CreateAPIView
     """
     pass
 
