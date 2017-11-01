@@ -620,7 +620,7 @@ class CoursesDetail(SecureAPIView):
 
         depth = request.query_params.get('depth', 0)
         depth_int = int(depth)
-        course_descriptor, course_key, course_content = get_course(request, user, course_id, depth=depth_int)  # pylint: disable=W0612
+        course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612
         if not course_descriptor:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
 

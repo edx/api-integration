@@ -305,37 +305,39 @@ class UsersList(SecureListAPIView):
         match = self.request.query_params.get('match', None)
         email = self.request.query_params.get('email', None)
         org_ids = self.request.query_params.get('organizations', None)
-        courses = self.request.query_params.get('courses', None)
+        courses = css_param_to_list(self.request, 'courses')
         organization_display_name = self.request.query_params.get('organization_display_name', None)
 
-        if org_ids is not None:
+        if org_ids:
             org_ids = map(int, org_ids.split(','))
             queryset = queryset.filter(organizations__id__in=org_ids).distinct()
 
-        if match is not None and match == 'partial':
-            if name is not None:
+        if match == 'partial':
+            if name:
                 queryset = queryset.filter(profile__name__icontains=name)
 
-            if email is not None:
+            if email:
                 queryset = queryset.filter(email__icontains=email)
 
             if organization_display_name is not None:
                 queryset = queryset.filter(organizations__display_name__icontains=organization_display_name)
 
-            if courses is not None:
-                queryset = queryset.filter(courseenrollment__course_id__icontains=courses)
+            if courses:
+                courses_filter_list = [Q(courseenrollment__course_id__icontains=course) for course in courses]
+                courses_filter_list = reduce(lambda a, b: a | b, courses_filter_list)
+                queryset = queryset.filter(courses_filter_list)
         else:
-            if name is not None:
+            if name:
                 queryset = queryset.filter(profile__name=name)
 
-            if email is not None:
+            if email:
                 queryset = queryset.filter(email=email)
 
-            if courses is not None:
-                course_ids = map(CourseKey.from_string, courses.split(','))
-                queryset = queryset.filter(courseenrollment__course_id__in=course_ids).distinct()
+            if courses:
+                courses = map(CourseKey.from_string, courses)
+                queryset = queryset.filter(courseenrollment__course_id__in=courses).distinct()
 
-        if courses is None:
+        if not courses:
             queryset = queryset.annotate(courses_enrolled=Count('courseenrollment'))
         queryset = queryset.prefetch_related('organizations', 'courseaccessrole_set').select_related('profile')
 
