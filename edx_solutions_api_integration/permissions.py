@@ -243,6 +243,13 @@ class SecureRetrieveUpdateAPIView(PermissionMixin, generics.RetrieveUpdateAPIVie
     pass
 
 
+class SecureCreateAPIView(PermissionMixin, generics.CreateAPIView):
+    """
+    Inherited from CreateAPIView
+    """
+    pass
+
+
 class MobileListAPIView(MobilePermissionMixin, FilterBackendMixin, PaginationMixin, generics.ListAPIView):
     """
     Base view for mobile list view APIs
