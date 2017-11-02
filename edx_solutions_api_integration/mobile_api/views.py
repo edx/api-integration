@@ -15,7 +15,6 @@ from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
 
-from courseware.courses import get_course
 from edx_solutions_api_integration.courseware_access import (
     course_exists,
     get_course_key
@@ -27,11 +26,9 @@ from edx_solutions_api_integration.users.views import (
     UsersCourseProgressList,
     UsersCoursesDetail,
 )
-from edx_solutions_api_integration.utils import get_aggregate_exclusion_user_ids
-from lms.djangoapps.ccx.utils import prep_course_for_grading
-from lms.djangoapps.grades.new.course_grade import CourseGradeFactory
 from openedx.core.lib.api.permissions import IsStaffOrOwner
 from student.models import CourseEnrollment
+from gradebook.models import StudentGradebook
 
 
 class MobileUsersOrganizationsList(MobileListAPIView, UsersOrganizationsList):
@@ -143,10 +140,19 @@ class MobileUsersCoursesGrades(MobileListAPIView):
         }, status=status.HTTP_200_OK)
 
     def _get_user_course_grades(self, user, course_id):
+        """
+        Get the user's grade for the given course.
+
+        Note: For performance reasons, we use the cached gradebook data here.
+        Once persistent grades are enabled on the solutions fork, we'll use CourseGradeFactory instead.
+        """
         course_key = get_course_key(course_id)
-        course = get_course(course_key)
-        prep_course_for_grading(course, self.request)
-        course_grade = CourseGradeFactory().create(user, course).percent
+        try:
+            record = StudentGradebook.objects.get(user=user, course_id=course_key)
+            course_grade = record.grade
+        except StudentGradebook.DoesNotExist:
+            course_grade = 0
+
         course_average = self._get_course_average_grade(course_key)
         return {
             'course_grade': course_grade,
@@ -154,14 +160,12 @@ class MobileUsersCoursesGrades(MobileListAPIView):
         }
 
     def _get_course_average_grade(self, course_key):
-        """ Get the average grade for all the users in the specified course."""
-        course = get_course(course_key)
-        users = CourseEnrollment.objects.users_enrolled_in(course_key)
-        users = users.exclude(id__in=get_aggregate_exclusion_user_ids(course.id))
-        course_grades = [
-            grade[1].percent  # grade is a (student, course_grade, err_msg) tuple
-            for grade in CourseGradeFactory().iter(course, users)
-        ]
-        if course_grades:
-            return sum(course_grades) / float(len(course_grades))
-        return None
+        """
+        Get the average grade for all the users in the specified course.
+
+        Note: For performance reasons, we use the cached gradebook data here.
+        Once persistent grades are enabled on the solutions fork, we'll use CourseGradeFactory instead.
+        """
+        return StudentGradebook.course_grade_avg(
+            course_key
+        )

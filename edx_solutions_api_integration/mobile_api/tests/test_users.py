@@ -11,8 +11,8 @@ from mobile_api.testutils import MobileAPITestCase
 from edx_solutions_organizations.models import Organization
 from openedx.core.djangolib.testing.utils import get_mock_request
 from student.tests.factories import UserFactory, CourseEnrollmentFactory
-from lms.djangoapps.grades.new.course_grade import CourseGradeFactory
 from lms.djangoapps.grades.tests.utils import answer_problem
+from gradebook.models import StudentGradebook
 from xmodule.modulestore.tests.factories import ItemFactory
 
 
@@ -285,15 +285,44 @@ class TestUserCourseGradesApi(MobileAPITestCase):
         CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
         CourseEnrollmentFactory.create(user=self.user2, course_id=self.course.id)
 
+        # Ensure the the baseline score and average are 0
+        self.login_and_enroll()
+        response = self.api_response(
+            expected_response_code=None,
+            data={'course_id': unicode(self.course.id), 'username': self.user.username}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['course_grade'], 0)
+        self.assertEqual(response.data['course_average_grade'], 0)
+
+        # Answer some problems
         self.request.user = self.user
         answer_problem(self.course, self.request, self.problem, score=1, max_value=1)
         self.request.user = self.user2
         answer_problem(self.course, self.request, self.problem, score=1, max_value=5)
 
         # Calculate the expected course average
-        user_grade = CourseGradeFactory().create(self.user, self.course)
-        user2_grade = CourseGradeFactory().create(self.user2, self.course)
-        course_avg_grade = (user_grade.percent + user2_grade.percent) / float(2)
+        user_grade = 0.1
+        StudentGradebook.objects.update_or_create(
+            user=self.user,
+            course_id=self.course.id,
+            defaults={
+                'grade': user_grade,
+                'proforma_grade': 1,
+                'is_passed': True,
+            }
+        )
+        user2_grade = 0.3
+        StudentGradebook.objects.update_or_create(
+            user=self.user2,
+            course_id=self.course.id,
+            defaults={
+                'grade': user2_grade,
+                'proforma_grade': 1,
+                'is_passed': True,
+            }
+        )
+        course_avg_grade = (user_grade + user2_grade) / float(2)
         self.assertTrue(course_avg_grade > 0)
 
         self.login_and_enroll()
@@ -303,7 +332,7 @@ class TestUserCourseGradesApi(MobileAPITestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['course_grade'], user_grade.percent)
+        self.assertEqual(response.data['course_grade'], user_grade)
         self.assertEqual(response.data['course_average_grade'], course_avg_grade)
 
         # Enroll another user, with a higher grade,
@@ -311,15 +340,24 @@ class TestUserCourseGradesApi(MobileAPITestCase):
         self.request.user = self.user3
         CourseEnrollmentFactory.create(user=self.user3, course_id=self.course.id)
         answer_problem(self.course, self.request, self.problem, score=10, max_value=1)
-        user3_grade = CourseGradeFactory().create(self.user3, self.course)
-        new_course_avg_grade = (user_grade.percent + user2_grade.percent + user3_grade.percent) / float(3)
+        user3_grade = 0.5
+        StudentGradebook.objects.update_or_create(
+            user=self.user3,
+            course_id=self.course.id,
+            defaults={
+                'grade': user3_grade,
+                'proforma_grade': 1,
+                'is_passed': True,
+            }
+        )
+        new_course_avg_grade = (user_grade + user2_grade + user3_grade) / float(3)
 
         response = self.api_response(
             expected_response_code=None,
             data={'course_id': unicode(self.course.id), 'username': self.user.username}
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['course_grade'], user_grade.percent)
+        self.assertEqual(response.data['course_grade'], user_grade)
         self.assertEqual(response.data['course_average_grade'], new_course_avg_grade)
         self.assertTrue(new_course_avg_grade > course_avg_grade)
 
@@ -337,9 +375,18 @@ class TestUserCourseGradesApi(MobileAPITestCase):
         self.client.logout()
         response = self.client.get(url)
         self.assertEqual(response.status_code, 401)
-        user_grade = CourseGradeFactory().create(self.user, self.course)
+        user_grade = 0.8
+        StudentGradebook.objects.update_or_create(
+            user=self.user,
+            course_id=self.course.id,
+            defaults={
+                'grade': user_grade,
+                'proforma_grade': 1,
+                'is_passed': True,
+            }
+        )
         # Now, try with a valid token header:
         token = _create_oauth2_token(self.user)
         response = self.client.get(url, HTTP_AUTHORIZATION="Bearer {0}".format(token))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['course_grade'], user_grade.percent)
+        self.assertEqual(response.data['course_grade'], user_grade)
