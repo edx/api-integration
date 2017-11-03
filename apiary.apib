@@ -4891,6 +4891,21 @@ Resources related to Mobile App Management in the API.
 ## Mobile Apps [/mobileapps/]
 
 Get list of mobile apps and create a new one.
+Following are the choices for operating system and deployment_mechanism:
+
+OS_CHOICES = (
+    (1, 'Android'),
+    (2, 'iOS'),
+    (3, 'Windows'),
+    (4, 'Other'),
+)
+
+DEPLOYMENT_CHOICES = (
+    (1, 'Public app store'),
+    (2, 'Enterprise'),
+    (3, 'OTA'),
+    (4, 'Other'),
+)
 
 ### Mobile Apps List [GET]
 
