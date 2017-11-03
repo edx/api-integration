@@ -383,11 +383,18 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['results'][0]['full_name'], 'Steve Jobs')
 
         # fetch user data by partial course id match
-        response = self.do_get('{}?courses={}&match=partial'.format(test_uri, 'edx'))
+        response = self.do_get('{}?courses={}&match=partial'.format(test_uri, 'edx,mit'))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data['results']), 2)
+        self.assertEqual(len(response.data['results']), 3)
         self.assertEqual(response.data['results'][0]['full_name'], 'John Doe')
         self.assertEqual(response.data['results'][1]['full_name'], 'Micheal Mcdonald')
+        self.assertEqual(response.data['results'][2]['full_name'], 'Steve Jobs')
+
+        # fetch user data by partial course ids and name match
+        response = self.do_get('{}?courses={}&match=partial&name={}'.format(test_uri, 'edx,mit', 'job'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['full_name'], 'Steve Jobs')
 
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_user_list_get_multiple_filters(self, store):
