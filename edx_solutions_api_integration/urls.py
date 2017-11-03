@@ -22,6 +22,7 @@ urlpatterns = patterns(
     '',
     url(r'^$', system_views.ApiDetail.as_view()),
     url(r'^system$', system_views.SystemDetail.as_view()),
+    url(r'^mobileapps/*', include('mobileapps.urls')),
     url(r'^users/*', include('edx_solutions_api_integration.users.urls')),
     url(r'^groups/*', include('edx_solutions_api_integration.groups.urls')),
     url(r'^sessions/*', include('edx_solutions_api_integration.sessions.urls')),

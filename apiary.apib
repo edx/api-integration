@@ -4884,3 +4884,485 @@ It returns a custom page in the course, including the page content.
             "content": "<p>&ldquo;It really is just the discomfort in anticipation but also during the conversation&hellip;&rdquo;</p>"
         }
 
+
+# Mobile App Management
+Resources related to Mobile App Management in the API.
+
+## Mobile Apps [/mobileapps/]
+
+Get list of mobile apps and create a new one.
+Following are the choices for operating system and deployment_mechanism:
+
+OS_CHOICES = (
+    (1, 'Android'),
+    (2, 'iOS'),
+    (3, 'Windows'),
+    (4, 'Other'),
+)
+
+DEPLOYMENT_CHOICES = (
+    (1, 'Public app store'),
+    (2, 'Enterprise'),
+    (3, 'OTA'),
+    (4, 'Other'),
+)
+
+### Mobile Apps List [GET]
+
+Returns a list of mobile apps
+
++ Response 200 (application/json)
+
+        {
+            "count": 2,
+            "previous": null,
+            "num_pages": 1,
+            "results": [
+                {
+                    "id": 22,
+                    "provider_key": "d15fe2e326094e12a2a338c04ddfaaf8",
+                    "provider_secret": "d15fe2e326094e12a2a338c04ddfaaf8",
+                    "created": "2017-10-30T09:35:20.519901Z",
+                    "modified": "2017-10-30T09:35:20.521415Z",
+                    "identifier": "mck-ios",
+                    "name": "Mckinsey",
+                    "operating_system": 1,
+                    "deployment_mechanism": 1,
+                    "download_url": "",
+                    "analytics_url_dev": "",
+                    "analytics_url_prod": "",
+                    "provider_dashboard_url": "",
+                    "current_version": "1",
+                    "is_active": false,
+                    "notification_provider": null,
+                    "updated_by": 13,
+                    "users": [
+                        12,
+                        13
+                    ],
+                    "organizations": [
+                        1
+                    ]
+                },
+                {
+                    "id": 23,
+                    "provider_key": "d15fe2e326094e12a2a338c04ddfaaf8",
+                    "provider_secret": "d15fe2e326094e12a2a338c04ddfaaf8",
+                    "created": "2017-10-30T09:35:20.519901Z",
+                    "modified": "2017-10-30T09:35:20.521415Z",
+                    "identifier": "mck-and",
+                    "name": "Mckinsey",
+                    "operating_system": 1,
+                    "deployment_mechanism": 1,
+                    "download_url": "",
+                    "analytics_url_dev": "",
+                    "analytics_url_prod": "",
+                    "provider_dashboard_url": "",
+                    "current_version": "1",
+                    "is_active": false,
+                    "notification_provider": null,
+                    "updated_by": 13,
+                    "users": [
+                        12,
+                        13
+                    ],
+                    "organizations": [
+                        1
+                    ]
+                }
+            ],
+            "next": null
+        }
+
+### Mobile App Create [POST]
+
+Returns a list of mobile apps
+
++ Request
+
+        {
+            "provider_key": "d15fe2e326094e12a2a338c04ddfaaf8",
+            "provider_secret": "d15fe2e326094e12a2a338c04ddfaaf8",
+            "identifier": "mck-and",
+            "name": "Mckinsey",
+            "operating_system": 1,
+            "deployment_mechanism":1,
+            "download_url": "",
+            "analytics_url_dev": "",
+            "analytics_url_prod": "",
+            "provider_dashboard_url": "",
+            "current_version": "0.1",
+            "is_active": false,
+            "notification_provider": null,
+            "users": [13,14],
+            "organizations": [1]
+        }
+
++ Response 201 (application/json)
+
+        {
+            "id": 24,
+            "provider_key": "d15fe2e326094e12a2a338c04ddfaaf8",
+            "provider_secret": "d15fe2e326094e12a2a338c04ddfaaf8",
+            "created": "2017-11-03T07:09:34.088834Z",
+            "modified": "2017-11-03T07:09:34.089213Z",
+            "identifier": "mck-and",
+            "name": "Mckinsey",
+            "operating_system": 1,
+            "deployment_mechanism": 1,
+            "download_url": "",
+            "analytics_url_dev": "",
+            "analytics_url_prod": "",
+            "provider_dashboard_url": "",
+            "current_version": "0.1",
+            "is_active": false,
+            "notification_provider": null,
+            "updated_by": 13,
+            "users": [
+                13,
+                14
+            ],
+            "organizations": [
+                1
+            ]
+        }
+
+## Mobile Apps Detail [/mobileapps/{id}]
+
+Get detail of mobile app and create a new one.
+
+### Mobile Apps Detail [GET]
+
+Returns a mobile app
+
++ Response 200 (application/json)
+
+        {
+            "id": 24,
+            "provider_key": "d15fe2e326094e12a2a338c04ddfaaf8",
+            "provider_secret": "d15fe2e326094e12a2a338c04ddfaaf8",
+            "created": "2017-11-03T07:09:34.088834Z",
+            "modified": "2017-11-03T07:09:34.089213Z",
+            "identifier": "mck-and",
+            "name": "Mckinsey",
+            "operating_system": 1,
+            "deployment_mechanism": 1,
+            "download_url": "",
+            "analytics_url_dev": "",
+            "analytics_url_prod": "",
+            "provider_dashboard_url": "",
+            "current_version": "0.1",
+            "is_active": false,
+            "notification_provider": null,
+            "updated_by": 13,
+            "users": [
+                13,
+                14
+            ],
+            "organizations": [
+                1
+            ]
+        }
+
+### Mobile Apps Detail [PUT]
+
+Update mobile app
+
++ Request
+
+        {
+            "provider_key": "d15fe2e326094e12a2a338c04ddfaaf8",
+            "provider_secret": "d15fe2e326094e12a2a338c04ddfaaf8",
+            "identifier": "mck-and",
+            "name": "Mckinsey and company",
+            "operating_system": 1,
+            "deployment_mechanism":1,
+            "download_url": "",
+            "analytics_url_dev": "",
+            "analytics_url_prod": "",
+            "provider_dashboard_url": "",
+            "current_version": "0.1",
+            "is_active": false,
+            "notification_provider": null,
+            "users": [13,14],
+            "organizations": [1]
+        }
+
++ Response 200 (application/json)
+
+        {
+            "id": 24,
+            "provider_key": "d15fe2e326094e12a2a338c04ddfaaf8",
+            "provider_secret": "d15fe2e326094e12a2a338c04ddfaaf8",
+            "created": "2017-11-03T07:09:34.088834Z",
+            "modified": "2017-11-03T07:09:34.089213Z",
+            "identifier": "mck-and",
+            "name": "Mckinsey and company",
+            "operating_system": 1,
+            "deployment_mechanism": 1,
+            "download_url": "",
+            "analytics_url_dev": "",
+            "analytics_url_prod": "",
+            "provider_dashboard_url": "",
+            "current_version": "0.1",
+            "is_active": false,
+            "notification_provider": null,
+            "updated_by": 13,
+            "users": [
+                13,
+                14
+            ],
+            "organizations": [
+                1
+            ]
+        }
+
+### Mobile Apps Detail [PATCH]
+
+Update mobile app partially. This method is also used for deactivating the app.
+
++ Request
+
+        {
+            "is_active": false,
+        }
+
++ Response 200 (application/json)
+
+        {
+            "id": 24,
+            "provider_key": "d15fe2e326094e12a2a338c04ddfaaf8",
+            "provider_secret": "d15fe2e326094e12a2a338c04ddfaaf8",
+            "created": "2017-11-03T07:09:34.088834Z",
+            "modified": "2017-11-03T07:09:34.089213Z",
+            "identifier": "mck-and",
+            "name": "Mckinsey",
+            "operating_system": 1,
+            "deployment_mechanism": 1,
+            "download_url": "",
+            "analytics_url_dev": "",
+            "analytics_url_prod": "",
+            "provider_dashboard_url": "",
+            "current_version": "0.1",
+            "is_active": false,
+            "notification_provider": null,
+            "updated_by": 13,
+            "users": [
+                13,
+                14
+            ],
+            "organizations": [
+                1
+            ]
+        }
+
+## Mobile App Users [/mobileapps/{id}/users]
+
+Get users of mobile app.
+
+### Mobile App Users [GET]
+
+Return mobile app users
+
++ Response 200 (application/json)
+
+        {
+            "count": 3,
+            "previous": null,
+            "num_pages": 1,
+            "results": [
+                {
+                    "id": 4,
+                    "email": "mcka_ta_user@mckinseyacademy.com",
+                    "username": "mcka_ta_user",
+                    "first_name": "mcka_ta_user",
+                    "last_name": "Tester",
+                    "created": "2017-05-15T12:09:26.463867Z",
+                    "is_active": true
+                },
+                {
+                    "id": 12,
+                    "email": "jim@example.com",
+                    "username": "jim",
+                    "first_name": "jim",
+                    "last_name": "jeff",
+                    "created": "2017-05-15T12:33:11.126953Z",
+                    "is_active": true
+                },
+                {
+                    "id": 15,
+                    "email": "jimy@example.com",
+                    "username": "jimy",
+                    "first_name": "jimy",
+                    "last_name": "jeff",
+                    "created": "2017-05-15T12:33:11.126953Z",
+                    "is_active": true
+                },
+            ],
+            "next": null
+        }
+
+### Mobile App Users [POST]
+
+Associate users to the mobile app
+
++ Request (application/json)
+
+        {
+            "users": [1,2,3,13]
+        }
+
++ Response 201 (application/json)
+
+### Mobile App Users [DELETE]
+
+Disassociate users to the mobile app
+
++ Request (application/json)
+
+        {
+            "users": [1,2,3,13]
+        }
+
++ Response 204 (application/json)
+
+
+## Mobile App Organizations [/mobileapps/{id}/organizations]
+
+Get organizations of mobile app.
+
+### Mobile App Organizations [GET]
+
+Return mobile app organizations
+
++ Response 200 (application/json)
+
+        {
+            "count": 1,
+            "previous": null,
+            "num_pages": 1,
+            "results": [
+                {
+                    "url": "http://lms.mcka.local/api/server/organizations/1/",
+                    "id": 1,
+                    "name": "mckinsey_and_company",
+                    "display_name": "McKinsey and Company",
+                    "contact_name": "McKinsey and Company",
+                    "contact_email": "company@mckinseyacademy.com",
+                    "contact_phone": "",
+                    "logo_url": null,
+                    "created": "2017-05-15T12:09:27.285207Z",
+                    "modified": "2017-10-05T09:44:13.877934Z"
+                }
+            ],
+            "next": null
+        }
+
+### Mobile App Organizations [POST]
+
+Associate organizations to the mobile app
+
++ Request (application/json)
+
+        {
+            "organizations": [1,2,3,13]
+        }
+
++ Response 201 (application/json)
+
+### Mobile App Organizations [DELETE]
+
+Disassociate organizations to the mobile app
+
++ Request (application/json)
+
+        {
+            "organizations": [1,2,3,13]
+        }
+
++ Response 204 (application/json)
+
+
+## Mobile App Notification Providers [/mobileapps/notification_providers]
+
+Get available notification providers.
+
+### Mobile App Notification Providers [GET]
+
+Return notification providers
+
++ Response 200 (application/json)
+
+        {
+            "count": 1,
+            "previous": null,
+            "num_pages": 1,
+            "results": [
+                {
+                    "id": 1,
+                    "created": "2017-10-25T12:40:13.174867Z",
+                    "modified": "2017-10-25T12:40:13.177709Z",
+                    "name": "Urban Airship",
+                    "api_url": "http://example.com"
+                }
+            ],
+            "next": null
+        }
+
+
+## Mobile App All Users Notifications [/mobileapps/{id}/notification]
+
+Sends a push notification to all the users of an app.
+
+### Mobile App All Users Notifications [POST]
+
++ Request (application/json)
+
+        {
+            "message": "Test message"
+        }
+
++ Response 202 (application/json)
+
+        {
+            "message": "Accepted"
+        }
+
+
+## Mobile App Selected Users Notifications [/mobileapps/{id}/users/notification]
+
+Sends a push notification to selected users of an app.
+
+### Mobile App Selected Users Notifications [POST]
+
++ Request (application/json)
+
+        {
+            "message": "Test message",
+            "users": [1,5,9,13]
+        }
+
++ Response 202 (application/json)
+
+        {
+            "message": "Accepted"
+        }
+
+
+## Mobile App Organization Users Notifications [/mobileapps/{id}/organization/{id}/notification]
+
+Sends a push notification to all the users of a specific organization, associated with a given app.
+
+### Mobile App Organization Users Notifications [POST]
+
++ Request (application/json)
+
+        {
+            "message": "Test message"
+        }
+
++ Response 202 (application/json)
+
+        {
+            "message": "Accepted"
+        }

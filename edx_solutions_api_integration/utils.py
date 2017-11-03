@@ -12,7 +12,7 @@ from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta, MO
 from django.conf import settings
 from django.shortcuts import get_object_or_404
-
+from lms.djangoapps.notification_prefs.views import UsernameCipher
 from rest_framework.exceptions import ParseError
 
 from openedx.core.djangoapps.user_api.accounts.image_helpers import (
@@ -411,3 +411,7 @@ def get_profile_image_urls_by_username(username, profile_image_uploaded_at):
         for size_display_name, url in urls.items()
     })
     return data
+
+
+class StringCipher(UsernameCipher):
+    pass
