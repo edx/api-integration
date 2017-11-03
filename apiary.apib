@@ -5293,3 +5293,61 @@ Return notification providers
             ],
             "next": null
         }
+
+
+## Mobile App All Users Notifications [/mobileapps/{id}/notification]
+
+Sends a push notification to all the users of an app.
+
+### Mobile App All Users Notifications [POST]
+
++ Request (application/json)
+
+        {
+            "message": "Test message"
+        }
+
++ Response 202 (application/json)
+
+        {
+            "message": "Accepted"
+        }
+
+
+## Mobile App Selected Users Notifications [/mobileapps/{id}/users/notification]
+
+Sends a push notification to selected users of an app.
+
+### Mobile App Selected Users Notifications [POST]
+
++ Request (application/json)
+
+        {
+            "message": "Test message",
+            "users": [1,5,9,13]
+        }
+
++ Response 202 (application/json)
+
+        {
+            "message": "Accepted"
+        }
+
+
+## Mobile App Organization Users Notifications [/mobileapps/{id}/organization/{id}/notification]
+
+Sends a push notification to all the users of a specific organization, associated with a given app.
+
+### Mobile App Organization Users Notifications [POST]
+
++ Request (application/json)
+
+        {
+            "message": "Test message"
+        }
+
++ Response 202 (application/json)
+
+        {
+            "message": "Accepted"
+        }
