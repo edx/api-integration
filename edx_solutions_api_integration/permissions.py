@@ -262,6 +262,30 @@ class MobileSecureAPIView(MobilePermissionMixin):
     """
 
 
+class MobileAPIView(MobilePermissionMixin, APIView):
+    """
+    Inherited from APIView
+    """
+    pass
+
+
+class MobileListCreateAPIView(MobilePermissionMixin,
+                        FilterBackendMixin,
+                        PaginationMixin,
+                        generics.ListCreateAPIView):
+    """
+    Inherited from ListCreateAPIView
+    """
+    pass
+
+
+class MobileRetrieveUpdateAPIView(MobilePermissionMixin, generics.RetrieveUpdateAPIView):
+    """
+    Inherited from RetrieveUpdateAPIView
+    """
+    pass
+
+
 class SecureModelViewSet(PermissionMixin, viewsets.ModelViewSet):
     """
     ModelViewSet used for protecting access to specific workflows
