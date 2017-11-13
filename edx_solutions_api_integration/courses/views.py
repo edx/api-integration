@@ -30,6 +30,8 @@ from mobile_api.course_info.views import apply_wrappers_to_content
 from openedx.core.lib.xblock_utils import get_course_update_items
 from openedx.core.lib.courses import course_image_url
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from openedx.core.djangoapps.content.course_structures.api.v0.api import course_structure
+from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
 from django_comment_common.models import FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
 from instructor.access import revoke_access, update_forum_role
@@ -627,13 +629,16 @@ class CoursesDetail(SecureAPIView):
         usage_key = modulestore().make_course_usage_key(course_key)
         usage_key = usage_key.replace(course_key=modulestore().fill_in_run(usage_key.course_key))
         try:
-            data_blocks = get_blocks(
-                request,
-                usage_key,
-                user=user,
-                depth=depth_int,
-                requested_fields=BLOCK_DATA_FIELDS
-            )
+            if not user.is_authenticated():
+                data_blocks = course_structure(course_key)
+            else:
+                data_blocks = get_blocks(
+                    request,
+                    usage_key,
+                    user=user,
+                    depth=depth_int,
+                    requested_fields=BLOCK_DATA_FIELDS
+                )
             root_block = data_blocks.get('blocks', {}).get(
                 data_blocks['root'],
                 {
@@ -672,8 +677,7 @@ class CoursesDetail(SecureAPIView):
             resource_uri = '{}/users/'.format(base_uri_without_qs)
             response_data['resources'].append({'uri': resource_uri})
             return Response(response_data, status=status.HTTP_200_OK)
-
-        except ItemNotFoundError as exception:
+        except (ItemNotFoundError, CourseStructureNotAvailableError) as exception:
             raise Http404("Block not found: {}".format(exception.message))
 
 

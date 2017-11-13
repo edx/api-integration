@@ -426,12 +426,20 @@ class CoursesApiTests(
 
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_course_detail_without_date_values(self, store):
-        create_course_with_out_date_values = CourseFactory.create(default_store=store)  # pylint: disable=C0103
-        test_uri = self.base_courses_uri + '/' + unicode(create_course_with_out_date_values.id)
+        # create a course without any dates.
+        with self.store.default_store(store):
+            course = CourseFactory.create(default_store=store)
+            ItemFactory.create(
+                category="chapter",
+                parent_location=course.location,
+                display_name="Test Chapter",
+            )
+
+        test_uri = self.base_courses_uri + '/' + unicode(course.id)
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['start'], create_course_with_out_date_values.start)
-        self.assertEqual(response.data['end'], create_course_with_out_date_values.end)
+        self.assertEqual(response.data['start'], course.start)
+        self.assertEqual(response.data['end'], course.end)
 
     def test_courses_detail_get(self):
         test_uri = self.base_courses_uri + '/' + self.test_course_id
@@ -814,7 +822,6 @@ class CoursesApiTests(
         test_uri = '{}/{}/overview'.format(self.base_courses_uri, self.test_bogus_course_id)
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
-
 
     def test_courses_overview_get_invalid_content(self):
 
