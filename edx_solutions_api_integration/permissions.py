@@ -256,12 +256,6 @@ class MobileListAPIView(MobilePermissionMixin, FilterBackendMixin, PaginationMix
     """
 
 
-class MobileSecureAPIView(MobilePermissionMixin):
-    """
-    Base view for mobile secure view APIs
-    """
-
-
 class MobileAPIView(MobilePermissionMixin, APIView):
     """
     Inherited from APIView

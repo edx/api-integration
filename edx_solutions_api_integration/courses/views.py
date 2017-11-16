@@ -66,7 +66,7 @@ from edx_solutions_api_integration.models import (
 )
 from progress.models import CourseModuleCompletion
 from social_engagement.models import StudentSocialEngagementScore
-from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView
+from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView, MobileAPIView
 from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer
 from edx_solutions_api_integration.utils import (
     generate_base_uri,
@@ -561,7 +561,7 @@ class CoursesList(SecureListAPIView):
         return results
 
 
-class CoursesDetail(SecureAPIView):
+class CoursesDetail(MobileAPIView):
     """
     **Use Case**
 
@@ -629,16 +629,13 @@ class CoursesDetail(SecureAPIView):
         usage_key = modulestore().make_course_usage_key(course_key)
         usage_key = usage_key.replace(course_key=modulestore().fill_in_run(usage_key.course_key))
         try:
-            if not user.is_authenticated():
-                data_blocks = course_structure(course_key)
-            else:
-                data_blocks = get_blocks(
-                    request,
-                    usage_key,
-                    user=user,
-                    depth=depth_int,
-                    requested_fields=BLOCK_DATA_FIELDS
-                )
+            data_blocks = get_blocks(
+                request,
+                usage_key,
+                user=user,
+                depth=depth_int,
+                requested_fields=BLOCK_DATA_FIELDS
+            )
             root_block = data_blocks.get('blocks', {}).get(
                 data_blocks['root'],
                 {

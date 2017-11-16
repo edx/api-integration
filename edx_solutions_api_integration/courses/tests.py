@@ -17,13 +17,13 @@ from freezegun import freeze_time
 from dateutil.relativedelta import relativedelta
 
 from requests.exceptions import ConnectionError
-
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.core.urlresolvers import reverse
 from django.core.exceptions import ObjectDoesNotExist
 from django.test.utils import override_settings
+from django.test.client import Client
 from rest_framework import status
 
 from courseware import module_render
@@ -292,6 +292,11 @@ class CoursesApiTests(
             u'data': u''}
         return updates
 
+    def login(self):
+        self.user = UserFactory.create(username='test', email='test@edx.org', password='test_password')
+        self.client = Client()
+        self.client.login(username=self.user.username, password='test_password')
+
     def _find_item_by_class(self, items, class_name):
         """Helper method to match a single matching item"""
         for item in items:
@@ -426,6 +431,7 @@ class CoursesApiTests(
 
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_course_detail_without_date_values(self, store):
+        self.login()
         # create a course without any dates.
         with self.store.default_store(store):
             course = CourseFactory.create(default_store=store)
@@ -442,6 +448,7 @@ class CoursesApiTests(
         self.assertEqual(response.data['end'], course.end)
 
     def test_courses_detail_get(self):
+        self.login()
         test_uri = self.base_courses_uri + '/' + self.test_course_id
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
@@ -462,6 +469,7 @@ class CoursesApiTests(
         self.assertEqual(response.data['uri'], confirm_uri)
 
     def test_courses_detail_get_with_child_content(self):
+        self.login()
         test_uri = self.base_courses_uri + '/' + self.test_course_id
         response = self.do_get('{}?depth=100'.format(test_uri))
         self.assertEqual(response.status_code, 200)
@@ -478,11 +486,13 @@ class CoursesApiTests(
             self.assertEqual(response.status_code, 200)
 
     def test_courses_detail_get_notfound(self):
+        self.login()
         test_uri = self.base_courses_uri + '/' + self.test_bogus_course_id
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
 
     def test_courses_tree_get(self):
+        self.login()
         # query the course tree to quickly get naviation information
         test_uri = self.base_courses_uri + '/' + self.test_course_id + '?depth=2'
         response = self.do_get(test_uri)
@@ -504,6 +514,7 @@ class CoursesApiTests(
         self.assertEqual(len(sequential), 2)
 
     def test_courses_tree_get_root(self):
+        self.login()
         # query the course tree to quickly get naviation information
         test_uri = self.base_courses_uri + '/' + self.test_course_id + '?depth=0'
         response = self.do_get(test_uri)
@@ -2285,6 +2296,7 @@ class CoursesApiTests(
         self.assertEqual(response.data['num_pages'], 3)
 
     def test_courses_data_metrics(self):
+        self.login()
         users_to_add, user_grade, user_completions, total_assessments = 5, 0.6, 10, 20
         course = CourseFactory()
         CourseAggregatedMetaData.objects.update_or_create(

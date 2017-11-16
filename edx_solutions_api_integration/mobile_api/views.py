@@ -8,8 +8,8 @@ from edx_solutions_api_integration.courses.views import (
 )
 from edx_solutions_api_integration.permissions import (
     MobileListAPIView,
-    MobileSecureAPIView,
     IsStaffOrEnrolled,
+    MobilePermissionMixin
 )
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -31,7 +31,7 @@ from student.models import CourseEnrollment
 from gradebook.models import StudentGradebook
 
 
-class MobileUsersOrganizationsList(MobileListAPIView, UsersOrganizationsList):
+class MobileUsersOrganizationsList(MobilePermissionMixin, UsersOrganizationsList):
     """
     View to return list of organizations a user belongs to.
     """
@@ -39,7 +39,7 @@ class MobileUsersOrganizationsList(MobileListAPIView, UsersOrganizationsList):
         self.permission_classes += (IsStaffOrOwner, )
 
 
-class MobileUsersCourseProgressList(MobileListAPIView, UsersCourseProgressList):
+class MobileUsersCourseProgressList(MobilePermissionMixin, UsersCourseProgressList):
     """
     View to return a list of courses user enrolled in and the progress for a user
     """
@@ -47,7 +47,7 @@ class MobileUsersCourseProgressList(MobileListAPIView, UsersCourseProgressList):
         self.permission_classes += (IsStaffOrOwner, )
 
 
-class MobileCoursesOverview(MobileSecureAPIView, CoursesOverview):
+class MobileCoursesOverview(MobilePermissionMixin, CoursesOverview):
     """
     View to return course an HTML representation of the overview for the specified course if user is enrolled in.
 
@@ -59,7 +59,7 @@ class MobileCoursesOverview(MobileSecureAPIView, CoursesOverview):
         self.permission_classes += (IsStaffOrOwner, IsStaffOrEnrolled, )
 
 
-class MobileUsersCoursesDetail(MobileSecureAPIView, UsersCoursesDetail):
+class MobileUsersCoursesDetail(MobilePermissionMixin, UsersCoursesDetail):
     """
     View that allow clients to interact with a specific User-Course relationship (aka, enrollment)
     """
@@ -68,7 +68,7 @@ class MobileUsersCoursesDetail(MobileSecureAPIView, UsersCoursesDetail):
         self.permission_classes += (IsStaffOrOwner, IsStaffOrEnrolled, )
 
 
-class MobileCoursesStaticTabsList(MobileSecureAPIView, CoursesStaticTabsList):
+class MobileCoursesStaticTabsList(MobilePermissionMixin, CoursesStaticTabsList):
     """
     View that returns a collection of custom pages in the course.
     CoursesStaticTabsList has an optional detail parameter that when
@@ -79,7 +79,7 @@ class MobileCoursesStaticTabsList(MobileSecureAPIView, CoursesStaticTabsList):
         self.permission_classes += (IsStaffOrOwner, IsStaffOrEnrolled, )
 
 
-class MobileCoursesStaticTabsDetail(MobileSecureAPIView, CoursesStaticTabsDetail):
+class MobileCoursesStaticTabsDetail(MobilePermissionMixin, CoursesStaticTabsDetail):
     """
     View that returns a custom page in the course, including the page content.
     """
@@ -88,7 +88,7 @@ class MobileCoursesStaticTabsDetail(MobileSecureAPIView, CoursesStaticTabsDetail
         self.permission_classes += (IsStaffOrOwner, IsStaffOrEnrolled, )
 
 
-class MobileUsersDiscussionMetrics(MobileSecureAPIView, UsersSocialMetrics):
+class MobileUsersDiscussionMetrics(MobilePermissionMixin, UsersSocialMetrics):
     """
     View to return user discussion metrics and engagement score.
     """
