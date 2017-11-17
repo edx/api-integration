@@ -46,6 +46,7 @@ class UserSerializer(DynamicFieldsModelSerializer):
     courses_enrolled = serializers.SerializerMethodField()
     roles = serializers.SerializerMethodField('get_user_roles')
     grades = serializers.SerializerMethodField('get_user_grades')
+    progress = serializers.SerializerMethodField('get_user_progress')
 
     def get_profile_image(self, user):
         """
@@ -100,6 +101,25 @@ class UserSerializer(DynamicFieldsModelSerializer):
 
         return {'grade': grade, 'proforma_grade': proforma_grade, 'section_breakdown': section_breakdown}
 
+    def get_user_progress(self, user):
+        """ returns user progress against course """
+        completion_percentage = 0
+        progress = user.studentprogress_set.all()
+        if 'course_id' in self.context and progress:
+            course_id = self.context['course_id']
+            actual_completions = next(
+                (
+                    progress_item.completions
+                    for progress_item in progress
+                    if progress_item.course_id == course_id
+                 ), 0
+            )
+            if self.context['course_meta_data']:
+                total_possible_completions = self.context['course_meta_data'].total_assessments
+                if total_possible_completions > 0:
+                    completion_percentage = min(100 * (actual_completions / float(total_possible_completions)), 100)
+        return completion_percentage
+
     class Meta(object):
         """ Serializer/field specification """
         model = APIUser
@@ -122,6 +142,7 @@ class UserSerializer(DynamicFieldsModelSerializer):
             "organizations",
             "roles",
             "grades",
+            "progress",
         )
         read_only_fields = ("id", "email", "username")
 

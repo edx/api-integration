@@ -1331,10 +1331,16 @@ class CoursesApiTests(
             end=self.course_end_date,
             default_store=store
         )
-        test_uri = self.base_courses_uri + '/{course_id}/users?additional_fields=organizations,grades,roles'
+        test_uri = self.base_courses_uri + '/{course_id}/users?additional_fields=organizations,grades,roles,progress'
         user = UserFactory.create(username="testuserattributes", profile='test')
-        CourseEnrollmentFactory.create(user=user, course_id=course.id)
+
         user_grade, user_proforma_grade = 0.9, 0.91
+        user_completions, course_total_assesments = 50, 100
+
+        CourseEnrollmentFactory.create(user=user, course_id=course.id)
+        CourseAggregatedMetaData.objects.update_or_create(
+            id=course.id, defaults={'total_assessments': course_total_assesments}
+        )
         section_breakdown = [
             {
                 "category": "Homework",
@@ -1348,6 +1354,14 @@ class CoursesApiTests(
             user=user, course_id=course.id,
             grade=user_grade, proforma_grade=user_proforma_grade,
             grade_summary=json.dumps(grade_summary)
+        )
+
+        StudentProgress.objects.update_or_create(
+            user=user,
+            course_id=course.id,
+            defaults={
+                'completions': user_completions,
+            }
         )
 
         data = {
@@ -1388,6 +1402,7 @@ class CoursesApiTests(
                 'section_breakdown': section_breakdown
             }
         )
+        self.assertEqual(response.data['results'][0]['progress'], 50.0)
 
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_courses_users_list_with_fields(self, store):

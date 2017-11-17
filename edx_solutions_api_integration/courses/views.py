@@ -1059,6 +1059,9 @@ class CoursesUsersList(SecureListAPIView):
         * GET supports exclude filtering of user by groups
          * To get users enrolled in a course and also not member of specific groups
          ```/api/courses/{course_id}/users?exclude_groups={group_id1},{group_id2}```
+        * GET supports additional fields to extract organizations,grades,roles,progress of the user
+         * To get users with organizations,grades,roles and progress
+         ```/api/courses/{course_id}/users?additional_fields=organizations,grades,roles,progress```
 
 
     **Post Values**
@@ -1068,6 +1071,7 @@ class CoursesUsersList(SecureListAPIView):
     """
     serializer_class = UserSerializer
     course_key = None
+    course_meta_data = None
 
     def post(self, request, course_id):
         """
@@ -1112,6 +1116,10 @@ class CoursesUsersList(SecureListAPIView):
         if not course_exists(request, request.user, course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         self.course_key = get_course_key(course_id)
+        try:
+            self.course_meta_data = CourseAggregatedMetaData.objects.get(id=self.course_key)
+        except CourseAggregatedMetaData.DoesNotExist:
+            self.course_meta_data = None
         return super(CoursesUsersList, self).list(request)
 
     def get_serializer_context(self):
@@ -1135,7 +1143,11 @@ class CoursesUsersList(SecureListAPIView):
             "is_staff",
             "last_login",
         ])
-        serializer_context.update({'course_id': self.course_key, 'default_fields': default_fields})
+        serializer_context.update({
+            'course_id': self.course_key,
+            'default_fields': default_fields,
+            'course_meta_data': self.course_meta_data
+        })
         return serializer_context
 
     def get_queryset(self):
@@ -1177,6 +1189,11 @@ class CoursesUsersList(SecureListAPIView):
         if 'courses_enrolled' in additional_fields:
             users = users.prefetch_related(
                 'courseenrollment_set'
+            )
+
+        if 'progress' in additional_fields:
+            users = users.prefetch_related(
+                'studentprogress_set'
             )
 
         users = users.select_related('profile')

@@ -2255,6 +2255,7 @@ Returns a JSON representation of users enrolled in the course, It supports dynam
     + groups (optional)
     + workgroups (optional)
     + exclude_groups (optional)
+    + additional_fields (optional) comma separated values. Possible values: organizations,grades,roles,progress
 
 + Response 200 (application/json)
 
@@ -4904,6 +4905,8 @@ DEPLOYMENT_CHOICES = (
 
 Returns a list of mobile apps
 
+Filters: app_name, organization_name, organization_ids(comma separated list)
+
 + Response 200 (application/json)
 
         {
@@ -4969,7 +4972,7 @@ Returns a list of mobile apps
 
 ### Mobile App Create [POST]
 
-Returns a list of mobile apps
+Create a new Mobile App
 
 + Request
 
