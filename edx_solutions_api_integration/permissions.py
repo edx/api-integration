@@ -280,6 +280,13 @@ class MobileRetrieveUpdateAPIView(MobilePermissionMixin, generics.RetrieveUpdate
     pass
 
 
+class MobileRetrieveUpdateDestroyAPIView(MobilePermissionMixin, generics.RetrieveUpdateDestroyAPIView):
+    """
+    Inherited from RetrieveUpdateDestroyAPIView
+    """
+    pass
+
+
 class SecureModelViewSet(PermissionMixin, viewsets.ModelViewSet):
     """
     ModelViewSet used for protecting access to specific workflows
