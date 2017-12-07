@@ -2,9 +2,12 @@
 import uuid
 import json
 import mock
+import StringIO
+from PIL import Image
 from functools import wraps
 
 from django.conf import settings
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db.models.signals import post_save
 from django.test import Client
 from django.utils.http import urlencode
@@ -24,6 +27,17 @@ from progress.models import CourseModuleCompletion
 from progress.signals import (
     handle_cmc_post_save_signal as cmc_post_save_listener
 )
+
+
+def get_temporary_image():
+    io = StringIO.StringIO()
+    size = (200, 200)
+    color = (255, 0, 0, 0)
+    image = Image.new("RGBA", size, color)
+    image.save(io, format='PNG')
+    image_file = InMemoryUploadedFile(io, None, 'temp.png', 'image/png', io.len, None)
+    image_file.seek(0)
+    return image_file
 
 
 def get_non_atomic_database_settings(db_alias='default'):
@@ -165,6 +179,20 @@ class APIClientMixin(Client):
     Customized client having edx api key prepended with each request
     """
     TEST_API_KEY = settings.EDX_API_KEY
+
+    def do_post_multipart(self, uri, data, secure=True):
+        """Submit an HTTP POST Multipart request"""
+        headers = {
+            'X-Edx-Api-Key': str(self.TEST_API_KEY),
+        }
+        extra = {}
+        if secure:
+            extra['wsgi.url_scheme'] = 'https'
+            extra['SERVER_PORT'] = 443
+
+        return self.client.post(
+            uri, headers=headers, data=data, **extra
+        )
 
     def do_post(self, uri, data, secure=True):
         """Submit an HTTP POST request"""
