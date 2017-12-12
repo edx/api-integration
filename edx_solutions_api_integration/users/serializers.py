@@ -60,10 +60,8 @@ class UserSerializer(DynamicFieldsModelSerializer):
 
     def get_courses_enrolled(self, user):
         """ Serialize user enrolled courses """
-        if hasattr(user, 'courses_enrolled'):
-            return user.courses_enrolled
-
-        return user.courseenrollment_set.all().count()
+        enrollments = user.courseenrollment_set.all()
+        return [unicode(enrollment.course_id) for enrollment in enrollments]
 
     def get_user_roles(self, user):
         """ returns list of user roles """

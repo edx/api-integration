@@ -1246,13 +1246,14 @@ class CoursesApiTests(
         response = self.do_get(test_uri.format(course_id=unicode(course.id)))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 2)
-        self.assertEqual(response.data['results'][0]['courses_enrolled'], 1)
+        self.assertEqual(response.data['results'][0]['courses_enrolled'][0], unicode(course.id))
 
         # fetch user 2
         response = self.do_get(test_uri.format(course_id=unicode(course2.id)))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 1)
-        self.assertEqual(response.data['results'][0]['courses_enrolled'], 2)
+        self.assertEqual(response.data['results'][0]['courses_enrolled'][0], unicode(course.id))
+        self.assertEqual(response.data['results'][0]['courses_enrolled'][1], unicode(course2.id))
 
     def test_courses_users_list_courses_passed(self):
         """ Test courses_passed value returned by courses users list api """
