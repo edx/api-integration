@@ -456,7 +456,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['results'][0]['email'], 'mic.mcdonald@example.com')
         self.assertEqual(len(response.data['results'][0]['organizations']), 1)
         self.assertEqual(response.data['results'][0]['organizations'][0]['display_name'], 'ABC Organization')
-        self.assertEqual(response.data['results'][0]['courses_enrolled'], 1)
+        self.assertEqual(response.data['results'][0]['courses_enrolled'][0], unicode(course1.id))
 
         response = self.do_get('{}/{}/courses'.format(test_uri, response.data['results'][0]['id']))
         self.assertEqual(len(response.data), 1)
@@ -478,8 +478,9 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_get(course_filter_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 2)
-        self.assertEqual(response.data['results'][0]['courses_enrolled'], 1)
-        self.assertEqual(response.data['results'][1]['courses_enrolled'], 2)
+        self.assertEqual(response.data['results'][0]['courses_enrolled'][0], unicode(self.course.id))
+        self.assertEqual(response.data['results'][1]['courses_enrolled'][0], unicode(self.course2.id))
+        self.assertEqual(response.data['results'][1]['courses_enrolled'][1], unicode(self.course.id))
 
         # fetch enrollments for second course
         course2_id = {'courses': '{}'.format(unicode(self.course2.id))}
@@ -487,7 +488,8 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_get(course2_filter_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 1)
-        self.assertEqual(response.data['results'][0]['courses_enrolled'], 2)
+        self.assertEqual(response.data['results'][0]['courses_enrolled'][0], unicode(self.course2.id))
+        self.assertEqual(response.data['results'][0]['courses_enrolled'][1], unicode(self.course.id))
 
     def test_user_list_get_courses_enrolled(self):
         test_uri = self.users_base_uri
@@ -502,13 +504,14 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_get('{}?ids={}'.format(test_uri, users[0].id))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 1)
-        self.assertEqual(response.data['results'][0]['courses_enrolled'], 0)
+        self.assertEqual(response.data['results'][0]['courses_enrolled'], [])
 
         # fetch user 2
         response = self.do_get('{}?ids={}'.format(test_uri, users[1].id))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 1)
-        self.assertEqual(response.data['results'][0]['courses_enrolled'], 2)
+        self.assertEqual(response.data['results'][0]['courses_enrolled'][0], unicode(self.course2.id))
+        self.assertEqual(response.data['results'][0]['courses_enrolled'][1], unicode(self.course.id))
 
     def test_user_list_get_roles(self):
         test_uri = self.users_base_uri

@@ -336,11 +336,12 @@ class UsersList(SecureListAPIView):
             if courses:
                 courses = map(CourseKey.from_string, courses)
                 queryset = queryset.filter(courseenrollment__course_id__in=courses).distinct()
-
-        if not courses:
-            queryset = queryset.annotate(courses_enrolled=Count('courseenrollment'))
-        queryset = queryset.prefetch_related('organizations', 'courseaccessrole_set').select_related('profile')
-
+                
+        queryset = queryset.prefetch_related(
+            'organizations',
+            'courseaccessrole_set',
+            'courseenrollment_set')\
+            .select_related('profile')
         return queryset
 
     def get(self, request, *args, **kwargs):
