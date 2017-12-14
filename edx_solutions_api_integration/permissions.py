@@ -101,6 +101,17 @@ class IsStaffOrEnrolled(permissions.BasePermission):
         return False
 
 
+class IsStaffOrReadOnlyView(permissions.BasePermission):
+    """
+    Permission that checks to see if the user is staff and the view is POST.
+    """
+
+    def has_permission(self, request, view):
+        if not request.method == 'GET':
+            return request.user.is_staff
+        return True
+
+
 class IdsInFilterBackend(filters.BaseFilterBackend):
     """
         This backend support filtering queryset by a list of ids

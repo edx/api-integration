@@ -5441,6 +5441,7 @@ Will return active theme of the specific organization
 ### Mobile App Organization Themes [POST]
 
 Will add a new and active theme for the specific organization. This will also inactive the previous active theme present for that organization.
+User must be a staff user.
 
 + Request
 
@@ -5483,7 +5484,7 @@ Will return active theme of the specific organization
 
 ### Mobile App Organization Themes Detail [PATCH]
 
-Will update the theme for the specific organization.
+Will update the theme for the specific organization. User must be a staff user.
 
 + Request
 
@@ -5499,7 +5500,7 @@ Will update the theme for the specific organization.
 
 ### Mobile App Organization Themes Detail [PUT]
 
-Will update the theme for the specific organization.
+Will update the theme for the specific organization. User must be a staff user.
 
 + Request
 
@@ -5511,3 +5512,9 @@ Will update the theme for the specific organization.
     }
 
 + Response 200 (application/json)
+
+### Mobile App Organization Themes Detail [DELETE]
+
+Will inactive the theme for the specific organization. User must be a staff user.
+
++ Response 204 (application/json)
