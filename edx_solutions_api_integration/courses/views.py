@@ -25,12 +25,12 @@ from rest_framework.response import Response
 
 from courseware.courses import get_course_about_section, get_course_info_section, get_course_info_section_module
 from courseware.models import StudentModule
-from courseware.views.views import get_static_tab_contents
+from courseware.views.views import get_static_tab_fragment
 from mobile_api.course_info.views import apply_wrappers_to_content
 from openedx.core.lib.xblock_utils import get_course_update_items
 from openedx.core.lib.courses import course_image_url
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from openedx.core.djangoapps.content.course_structures.api.v0.api import course_structure
+
 from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
 from django_comment_common.models import FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
@@ -282,11 +282,10 @@ def _get_static_tab_contents(request, course, tab, strip_wrapper_div=True):
     """
     Wrapper around get_static_tab_contents to cache contents for the given static tab
     """
-
     cache_key = u'course.{course_id}.static.tab.{url_slug}.contents'.format(course_id=course.id, url_slug=tab.url_slug)
     contents = cache.get(cache_key)
     if contents is None:
-        contents = get_static_tab_contents(request, course, tab)
+        contents = get_static_tab_fragment(request, course, tab).content
         _cache_static_tab_contents(cache_key, contents)
 
     if strip_wrapper_div:

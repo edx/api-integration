@@ -114,6 +114,7 @@ class CoursesApiTests(
     """ Test suite for Courses API views """
 
     MODULESTORE = TEST_DATA_SPLIT_MODULESTORE
+    ENABLED_SIGNALS = ['course_published']
 
     @classmethod
     def setUpClass(cls):
@@ -867,7 +868,7 @@ class CoursesApiTests(
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.data), 0)
-        self.assertEqual(response.data['content'], TEST_COURSE_UPDATES_CONTENT)
+        self.assertEqual(response.data['content'], TEST_COURSE_UPDATES_CONTENT.strip())
 
         # then try parsed
         test_uri = self.base_courses_uri + '/' + self.test_course_id + '/updates?parse=True'
@@ -919,7 +920,7 @@ class CoursesApiTests(
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.data), 0)
-        self.assertEqual(response.data['content'], TEST_COURSE_UPDATES_CONTENT_LEGACY)
+        self.assertEqual(response.data['content'], TEST_COURSE_UPDATES_CONTENT_LEGACY.strip())
 
         # then try parsed
         test_uri = self.base_courses_uri + '/' + unicode(test_course.id) + '/updates?parse=True'
@@ -2716,8 +2717,8 @@ class CoursesApiTests(
                 'vertical': unicode(self.content_child2.location),
                 'section': unicode(self.course_content2.location),
                 'course_key': unicode(self.course.id),
-                'final_target_id': unicode(self.content_child.location),
-                'position': '1_1',
+                'final_target_id': unicode(self.content_subchild.location),
+                'position': u'1',
             },
             response.data
         )
