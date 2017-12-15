@@ -68,6 +68,7 @@ class CourseSerializer(serializers.Serializer):
     org = serializers.CharField(source='display_org_with_default')
     uri = serializers.SerializerMethodField()
     course_image_url = serializers.SerializerMethodField()
+    mobile_available = serializers.BooleanField()
     due = serializers.SerializerMethodField('get_due_date')
     start = serializers.DateTimeField()
     end = serializers.DateTimeField()
