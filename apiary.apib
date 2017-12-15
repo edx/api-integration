@@ -3801,7 +3801,7 @@ Returns groups in an organization, type parameter can be used to filter by group
         {}
 
 
-## Organization Courses List [/organizations/{organization_id}/courses/]
+## Organization Courses List [/organizations/{organization_id}/courses/?mobile_available=true|false]
 
 It allows clients to interact with a specific organization courses
 
@@ -3820,6 +3820,7 @@ Returns courses in an organization
                 "org": "edX",
                 "uri": "http://lms.mcka.local/api/server/courses/course-v1:edX+DemoX+Demo_Course",
                 "course_image_url": "/asset-v1:edX+DemoX+Demo_Course+type@asset+block@images_course_image.jpg",
+                "mobile_available": false,
                 "due": null,
                 "start": "2013-02-05T05:00:00Z",
                 "end": null,
@@ -3835,6 +3836,7 @@ Returns courses in an organization
                 "org": "edX",
                 "uri": "http://lms.mcka.local/api/server/courses/edX/CS301/2017_T1",
                 "course_image_url": "/c4x/edX/CS301/asset/images_course_image.jpg",
+                "mobile_available": true,
                 "due": null,
                 "start": "2017-01-01T00:00:00Z",
                 "end": null,
