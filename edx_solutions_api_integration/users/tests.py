@@ -2528,6 +2528,7 @@ class UsersProgressApiTests(
 ):
     """ Test suite for User Progress API views """
 
+    ENABLED_SIGNALS = ['course_published']
     MODULESTORE = TEST_DATA_SPLIT_MODULESTORE
 
     @classmethod
