@@ -6,6 +6,7 @@ from edx_solutions_api_integration.courses.views import (
     CoursesStaticTabsList,
     CoursesStaticTabsDetail,
 )
+from edx_solutions_api_integration.mobile_api.serializers import MobileOrganizationSerializer
 from edx_solutions_api_integration.permissions import (
     MobileListAPIView,
     IsStaffOrEnrolled,
@@ -35,8 +36,13 @@ class MobileUsersOrganizationsList(MobilePermissionMixin, UsersOrganizationsList
     """
     View to return list of organizations a user belongs to.
     """
+    serializer_class = MobileOrganizationSerializer
+
     def __init__(self):
         self.permission_classes += (IsStaffOrOwner, )
+
+    def get_queryset(self):
+        return super(MobileUsersOrganizationsList, self).get_queryset().prefetch_related('mobile_apps', 'theme')
 
 
 class MobileUsersCourseProgressList(MobilePermissionMixin, UsersCourseProgressList):

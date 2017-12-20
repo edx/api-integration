@@ -4,6 +4,8 @@ Tests for user related use cases in mobile APIs
 import ddt
 from capa.tests.response_xml_factory import MultipleChoiceResponseXMLFactory
 from datetime import datetime, timedelta
+
+from mobileapps.models import Theme, MobileApp
 from oauth2_provider import models as dot_models
 import urllib
 
@@ -83,6 +85,62 @@ class TestUserOrganizationsApi(MobileAPITestCase):
         response = self.api_response(data={'username': self.user.username})
         self.assertEqual(response.data['count'], 1)
         self.assertEqual(response.data['results'][0]['display_name'], org_name)
+
+    def test_mobileapps_in_organizations_list(self):
+        self.login()
+        organization1 = Organization.objects.create(display_name='ABC Organization')
+        organization2 = Organization.objects.create(display_name='XYZ Organization')
+
+        organization1.users.add(self.user)
+        organization2.users.add(self.user)
+
+        mobile_app1 = MobileApp.objects.create(name='Mobileapp 1', current_version='1.0', updated_by=self.user)
+        mobile_app2 = MobileApp.objects.create(name='Mobileapp 2', current_version='1.0', updated_by=self.user)
+
+        mobile_app1.organizations.add(organization1)
+        mobile_app1.organizations.add(organization2)
+        mobile_app2.organizations.add(organization2)
+
+        response = self.api_response(data={'username': self.user.username})
+        self.assertEqual(response.data['count'], 2)
+        self.assertEqual(len(response.data['results']), 2)
+        self.assertEqual(response.data['num_pages'], 1)
+
+        self.assertEqual(response.data['results'][0]['display_name'], 'ABC Organization')
+        self.assertEqual(len(response.data['results'][0]['mobile_apps']), 1)
+        self.assertEqual(response.data['results'][0]['mobile_apps'][0]['name'], 'Mobileapp 1')
+
+        self.assertEqual(response.data['results'][1]['display_name'], 'XYZ Organization')
+        self.assertEqual(len(response.data['results'][1]['mobile_apps']), 2)
+        self.assertEqual(response.data['results'][1]['mobile_apps'][0]['name'], 'Mobileapp 1')
+        self.assertEqual(response.data['results'][1]['mobile_apps'][1]['name'], 'Mobileapp 2')
+
+    def test_themes_in_organizations_list(self):
+        self.login()
+        organization1 = Organization.objects.create(display_name='ABC Organization')
+        organization2 = Organization.objects.create(display_name='XYZ Organization')
+
+        organization1.users.add(self.user)
+        organization2.users.add(self.user)
+
+        Theme.objects.create(name='Theme 1', organization=organization1, active=True)
+        Theme.objects.create(name='Theme 2', organization=organization2, active=True)
+        Theme.objects.create(name='Theme 3', organization=organization1)
+        Theme.objects.create(name='Theme 4', organization=organization1)
+
+        response = self.api_response(data={'username': self.user.username})
+        self.assertEqual(response.data['count'], 2)
+        self.assertEqual(len(response.data['results']), 2)
+        self.assertEqual(response.data['num_pages'], 1)
+
+        self.assertEqual(response.data['results'][0]['display_name'], 'ABC Organization')
+        self.assertEqual(response.data['results'][0]['theme']['name'], 'Theme 1')
+        self.assertEqual(response.data['results'][0]['theme']['active'], True)
+
+        self.assertEqual(response.data['results'][1]['display_name'], 'XYZ Organization')
+        self.assertEqual(response.data['results'][1]['theme']['name'], 'Theme 2')
+        self.assertEqual(response.data['results'][1]['theme']['active'], True)
+
 
 
 @ddt.ddt
