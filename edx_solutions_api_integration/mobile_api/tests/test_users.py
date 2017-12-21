@@ -115,6 +115,33 @@ class TestUserOrganizationsApi(MobileAPITestCase):
         self.assertEqual(response.data['results'][1]['mobile_apps'][0]['name'], 'Mobileapp 1')
         self.assertEqual(response.data['results'][1]['mobile_apps'][1]['name'], 'Mobileapp 2')
 
+    def test_mobileapps_data_in_organizations_list(self):
+        self.login()
+        organization1 = Organization.objects.create(display_name='ABC Organization')
+        organization1.users.add(self.user)
+
+        mobile_app1 = MobileApp.objects.create(name='Mobileapp 1', current_version='1.0', updated_by=self.user)
+        mobile_app1.organizations.add(organization1)
+
+        response = self.api_response(data={'username': self.user.username})
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['num_pages'], 1)
+
+        self.assertEqual(response.data['results'][0]['display_name'], 'ABC Organization')
+        self.assertEqual(len(response.data['results'][0]['mobile_apps']), 1)
+        self.assertEqual(response.data['results'][0]['mobile_apps'][0]['name'], 'Mobileapp 1')
+
+        self.assertIn('ios_app_id', response.data['results'][0]['mobile_apps'][0])
+        self.assertIn('android_app_id', response.data['results'][0]['mobile_apps'][0])
+        self.assertIn('ios_download_url', response.data['results'][0]['mobile_apps'][0])
+        self.assertIn('android_download_url', response.data['results'][0]['mobile_apps'][0])
+        self.assertIn('deployment_mechanism', response.data['results'][0]['mobile_apps'][0])
+        self.assertIn('current_version', response.data['results'][0]['mobile_apps'][0])
+        self.assertIn('is_active', response.data['results'][0]['mobile_apps'][0])
+        self.assertNotIn('provider_key', response.data['results'][0]['mobile_apps'][0])
+        self.assertNotIn('provider_secret', response.data['results'][0]['mobile_apps'][0])
+
     def test_themes_in_organizations_list(self):
         self.login()
         organization1 = Organization.objects.create(display_name='ABC Organization')
@@ -141,6 +168,22 @@ class TestUserOrganizationsApi(MobileAPITestCase):
         self.assertEqual(response.data['results'][1]['theme']['name'], 'Theme 2')
         self.assertEqual(response.data['results'][1]['theme']['active'], True)
 
+    def test_themes_data_in_organizations_list(self):
+        self.login()
+        organization1 = Organization.objects.create(display_name='ABC Organization')
+        organization1.users.add(self.user)
+
+        Theme.objects.create(name='Theme 1', organization=organization1, active=True)
+
+        response = self.api_response(data={'username': self.user.username})
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['num_pages'], 1)
+
+        self.assertEqual(response.data['results'][0]['display_name'], 'ABC Organization')
+        self.assertEqual(response.data['results'][0]['theme']['name'], 'Theme 1')
+        self.assertEqual(response.data['results'][0]['theme']['active'], True)
+        self.assertNotIn('organization', response.data['results'][0]['theme'])
 
 
 @ddt.ddt
