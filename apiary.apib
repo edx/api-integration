@@ -5529,10 +5529,24 @@ Will return active theme of the specific organization
                         "image_url_small": "http://example.com/logo.png",
                         "image_url_medium": "http://example.com/logo.png"
                     },
+                    "header_bg_image": {
+                        "image_url_ipad_02": "http://example.com/header_ng_image.png",
+                        "image_url_hdpi": "http://example.com/header_ng_image.png",
+                        "image_url_xxxhdpi": "http://example.com/header_ng_image.png",
+                        "image_url_xhdpi": "http://example.com/header_ng_image.png",
+                        "image_url_iphone_01": "http://example.com/header_ng_image.png",
+                        "image_url_xxhdpi": "http://example.com/header_ng_image.png",
+                        "image_url_iphone_plus_01": "http://example.com/header_ng_image.png",
+                        "image_url_ipad_03": "http://example.com/header_ng_image.png",
+                        "image_url_ipad_01": "http://example.com/header_ng_image.png",
+                        "has_image": true,
+                        "image_url_mdpi": "http://example.com/header_ng_image.png",
+                    },
                     "created": "2017-12-07T09:52:30.366444Z",
                     "modified": "2017-12-07T09:52:30.547220Z",
                     "name": "green",
                     "logo_image_uploaded_at": "2017-12-07T09:52:30.542546Z",
+                    "header_bg_image_uploaded_at": "2017-12-07T09:52:33.542546Z",
                     "active": true,
                     "organization": 1
                 }
@@ -5549,6 +5563,7 @@ User must be a staff user.
 
     {
         'logo_image': (image file),
+        'header_bg_image': (image file),
         'name': 'Green',
         'active': true,
         'organization': 1,
@@ -5576,10 +5591,24 @@ Will return active theme of the specific organization
                 "image_url_small": "http://example.com/logo.png",
                 "image_url_medium": "http://example.com/logo.png"
             },
+            "header_bg_image": {
+                "image_url_ipad_02": "http://example.com/header_ng_image.png",
+                "image_url_hdpi": "http://example.com/header_ng_image.png",
+                "image_url_xxxhdpi": "http://example.com/header_ng_image.png",
+                "image_url_xhdpi": "http://example.com/header_ng_image.png",
+                "image_url_iphone_01": "http://example.com/header_ng_image.png",
+                "image_url_xxhdpi": "http://example.com/header_ng_image.png",
+                "image_url_iphone_plus_01": "http://example.com/header_ng_image.png",
+                "image_url_ipad_03": "http://example.com/header_ng_image.png",
+                "image_url_ipad_01": "http://example.com/header_ng_image.png",
+                "has_image": true,
+                "image_url_mdpi": "http://example.com/header_ng_image.png",
+            },
             "created": "2017-11-29T08:06:54.537419Z",
             "modified": "2017-12-07T11:10:21.667500Z",
             "name": "green",
             "logo_image_uploaded_at": "2017-11-29T09:35:14.378119Z",
+            "header_bg_image_uploaded_at": "2017-11-29T09:35:18.378119Z",
             "active": null,
             "organization": 1
         }
@@ -5592,6 +5621,7 @@ Will update the theme for the specific organization. User must be a staff user.
 
     {
         'logo_image': (image file),
+        'header_bg_image': (image file),
         'name': 'Green',
         'active': true,
         'organization': 1,
@@ -5608,6 +5638,7 @@ Will update the theme for the specific organization. User must be a staff user.
 
     {
         'logo_image': (image file),
+        'header_bg_image': (image file),
         'name': 'Green',
         'active': true,
         'organization': 1,
