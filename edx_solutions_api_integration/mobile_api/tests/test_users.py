@@ -133,6 +133,7 @@ class TestUserOrganizationsApi(MobileAPITestCase):
         self.assertEqual(response.data['results'][0]['mobile_apps'][0]['name'], 'Mobileapp 1')
 
         self.assertIn('ios_app_id', response.data['results'][0]['mobile_apps'][0])
+        self.assertIn('ios_bundle_id', response.data['results'][0]['mobile_apps'][0])
         self.assertIn('android_app_id', response.data['results'][0]['mobile_apps'][0])
         self.assertIn('ios_download_url', response.data['results'][0]['mobile_apps'][0])
         self.assertIn('android_download_url', response.data['results'][0]['mobile_apps'][0])
