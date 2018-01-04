@@ -31,7 +31,7 @@ from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
 from progress.models import StudentProgress
-from course_metadata.models import CourseAggregatedMetaData
+from course_metadata.models import CourseAggregatedMetaData, CourseSetting
 from social_engagement.models import StudentSocialEngagementScore
 from instructor.access import allow_access
 from edx_solutions_organizations.models import Organization
@@ -252,6 +252,7 @@ class CoursesApiTests(
             user_profile.save()
 
         cls.test_course_id = unicode(cls.course.id)
+        cls.languages = ["it", "de-at", "es", "pt-br"]
         cls.test_bogus_course_id = 'foo/bar/baz'
         cls.test_course_name = cls.course.display_name
         cls.test_course_number = cls.course.number
@@ -448,6 +449,7 @@ class CoursesApiTests(
         self.assertEqual(response.data['end'], course.end)
 
     def test_courses_detail_get(self):
+        CourseSetting.objects.create(id=self.test_course_id, languages=self.languages)
         self.login()
         test_uri = self.base_courses_uri + '/' + self.test_course_id
         response = self.do_get(test_uri)
@@ -467,6 +469,10 @@ class CoursesApiTests(
         self.assertEqual(response.data['org'], self.test_course_org)
         confirm_uri = self.test_server_prefix + test_uri
         self.assertEqual(response.data['uri'], confirm_uri)
+
+        self.assertIn('languages', response.data)
+        for language in response.data['languages']:
+            self.assertIn(language, self.languages)
 
     def test_courses_detail_get_with_child_content(self):
         self.login()

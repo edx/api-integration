@@ -42,7 +42,7 @@ from openedx.core.djangoapps.course_groups.cohorts import (
 from openedx.core.djangoapps.user_api.models import UserPreference
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from edx_notifications.lib.consumer import mark_notification_read
-from course_metadata.models import CourseAggregatedMetaData
+from course_metadata.models import CourseAggregatedMetaData, CourseSetting
 from progress.models import StudentProgress
 from student.models import CourseEnrollment, CourseEnrollmentException, PasswordHistory, UserProfile
 from student.roles import (
@@ -1621,6 +1621,7 @@ class UsersCourseProgressList(SecureListAPIView):
 
         student_progress = StudentProgress.objects.filter(user=user).values('course_id', 'completions')
         course_meta_data = CourseAggregatedMetaData.objects.filter(id__in=course_keys).values('id', 'total_assessments')
+        course_settings = CourseSetting.objects.filter(id__in=course_keys).values('id', 'languages')
 
         course_overview = CourseOverview.objects.filter(id__in=course_keys)
         if str2bool(mobile_only):
@@ -1641,6 +1642,7 @@ class UsersCourseProgressList(SecureListAPIView):
             'student_progress': student_progress,
             'course_overview': course_overview,
             'course_metadata': course_meta_data,
+            'course_settings': course_settings,
         })
 
         return Response(serializer.data, status=status.HTTP_200_OK)

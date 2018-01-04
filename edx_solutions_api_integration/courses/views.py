@@ -49,7 +49,7 @@ from student.roles import CourseAccessRole, CourseInstructorRole, CourseStaffRol
 from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.search import path_to_location
 from xmodule.modulestore.exceptions import ItemNotFoundError
-from course_metadata.models import CourseAggregatedMetaData
+from course_metadata.models import CourseAggregatedMetaData, CourseSetting
 
 from edx_solutions_api_integration.courses.serializers import UserGradebookSerializer
 from edx_solutions_api_integration.courseware_access import (
@@ -659,6 +659,8 @@ class CoursesDetail(MobileAPIView):
             image_url = ''
             if hasattr(course_descriptor, 'course_image') and course_descriptor.course_image:
                 image_url = course_image_url(course_descriptor)
+            course_setting = CourseSetting.objects.filter(id=course_key).first()
+            response_data['languages'] = course_setting.languages_list if course_setting else None
             response_data['course_image_url'] = image_url
             response_data['resources'] = []
             resource_uri = '{}/content/'.format(base_uri_without_qs)
