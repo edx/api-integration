@@ -2069,6 +2069,10 @@ Returns a JSON representation of course details for a specified course
 
         {
             "category": "course",
+            "languages": [
+                "us-en",
+                "br"
+            ],
             "end": null,
             "name": "edX Demonstration Course",
             "uri": "http://lms.mcka.local/api/server/courses/course-v1:edX+DemoX+Demo_Course",
@@ -4671,6 +4675,10 @@ Progress here is in percentage.
                 "created": "2017-05-16 10:52:08.545346+00:00",
                 "is_active": true,
                 "course": {
+                    "languages": [
+                        "en-us",
+                        "br"
+                    ],
                     "start": "2017-04-06T00:00:00Z",
                     "course_image_url": "/asset-v1:edX+DemoX+Demo_Course+type@asset+block@images_course_image.jpg",
                     "end": null,
@@ -4683,6 +4691,10 @@ Progress here is in percentage.
                 "created": "2017-05-16 08:09:03.294214+00:00",
                 "is_active": true,
                 "course": {
+                    "languages": [
+                        "en-us",
+                        "br"
+                    ],
                     "start": "2015-10-29T01:00:00Z",
                     "course_image_url": "/c4x/OrganizationX/cs202/asset/McKA_course_tile_BusStrat.png",
                     "end": "2019-02-09T23:00:00Z",
@@ -4712,6 +4724,10 @@ Progress here is in percentage.
                 "created": "2017-05-16 10:52:08.545346+00:00",
                 "is_active": true,
                 "course": {
+                    "languages": [
+                        "en-us",
+                        "br"
+                    ],
                     "start": "2017-04-06T00:00:00Z",
                     "course_image_url": "/asset-v1:edX+DemoX+Demo_Course+type@asset+block@images_course_image.jpg",
                     "end": null,
@@ -4724,6 +4740,10 @@ Progress here is in percentage.
                 "created": "2017-05-16 08:09:03.294214+00:00",
                 "is_active": true,
                 "course": {
+                    "languages": [
+                        "en-us",
+                        "br"
+                    ],
                     "start": "2015-10-29T01:00:00Z",
                     "course_image_url": "/c4x/OrganizationX/cs202/asset/McKA_course_tile_BusStrat.png",
                     "end": "2019-02-09T23:00:00Z",
@@ -5658,3 +5678,69 @@ Will update the theme for the specific organization. User must be a staff user.
 Will inactive the theme for the specific organization. User must be a staff user.
 
 + Response 204 (application/json)
+
+
+# Course Settings [/courses_metadata/{course_id}/settings]
+
+
+### Course Settings [GET]
+
+Will return settings of the course
+
++ Response 200 (application/json)
+
+        {
+            "id": "course-v1:UniversityG+UG109+2017_UG",
+            "languages": [
+                "en-us",
+                "br"
+            ],
+            "created": "2018-01-05T13:39:16.074502Z",
+            "modified": "2018-01-05T14:53:11.397642Z"
+        }
+
+### Course Settings [PUT]
+
+Will update course settings. Currently we have only languages in course settings.
+
++ Request
+
+    {
+        "languages": ["it", "de-at", "pt-br"]
+    }
+
++ Response 200 (application/json)
+
+    {
+        "id": "course-v1:UniversityG+UG109+2017_UG",
+        "languages": [
+            "it",
+            "de-at",
+            "pt-br"
+        ],
+        "created": "2018-01-05T13:39:16.074502Z",
+        "modified": "2018-01-08T13:43:20.154977Z"
+    }
+
+### Course Settings [PATCH]
+
+Will update course settings
+
++ Request
+
+    {
+        "languages": ["it", "de-at", "pt-br"]
+    }
+
++ Response 200 (application/json)
+
+    {
+        "id": "course-v1:UniversityG+UG109+2017_UG",
+        "languages": [
+            "it",
+            "de-at",
+            "pt-br"
+        ],
+        "created": "2018-01-05T13:39:16.074502Z",
+        "modified": "2018-01-08T13:43:20.154977Z"
+    }
