@@ -30,6 +30,7 @@ from django.utils.translation import ugettext as _
 from courseware import module_render
 from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR, ForumsConfig
+from course_metadata.models import CourseSetting
 from edx_notifications.data import NotificationType, NotificationMessage
 from edx_notifications.lib.consumer import get_notifications_count_for_user
 from edx_notifications.lib.publisher import register_notification_type, publish_notification_to_user
@@ -2543,6 +2544,7 @@ class UsersProgressApiTests(
             end=cls.course_end_date,
         )
         cls.test_data = '<html>{}</html>'.format(str(uuid.uuid4()))
+        cls.languages = ["it", "de-at", "es", "pt-br"]
 
         cls.chapter = ItemFactory.create(
             category="chapter",
@@ -2599,6 +2601,7 @@ class UsersProgressApiTests(
     def test_users_progress_list(self):
         """ Test progress value returned by users progress list api """
         CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
+        CourseSetting.objects.create(id=self.course.id, languages=self.languages)
 
         completions_uri = '{}/{}/completions/'.format(self.base_courses_uri, self.course.id)
         completions_data = {
@@ -2630,6 +2633,10 @@ class UsersProgressApiTests(
         self.assertIn('start', response_obj['course'])
         self.assertIn('end', response_obj['course'])
         self.assertIn('id', response_obj['course'])
+
+        self.assertIn('languages', response_obj['course'])
+        for language in response_obj['course']['languages']:
+            self.assertIn(language, self.languages)
 
     def test_users_no_progress_in_course(self):
         """ 
