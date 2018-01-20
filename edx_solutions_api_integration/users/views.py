@@ -986,12 +986,16 @@ class UsersCoursesDetail(SecureAPIView):
         user = get_user_from_request_params(self.request, self.kwargs)
         if not user:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
-        course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612
+
+        course_key = get_course_key(course_id)
         if not CourseEnrollment.is_enrolled(user, course_key):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
+
         response_data['user_id'] = user.id
         response_data['course_id'] = course_id
         response_data['uri'] = base_uri
+
+        course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612
         field_data_cache = FieldDataCache.cache_for_descriptor_descendents(
             course_key,
             user,
@@ -1004,7 +1008,12 @@ class UsersCoursesDetail(SecureAPIView):
             field_data_cache,
             course_key)
         response_data['position'] = getattr(course_module, 'position', None)
+        response_data['mobile_available'] = getattr(course_module, 'mobile_available', None)
         response_data['position_tree'] = {}
+
+        course_setting = CourseSetting.objects.filter(id=course_key).first()
+        response_data['languages'] = course_setting.languages_list if course_setting else []
+
         parent_module = course_module
         while parent_module is not None:
             current_child_loc = _get_current_position_loc(parent_module)
