@@ -572,9 +572,6 @@ class TestUserCourseApi(MobileAPITestCase):
         """
         Test scenario when logged in user is enrolled in the course.
         """
-        languages = ["it", "de-at", "es", "pt-br"]
-        CourseSetting.objects.create(id=self.course.id, languages=languages)
-
         self.login_and_enroll()
 
         response = self.api_response(
@@ -585,5 +582,16 @@ class TestUserCourseApi(MobileAPITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['user_id'], self.user.id)
         self.assertEqual(response.data['mobile_available'], True)
+        self.assertEqual(response.data['languages'], [])
+
+        languages = ["it", "de-at", "es", "pt-br"]
+        CourseSetting.objects.create(id=self.course.id, languages=languages)
+
+        response = self.api_response(
+            expected_response_code=None,
+            data={'course_id': unicode(self.course.id), 'username': self.user.username}
+        )
+
+        self.assertEqual(response.status_code, 200)
         for language in response.data['languages']:
             self.assertIn(language, languages)

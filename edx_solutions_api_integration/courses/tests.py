@@ -449,9 +449,15 @@ class CoursesApiTests(
         self.assertEqual(response.data['end'], course.end)
 
     def test_courses_detail_get(self):
-        CourseSetting.objects.create(id=self.test_course_id, languages=self.languages)
         self.login()
         test_uri = self.base_courses_uri + '/' + self.test_course_id
+
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['languages'], [])
+
+        CourseSetting.objects.create(id=self.test_course_id, languages=self.languages)
+
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.data), 0)
