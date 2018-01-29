@@ -512,18 +512,24 @@ class CoursesApiTests(
         self.assertGreater(len(response.data), 0)
         self.assertEqual(response.data['category'], 'course')
         self.assertEqual(response.data['name'], self.course.display_name)
-        self.assertEqual(len(response.data['content']), 3)
+        self.assertIn('start', response.data)
+        self.assertIn('end', response.data)
 
+        self.assertEqual(len(response.data['content']), 3)
         chapter = response.data['content'][0]
         self.assertEqual(chapter['category'], 'chapter')
         self.assertEqual(chapter['name'], 'Overview Chapter')
         # we should have 2 children of Overview chapter
         # 2 sequentials named Sequential and test subsection
         self.assertEqual(len(chapter['children']), 2)
+        self.assertIn('start', chapter)
 
         # Make sure both of the children should be a sequential
         sequential = [child for child in chapter['children'] if child['category'] == 'sequential']
         self.assertEqual(len(sequential), 2)
+
+        for item in sequential:
+            self.assertIn('start', item)
 
     def test_courses_tree_get_root(self):
         self.login()
