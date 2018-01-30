@@ -1010,9 +1010,7 @@ class UsersCoursesDetail(SecureAPIView):
         response_data['position'] = getattr(course_module, 'position', None)
         response_data['mobile_available'] = getattr(course_module, 'mobile_available', None)
         response_data['position_tree'] = {}
-
-        course_setting = CourseSetting.objects.filter(id=course_key).first()
-        response_data['languages'] = course_setting.languages_list if course_setting else []
+        response_data['language'] = course_descriptor.language
 
         parent_module = course_module
         while parent_module is not None:
@@ -1630,13 +1628,11 @@ class UsersCourseProgressList(SecureListAPIView):
 
         student_progress = StudentProgress.objects.filter(user=user).values('course_id', 'completions')
         course_meta_data = CourseAggregatedMetaData.objects.filter(id__in=course_keys).values('id', 'total_assessments')
-        course_settings = CourseSetting.objects.filter(id__in=course_keys).values('id', 'languages')
-
         course_overview = CourseOverview.objects.filter(id__in=course_keys)
         if str2bool(mobile_only):
             course_overview = course_overview.filter(mobile_available=True)
         course_overview = course_overview.values(
-            'id', 'start', 'end', 'course_image_url', 'display_name', 'mobile_available'
+            'id', 'start', 'end', 'course_image_url', 'display_name', 'mobile_available', 'language'
         )
 
         filtered_course_overview = [overview["id"] for overview in course_overview]
@@ -1651,7 +1647,6 @@ class UsersCourseProgressList(SecureListAPIView):
             'student_progress': student_progress,
             'course_overview': course_overview,
             'course_metadata': course_meta_data,
-            'course_settings': course_settings,
         })
 
         return Response(serializer.data, status=status.HTTP_200_OK)

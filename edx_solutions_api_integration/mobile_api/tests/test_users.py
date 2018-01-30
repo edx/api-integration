@@ -5,7 +5,6 @@ import ddt
 from capa.tests.response_xml_factory import MultipleChoiceResponseXMLFactory
 from datetime import datetime, timedelta
 
-from course_metadata.models import CourseSetting
 from mobileapps.models import Theme, MobileApp
 from oauth2_provider import models as dot_models
 import urllib
@@ -582,16 +581,4 @@ class TestUserCourseApi(MobileAPITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['user_id'], self.user.id)
         self.assertEqual(response.data['mobile_available'], True)
-        self.assertEqual(response.data['languages'], [])
-
-        languages = ["it", "de-at", "es", "pt-br"]
-        CourseSetting.objects.create(id=self.course.id, languages=languages)
-
-        response = self.api_response(
-            expected_response_code=None,
-            data={'course_id': unicode(self.course.id), 'username': self.user.username}
-        )
-
-        self.assertEqual(response.status_code, 200)
-        for language in response.data['languages']:
-            self.assertIn(language, languages)
+        self.assertEqual(response.data['language'], None)

@@ -205,13 +205,4 @@ class CourseProgressSerializer(serializers.Serializer):
                 if course_overview['id'] == enrollment['course_id']
             ), None
         )
-
-        # update course language in overview dict
-        course_overview.update({'languages': next(
-            (
-                string_list_to_list(setting['languages'])
-                for setting in self.context['course_settings']
-                if setting['id'] == enrollment['course_id']
-            ), None
-        )})
         return course_overview
