@@ -656,8 +656,7 @@ class CoursesDetail(MobileAPIView):
             image_url = ''
             if hasattr(course_descriptor, 'course_image') and course_descriptor.course_image:
                 image_url = course_image_url(course_descriptor)
-            course_setting = CourseSetting.objects.filter(id=course_key).first()
-            response_data['languages'] = course_setting.languages_list if course_setting else []
+            response_data['language'] = course_descriptor.language
             response_data['course_image_url'] = image_url
             response_data['resources'] = []
             resource_uri = '{}/content/'.format(base_uri_without_qs)

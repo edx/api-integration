@@ -127,12 +127,13 @@ class CoursesApiTests(
         cls.base_workgroups_uri = '/api/server/workgroups/'
         cls.test_group_name = 'Alpha Group'
         cls.attempts = 3
-
+        cls.language = "en-us"
         cls.course_start_date = timezone.now() + relativedelta(days=-1)
         cls.course_end_date = timezone.now() + relativedelta(days=60)
         cls.course = CourseFactory.create(
             start=cls.course_start_date,
             end=cls.course_end_date,
+            language=cls.language,
         )
         cls.test_data = '<html>{}</html>'.format(str(uuid.uuid4()))
 
@@ -252,7 +253,6 @@ class CoursesApiTests(
             user_profile.save()
 
         cls.test_course_id = unicode(cls.course.id)
-        cls.languages = ["it", "de-at", "es", "pt-br"]
         cls.test_bogus_course_id = 'foo/bar/baz'
         cls.test_course_name = cls.course.display_name
         cls.test_course_number = cls.course.number
@@ -454,12 +454,6 @@ class CoursesApiTests(
 
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['languages'], [])
-
-        CourseSetting.objects.create(id=self.test_course_id, languages=self.languages)
-
-        response = self.do_get(test_uri)
-        self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.data), 0)
         self.assertEqual(response.data['id'], self.test_course_id)
         self.assertEqual(response.data['name'], self.test_course_name)
@@ -475,10 +469,7 @@ class CoursesApiTests(
         self.assertEqual(response.data['org'], self.test_course_org)
         confirm_uri = self.test_server_prefix + test_uri
         self.assertEqual(response.data['uri'], confirm_uri)
-
-        self.assertIn('languages', response.data)
-        for language in response.data['languages']:
-            self.assertIn(language, self.languages)
+        self.assertEqual(response.data['language'], self.language)
 
     def test_courses_detail_get_with_child_content(self):
         self.login()

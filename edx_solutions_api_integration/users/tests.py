@@ -2536,15 +2536,15 @@ class UsersProgressApiTests(
         super(UsersProgressApiTests, cls).setUpClass()
         cls.base_courses_uri = '/api/server/courses'
         cls.base_users_uri = '/api/server/users'
-
+        cls.language = "en-us"
         cls.course_start_date = timezone.now() + relativedelta(days=-1)
         cls.course_end_date = timezone.now() + relativedelta(days=60)
         cls.course = CourseFactory.create(
             start=cls.course_start_date,
             end=cls.course_end_date,
+            language=cls.language,
         )
         cls.test_data = '<html>{}</html>'.format(str(uuid.uuid4()))
-        cls.languages = ["it", "de-at", "es", "pt-br"]
 
         cls.chapter = ItemFactory.create(
             category="chapter",
@@ -2601,7 +2601,6 @@ class UsersProgressApiTests(
     def test_users_progress_list(self):
         """ Test progress value returned by users progress list api """
         CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
-        CourseSetting.objects.create(id=self.course.id, languages=self.languages)
 
         completions_uri = '{}/{}/completions/'.format(self.base_courses_uri, self.course.id)
         completions_data = {
@@ -2634,9 +2633,7 @@ class UsersProgressApiTests(
         self.assertIn('end', response_obj['course'])
         self.assertIn('id', response_obj['course'])
 
-        self.assertIn('languages', response_obj['course'])
-        for language in response_obj['course']['languages']:
-            self.assertIn(language, self.languages)
+        self.assertEqual(response_obj['course']['language'], self.language)
 
     def test_users_no_progress_in_course(self):
         """ 
