@@ -1643,7 +1643,16 @@ class UsersCourseProgressList(SecureListAPIView):
                 if enrollment['course_id'] in filtered_course_overview
             ]
 
+        # Calling the new API to get the progress.
+        view = CompletionListView()
+        view.request = request
+        result = view.get(request)
+        new_api_data = {}
+        for obj in result.data['results']:
+            new_api_data[obj['course_key']] = obj
+
         serializer = CourseProgressSerializer(enrollments, many=True, context={
+            'new_api_data': new_api_data,
             'student_progress': student_progress,
             'course_overview': course_overview,
             'course_metadata': course_meta_data,

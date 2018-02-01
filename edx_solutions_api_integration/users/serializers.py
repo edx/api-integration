@@ -178,6 +178,12 @@ class CourseProgressSerializer(serializers.Serializer):
     def get_progress(self, enrollment):
         completion_percentage = 0
 
+        # If this enrollment has a value from the new API, use that instead of calculating one.
+        if enrollment['course_id'] in self.context['new_api_data']:
+            return self.context['new_api_data'][enrollment['course_id']]['completion']['ratio']
+
+
+
         actual_completions = next(
             (
                 progress['completions']
