@@ -101,6 +101,15 @@ class IsStaffOrEnrolled(permissions.BasePermission):
         return False
 
 
+class IsStaffView(permissions.BasePermission):
+    """
+    Permission that checks to see if the user is staff.
+    """
+
+    def has_permission(self, request, view):
+        return request.user.is_staff
+
+
 class IsStaffOrReadOnlyView(permissions.BasePermission):
     """
     Permission that checks to see if the user is staff and the view is POST.
@@ -294,6 +303,13 @@ class MobileRetrieveUpdateAPIView(MobilePermissionMixin, generics.RetrieveUpdate
 class MobileRetrieveUpdateDestroyAPIView(MobilePermissionMixin, generics.RetrieveUpdateDestroyAPIView):
     """
     Inherited from RetrieveUpdateDestroyAPIView
+    """
+    pass
+
+
+class MobileDestroyAPIView(MobilePermissionMixin, generics.DestroyAPIView):
+    """
+    Inherited from DestroyAPIView
     """
     pass
 
