@@ -30,6 +30,7 @@ from django.utils.translation import ugettext as _
 from courseware import module_render
 from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR, ForumsConfig
+from course_metadata.models import CourseSetting
 from edx_notifications.data import NotificationType, NotificationMessage
 from edx_notifications.lib.consumer import get_notifications_count_for_user
 from edx_notifications.lib.publisher import register_notification_type, publish_notification_to_user
@@ -2536,12 +2537,13 @@ class UsersProgressApiTests(
         super(UsersProgressApiTests, cls).setUpClass()
         cls.base_courses_uri = '/api/server/courses'
         cls.base_users_uri = '/api/server/users'
-
+        cls.language = "en-us"
         cls.course_start_date = timezone.now() + relativedelta(days=-1)
         cls.course_end_date = timezone.now() + relativedelta(days=60)
         cls.course = CourseFactory.create(
             start=cls.course_start_date,
             end=cls.course_end_date,
+            language=cls.language,
         )
         cls.test_data = '<html>{}</html>'.format(str(uuid.uuid4()))
 
@@ -2631,6 +2633,8 @@ class UsersProgressApiTests(
         self.assertIn('start', response_obj['course'])
         self.assertIn('end', response_obj['course'])
         self.assertIn('id', response_obj['course'])
+
+        self.assertEqual(response_obj['course']['language'], self.language)
 
     def test_users_no_progress_in_course(self):
         """ 

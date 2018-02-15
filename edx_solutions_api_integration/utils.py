@@ -5,6 +5,7 @@ import struct
 import json
 import re
 import datetime
+import ast
 
 from django.core.cache import cache
 from django.utils.timezone import now
@@ -99,6 +100,10 @@ def dict_has_items(obj, items):
             else:
                 return False
     return has_items
+
+
+def string_list_to_list(string_list):
+    return ast.literal_eval(string_list)
 
 
 def get_cache_key(category, course_id, user_id=None):

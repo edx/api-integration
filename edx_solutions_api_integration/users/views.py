@@ -42,7 +42,7 @@ from openedx.core.djangoapps.course_groups.cohorts import (
 from openedx.core.djangoapps.user_api.models import UserPreference
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from edx_notifications.lib.consumer import mark_notification_read
-from course_metadata.models import CourseAggregatedMetaData
+from course_metadata.models import CourseAggregatedMetaData, CourseSetting
 from progress.models import StudentProgress
 from student.models import CourseEnrollment, CourseEnrollmentException, PasswordHistory, UserProfile
 from student.roles import (
@@ -986,12 +986,16 @@ class UsersCoursesDetail(SecureAPIView):
         user = get_user_from_request_params(self.request, self.kwargs)
         if not user:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
-        course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612
+
+        course_key = get_course_key(course_id)
         if not CourseEnrollment.is_enrolled(user, course_key):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
+
         response_data['user_id'] = user.id
         response_data['course_id'] = course_id
         response_data['uri'] = base_uri
+
+        course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612
         field_data_cache = FieldDataCache.cache_for_descriptor_descendents(
             course_key,
             user,
@@ -1004,7 +1008,10 @@ class UsersCoursesDetail(SecureAPIView):
             field_data_cache,
             course_key)
         response_data['position'] = getattr(course_module, 'position', None)
+        response_data['mobile_available'] = getattr(course_module, 'mobile_available', None)
         response_data['position_tree'] = {}
+        response_data['language'] = course_descriptor.language
+
         parent_module = course_module
         while parent_module is not None:
             current_child_loc = _get_current_position_loc(parent_module)
@@ -1621,12 +1628,11 @@ class UsersCourseProgressList(SecureListAPIView):
 
         student_progress = StudentProgress.objects.filter(user=user).values('course_id', 'completions')
         course_meta_data = CourseAggregatedMetaData.objects.filter(id__in=course_keys).values('id', 'total_assessments')
-
         course_overview = CourseOverview.objects.filter(id__in=course_keys)
         if str2bool(mobile_only):
             course_overview = course_overview.filter(mobile_available=True)
         course_overview = course_overview.values(
-            'id', 'start', 'end', 'course_image_url', 'display_name', 'mobile_available'
+            'id', 'start', 'end', 'course_image_url', 'display_name', 'mobile_available', 'language'
         )
 
         filtered_course_overview = [overview["id"] for overview in course_overview]

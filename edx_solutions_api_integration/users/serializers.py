@@ -6,7 +6,7 @@ from django.core.exceptions import ObjectDoesNotExist
 
 from edx_solutions_api_integration.models import APIUser
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
-from edx_solutions_api_integration.utils import get_profile_image_urls_by_username
+from edx_solutions_api_integration.utils import get_profile_image_urls_by_username, string_list_to_list
 from student.roles import CourseAccessRole
 
 

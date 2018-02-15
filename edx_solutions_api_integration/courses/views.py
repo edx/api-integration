@@ -49,7 +49,7 @@ from student.roles import CourseAccessRole, CourseInstructorRole, CourseStaffRol
 from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.search import path_to_location
 from xmodule.modulestore.exceptions import ItemNotFoundError
-from course_metadata.models import CourseAggregatedMetaData
+from course_metadata.models import CourseAggregatedMetaData, CourseSetting
 
 from edx_solutions_api_integration.courses.serializers import UserGradebookSerializer
 from edx_solutions_api_integration.courseware_access import (
@@ -92,7 +92,7 @@ from edx_solutions_api_integration.courses.serializers import (
 from progress.serializers import CourseModuleCompletionSerializer
 
 
-BLOCK_DATA_FIELDS = ['children', 'display_name', 'type', 'due']
+BLOCK_DATA_FIELDS = ['children', 'display_name', 'type', 'due', 'start']
 log = logging.getLogger(__name__)
 
 
@@ -231,12 +231,11 @@ def _make_block_tree(request, blocks_data, course_key, course_block, block=None,
     )
 
     if block:
-        data['id'] = block['id']
-        data['name'] = block['display_name']
+        data['id'] = block.get('id', None)
+        data['name'] = block.get('display_name', None)
         data['due'] = block.get('due', None)
-        data['start'] = getattr(course_block, 'start', None)
-        data['end'] = getattr(course_block, 'end', None)
-        data['category'] = block['type']
+        data['start'] = block.get('start', None)
+        data['category'] = block.get('type', None)
 
         if 'children' in block and depth > 0:
             for child in block['children']:
@@ -245,18 +244,16 @@ def _make_block_tree(request, blocks_data, course_key, course_block, block=None,
                 )
                 children.append(child_content)
 
-        if data['category'] == 'course':
-            data['content'] = children
-        else:
-            data['children'] = children
-
         if data['category'] and data['category'] == 'course':
             content_id = unicode(course_block.id)
             content_uri = '{}/{}'.format(base_content_uri, content_id)
+            data['content'] = children
+            data['end'] = getattr(course_block, 'end', None)
             data['number'] = course_block.location.course
             data['org'] = course_block.location.org
             data['id'] = unicode(course_block.id)
         else:
+            data['children'] = children
             content_uri = '{}/{}/content/{}'.format(base_content_uri, unicode(course_key), data['id'])
 
         data['uri'] = content_uri
@@ -658,6 +655,7 @@ class CoursesDetail(MobileAPIView):
             image_url = ''
             if hasattr(course_descriptor, 'course_image') and course_descriptor.course_image:
                 image_url = course_image_url(course_descriptor)
+            response_data['language'] = course_descriptor.language
             response_data['course_image_url'] = image_url
             response_data['resources'] = []
             resource_uri = '{}/content/'.format(base_uri_without_qs)

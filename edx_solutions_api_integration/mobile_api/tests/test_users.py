@@ -133,6 +133,7 @@ class TestUserOrganizationsApi(MobileAPITestCase):
         self.assertEqual(response.data['results'][0]['mobile_apps'][0]['name'], 'Mobileapp 1')
 
         self.assertIn('ios_app_id', response.data['results'][0]['mobile_apps'][0])
+        self.assertIn('ios_bundle_id', response.data['results'][0]['mobile_apps'][0])
         self.assertIn('android_app_id', response.data['results'][0]['mobile_apps'][0])
         self.assertIn('ios_download_url', response.data['results'][0]['mobile_apps'][0])
         self.assertIn('android_download_url', response.data['results'][0]['mobile_apps'][0])
@@ -491,3 +492,93 @@ class TestUserCourseGradesApi(MobileAPITestCase):
         response = self.client.get(url, HTTP_AUTHORIZATION="Bearer {0}".format(token))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['course_grade'], user_grade)
+
+
+@ddt.ddt
+class TestUserCourseApi(MobileAPITestCase):
+    """
+    Tests for /api/server/mobile/v1/users/courses/{course_id}
+    """
+    REVERSE_INFO = {'name': 'mobile-users-courses-detail', 'params': ['course_id']}
+
+    def test_with_unauthenticated_user(self):
+        """
+        Tests scenario calling API when not authenticated user.
+        """
+        response = self.api_response(expected_response_code=None)
+        self.assertEqual(response.status_code, 401)
+
+    def test_with_invalid_course_id(self):
+        """
+        Test scenario when calling API without valid course_id.
+        """
+        self.user.is_staff = True
+        self.user.save()
+        self.login()
+
+        response = self.api_response(
+            expected_response_code=None,
+            data={'username': self.user.username},
+            course_id='org.X/course_X/Run_X',
+        )
+        self.assertEqual(response.status_code, 404)
+
+    @ddt.data(True, False)
+    def test_with_another_users_username(self, is_staff):
+        """
+        Test scenario when requested user and logged in user are not same.
+        """
+        other_user = UserFactory()
+
+        if is_staff:
+            self.user.is_staff = True
+            self.user.save()
+        CourseEnrollmentFactory.create(user=other_user, course_id=self.course.id)
+
+        self.login()
+
+        response = self.api_response(
+            expected_response_code=None,
+            data={'course_id': unicode(self.course.id), 'username': other_user.username}
+        )
+        if is_staff:
+            self.assertEqual(response.status_code, 200)
+        else:
+            self.assertEqual(response.status_code, 403)
+
+    @ddt.data(True, False)
+    def test_with_unenrolled_user(self, is_staff):
+        """
+        Test scenario when logged in user is not enrolled in the course.
+        """
+        if is_staff:
+            self.user.is_staff = True
+            self.user.save()
+
+        self.login()
+
+        response = self.api_response(
+            expected_response_code=None,
+            data={'course_id': unicode(self.course.id), 'username': self.user.username}
+        )
+
+        if is_staff:
+            self.assertEqual(response.status_code, 404)
+        else:
+            self.assertEqual(response.status_code, 403)
+
+    def test_with_enrolled_user(self):
+        """
+        Test scenario when logged in user is enrolled in the course.
+        """
+        self.login_and_enroll()
+
+        response = self.api_response(
+            expected_response_code=None,
+            data={'course_id': unicode(self.course.id), 'username': self.user.username}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['user_id'], self.user.id)
+        self.assertEqual(response.data['mobile_available'], True)
+        self.assertEqual(response.data['language'], None)

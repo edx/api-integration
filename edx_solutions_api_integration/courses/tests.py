@@ -31,7 +31,7 @@ from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
 from progress.models import StudentProgress
-from course_metadata.models import CourseAggregatedMetaData
+from course_metadata.models import CourseAggregatedMetaData, CourseSetting
 from social_engagement.models import StudentSocialEngagementScore
 from instructor.access import allow_access
 from edx_solutions_organizations.models import Organization
@@ -128,12 +128,13 @@ class CoursesApiTests(
         cls.base_workgroups_uri = '/api/server/workgroups/'
         cls.test_group_name = 'Alpha Group'
         cls.attempts = 3
-
+        cls.language = "en-us"
         cls.course_start_date = timezone.now() + relativedelta(days=-1)
         cls.course_end_date = timezone.now() + relativedelta(days=60)
         cls.course = CourseFactory.create(
             start=cls.course_start_date,
             end=cls.course_end_date,
+            language=cls.language,
         )
         cls.test_data = '<html>{}</html>'.format(str(uuid.uuid4()))
 
@@ -451,6 +452,7 @@ class CoursesApiTests(
     def test_courses_detail_get(self):
         self.login()
         test_uri = self.base_courses_uri + '/' + self.test_course_id
+
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.data), 0)
@@ -468,6 +470,7 @@ class CoursesApiTests(
         self.assertEqual(response.data['org'], self.test_course_org)
         confirm_uri = self.test_server_prefix + test_uri
         self.assertEqual(response.data['uri'], confirm_uri)
+        self.assertEqual(response.data['language'], self.language)
 
     def test_courses_detail_get_with_child_content(self):
         self.login()
@@ -501,18 +504,24 @@ class CoursesApiTests(
         self.assertGreater(len(response.data), 0)
         self.assertEqual(response.data['category'], 'course')
         self.assertEqual(response.data['name'], self.course.display_name)
-        self.assertEqual(len(response.data['content']), 3)
+        self.assertIn('start', response.data)
+        self.assertIn('end', response.data)
 
+        self.assertEqual(len(response.data['content']), 3)
         chapter = response.data['content'][0]
         self.assertEqual(chapter['category'], 'chapter')
         self.assertEqual(chapter['name'], 'Overview Chapter')
         # we should have 2 children of Overview chapter
         # 2 sequentials named Sequential and test subsection
         self.assertEqual(len(chapter['children']), 2)
+        self.assertIn('start', chapter)
 
         # Make sure both of the children should be a sequential
         sequential = [child for child in chapter['children'] if child['category'] == 'sequential']
         self.assertEqual(len(sequential), 2)
+
+        for item in sequential:
+            self.assertIn('start', item)
 
     def test_courses_tree_get_root(self):
         self.login()
