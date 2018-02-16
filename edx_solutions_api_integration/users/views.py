@@ -60,7 +60,6 @@ from util.password_policy_validators import (
 )
 from xmodule.modulestore import InvalidLocationError
 
-from completion_api.views import CompletionListView
 from progress.serializers import CourseModuleCompletionSerializer
 from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
 from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView, IdsInFilterBackend, \
@@ -1644,16 +1643,7 @@ class UsersCourseProgressList(SecureListAPIView):
                 if enrollment['course_id'] in filtered_course_overview
             ]
 
-        # Calling the new API to get the progress.
-        view = CompletionListView()
-        view.request = request
-        result = view.get(request)
-        new_api_data = {}
-        for obj in result.data['results']:
-            new_api_data[obj['course_key']] = obj
-
         serializer = CourseProgressSerializer(enrollments, many=True, context={
-            'new_api_data': new_api_data,
             'student_progress': student_progress,
             'course_overview': course_overview,
             'course_metadata': course_meta_data,
