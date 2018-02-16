@@ -27,6 +27,7 @@ from django.utils import timezone
 from django.db import transaction
 from django.utils.translation import ugettext as _
 
+from rest_framework.test import APIClient
 from courseware import module_render
 from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR, ForumsConfig
@@ -2608,6 +2609,8 @@ class UsersProgressApiTests(
             'user_id': self.user.id,
             'stage': 'First'
         }
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
         response = self.do_post(completions_uri, completions_data)
         self.assertEqual(response.status_code, 201)
 
@@ -2643,6 +2646,8 @@ class UsersProgressApiTests(
         CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
 
         test_uri = '{}/{}/courses/progress'.format(self.base_users_uri, self.user.id)
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
         response = self.do_get(test_uri)
 
         self.assertEqual(response.status_code, 200)
@@ -2682,6 +2687,8 @@ class UsersProgressApiTests(
             'user_id': self.user.id,
             'stage': 'First'
         }
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
         response = self.do_post(completions_uri, completions_data)
         self.assertEqual(response.status_code, 201)
 
