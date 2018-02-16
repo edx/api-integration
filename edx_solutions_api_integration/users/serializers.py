@@ -179,11 +179,13 @@ class CourseProgressSerializer(serializers.Serializer):
         completion_percentage = 0
 
         # If this enrollment has a value from the new API, use that instead
-        # of calculating one. Note: Must multiply by 100 because its a ratio.
+        # of calculating one.
         if enrollment['course_id'] in self.context['new_api_data']:
             data_dict = self.context['new_api_data'][enrollment['course_id']]['completion']
             earned = data_dict['earned']
             possible = data_dict['possible']
+            if possible < 1:
+                return 100
             completion_percentage = earned * 100.0 / possible
             return completion_percentage
 
