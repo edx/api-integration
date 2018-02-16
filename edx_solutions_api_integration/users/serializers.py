@@ -186,6 +186,7 @@ class CourseProgressSerializer(serializers.Serializer):
             possible = data_dict['possible']
             if possible < 1:
                 return 100
+
             completion_percentage = earned * 100.0 / possible
             return completion_percentage
 
