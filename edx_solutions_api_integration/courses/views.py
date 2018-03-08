@@ -2027,9 +2027,13 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
                 cache_course_data('progress_leaderboard', course_id, {'leaders': data['leaders']})
         else:
             cache_course_data('progress', course_id, {'course_avg': data['course_avg']})
-            cache_course_user_data('progress', course_id, user_id, {
-                'completions': data['completions'], 'position': data['position']
-            })
+
+            #set user data in cache only if the user exists
+            if user_id:
+                cache_course_user_data('progress', course_id, user_id, {
+                    'completions': data['completions'], 'position': data['position']
+                })
+
         return Response(data, status=status.HTTP_200_OK)
 
 
