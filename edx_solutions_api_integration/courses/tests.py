@@ -2221,6 +2221,11 @@ class CoursesApiTests(
         self.assertIsNone(response.data.get('leaders', None))
         self.assertEqual(response.data['completions'], 0)
 
+        # test with no user
+        test_uri = '{}?skipleaders=true'.format(setup_data['leaders_uri'])
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+
         # test a case where completions are greater than total course modules. it should not be more than 100
         setup_data['contents'].append(self.course_content)
         for content in setup_data['contents'][2:]:
