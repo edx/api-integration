@@ -101,11 +101,14 @@ class CourseSerializer(serializers.Serializer):
 class OrganizationCourseSerializer(CourseSerializer):
     """ Serializer for Organization Courses """
     name = serializers.CharField(source='display_name')
-    enrolled_users = serializers.ListField(child=serializers.IntegerField())
+    enrolled_users = serializers.SerializerMethodField()
 
     class Meta(object):
         """ Serializer/field specification """
         fields = ('id', 'name', 'number', 'org', 'start', 'end', 'due', 'enrolled_users', )
+
+    def get_enrolled_users(self, obj):
+        return self.context['enrollments'][unicode(obj.id)]
 
 
 class UserGradebookSerializer(serializers.Serializer):
