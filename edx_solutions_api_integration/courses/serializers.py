@@ -108,7 +108,7 @@ class OrganizationCourseSerializer(CourseSerializer):
         fields = ('id', 'name', 'number', 'org', 'start', 'end', 'due', 'enrolled_users', )
 
     def get_enrolled_users(self, obj):
-        return self.context['enrollments'][unicode(obj.id)]
+        return self.context['enrollments'][unicode(obj.id)] if unicode(obj.id) in self.context['enrollments'] else []
 
 
 class UserGradebookSerializer(serializers.Serializer):
