@@ -25,6 +25,7 @@ from rest_framework.response import Response
 
 from courseware.courses import get_course_about_section, get_course_info_section, get_course_info_section_module
 from courseware.models import StudentModule
+from courseware.module_render import handle_xblock_callback
 from courseware.views.views import get_static_tab_fragment
 from mobile_api.course_info.views import apply_wrappers_to_content
 from openedx.core.lib.xblock_utils import get_course_update_items
@@ -2372,3 +2373,28 @@ class CourseNavView(SecureAPIView):
         }
 
         return Response(result, status=status.HTTP_200_OK)
+
+
+class XblockCallbackView(MobileAPIView):
+    """
+    Class-based view for extensions. This is where AJAX calls go.
+
+    Return 403 error if the user is not logged in. Raises Http404 if
+    the location and course_id do not identify a valid module, the module is
+    not accessible by the user, or the module raises NotFoundError. If the
+    module raises any other error, it will escape this function.
+    """
+    def get(self, request, course_id, content_id, handler, suffix=None):
+        return handle_xblock_callback(request, course_id, content_id, handler, suffix)
+
+    def post(self, request, course_id, content_id, handler, suffix=None):
+        return handle_xblock_callback(request, course_id, content_id, handler, suffix)
+
+    def put(self, request, course_id, content_id, handler, suffix=None):
+        return handle_xblock_callback(request, course_id, content_id, handler, suffix)
+
+    def patch(self, request, course_id, content_id, handler, suffix=None):
+        return handle_xblock_callback(request, course_id, content_id, handler, suffix)
+
+    def delete(self, request, course_id, content_id, handler, suffix=None):
+        return handle_xblock_callback(request, course_id, content_id, handler, suffix)

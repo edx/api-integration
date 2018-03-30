@@ -60,6 +60,10 @@ urlpatterns = patterns(
     url(r'^{0}/workgroups/*$'.format(COURSE_ID_PATTERN), courses_views.CoursesWorkgroupsList.as_view()),
     url(r'^{0}/navigation/{1}$'.format(COURSE_ID_PATTERN, settings.USAGE_KEY_PATTERN),
         courses_views.CourseNavView.as_view()),
+    url(r'^{course_key}/xblock/{usage_key}/handler/(?P<handler>[^/]*)(?:/(?P<suffix>.*))?$'.format(
+            course_key=COURSE_ID_PATTERN,
+            usage_key=CONTENT_ID_PATTERN,
+        ), courses_views.XblockCallbackView.as_view()),
     url(r'^{0}$'.format(COURSE_ID_PATTERN), courses_views.CoursesDetail.as_view(), name='course-detail'),
     url(r'/*$^', courses_views.CoursesList.as_view()),
 )
