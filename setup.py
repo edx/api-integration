@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='api-integration',
-    version='1.7.3',
+    version='1.7.7',
     description='RESTful api integration for edX platform',
     long_description=open('README.rst').read(),
     author='edX',
@@ -13,7 +13,6 @@ setup(
     include_package_data=True,
     install_requires=[
         'django>=1.8',
-        'djangorestframework>=3.2.0',
         'six',
     ],
 )
