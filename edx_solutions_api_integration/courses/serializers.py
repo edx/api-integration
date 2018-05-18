@@ -49,7 +49,7 @@ class CourseCompletionsLeadersSerializer(BaseCourseLeadersSerializer):
         completions = obj['completions'] or 0
         completion_percentage = 0
         if total_completions > 0:
-            completion_percentage = min(100 * (completions / float(total_completions)), 100)
+            completion_percentage = int(round(100 * completions / float(total_completions)))
         return completion_percentage
 
 
