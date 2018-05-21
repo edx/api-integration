@@ -2169,7 +2169,7 @@ class CoursesApiTests(
         for user in users:
             self.assertTrue(result_users.get(str(user.id)))
 
-    def test_courses_completions_leaders_list_get(self):
+    def test_courses_users_list_courses_enrolled(self):
         setup_data = self._setup_courses_completions_leaders()
         expected_course_avg = '25.000'
         test_uri = '{}?count=6'.format(setup_data['leaders_uri'])

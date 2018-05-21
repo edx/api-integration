@@ -325,7 +325,7 @@ def _get_course_progress_metrics(course_key, user_id=None, exclude_users=None, o
         user_completions = user_data['completions']
         completion_percentage = 0
         if total_possible_completions > 0:
-            completion_percentage = int(round(100 * user_completions / float(total_possible_completions)))
+            completion_percentage = min(int(round(100 * user_completions / float(total_possible_completions))), 100)
         data['completions'] = completion_percentage
 
     total_users_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users)

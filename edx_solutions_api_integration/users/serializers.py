@@ -115,7 +115,10 @@ class UserSerializer(DynamicFieldsModelSerializer):
             if self.context['course_meta_data']:
                 total_possible_completions = self.context['course_meta_data'].total_assessments
                 if total_possible_completions > 0:
-                    completion_percentage = int(round(100 * actual_completions / float(total_possible_completions)))
+                    completion_percentage = min(
+                        int(round(100 * actual_completions / float(total_possible_completions))),
+                        100
+                    )
         return completion_percentage
 
     class Meta(object):
