@@ -314,7 +314,7 @@ class UsersList(SecureListAPIView):
 
         if match == 'partial':
             if name:
-                queryset = queryset.filter(profile__name__icontains=name)
+                queryset = queryset.filter(Q(first_name__icontains=name) | Q(last_name__icontains=name))
 
             if email:
                 queryset = queryset.filter(email__icontains=email)
@@ -328,7 +328,7 @@ class UsersList(SecureListAPIView):
                 queryset = queryset.filter(courses_filter_list)
         else:
             if name:
-                queryset = queryset.filter(profile__name=name)
+                queryset = queryset.filter(Q(first_name=name) | Q(last_name=name))
 
             if email:
                 queryset = queryset.filter(email=email)
