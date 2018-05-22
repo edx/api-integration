@@ -318,26 +318,6 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         if 'id' in response.data['results'][0]:
             self.fail("Dynamic field filtering error in UserSerializer")
 
-        # fetch by first_name with an existing user
-        response = self.do_get('{}?match=partial&name={}'.format(test_uri, 'john1'))
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data['results']), 1)
-
-        # fetch by first_name with a non existing user
-        response = self.do_get('{}?match=partial&name={}'.format(test_uri, 'james'))
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data['results']), 0)
-
-        # fetch by last_name with an existing user
-        response = self.do_get('{}?match=partial&name={}'.format(test_uri, 'Doe1'))
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data['results']), 1)
-
-        # fetch by last_name with a non existing user
-        response = self.do_get('{}?match=partial&name={}'.format(test_uri, 'james'))
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data['results']), 0)
-
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_user_list_get_filters(self, store):
         test_uri = self.users_base_uri
@@ -373,6 +353,19 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(len(response.data['results']), 2)
         self.assertEqual(response.data['results'][0]['full_name'], 'John Doe')
         self.assertEqual(response.data['results'][1]['full_name'], 'Steve Jobs')
+
+        # fetch user data by exact first_name/last_name match
+        response = self.do_get('{}?name={}'.format(test_uri, 'John'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['first_name'], 'John')
+
+        # fetch user data by partial first_name/last_name match
+        response = self.do_get('{}?name={}&match=partial'.format(test_uri, 'Jo'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 2)
+        self.assertEqual(response.data['results'][0]['first_name'], 'John')
+        self.assertEqual(response.data['results'][1]['last_name'], 'Jobs')
 
         # fetch user data by exact email match
         response = self.do_get('{}?email={}'.format(test_uri, 'steve.jobs@edx.org'))
