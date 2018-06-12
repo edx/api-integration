@@ -1621,15 +1621,31 @@ class UsersCourseProgressList(SecureListAPIView):
     def get(self, request, *args, **kwargs):  # pylint: disable=unused-argument
         user = get_user_from_request_params(self.request, self.kwargs)
 
+        courses = css_param_to_list(self.request, 'courses')
         mobile_only = self.request.query_params.get('mobile_only', None)
-        enrollments = CourseEnrollment.objects.filter(user=user).values('course_id', 'created', 'is_active')
+        is_active = self.request.query_params.get('is_active', None)
+
+        if courses:
+            courses = [CourseKey.from_string(key) for key in courses]
+            enrollments = CourseEnrollment.objects.filter(user=user, course_id__in=courses)
+        else:
+            enrollments = CourseEnrollment.objects.filter(user=user)
+
+        if is_active:
+            enrollments = enrollments.filter(is_active=str2bool(is_active)).values('course_id', 'created', 'is_active')
+        else:
+            enrollments = enrollments.values('course_id', 'created', 'is_active')
 
         course_keys = []
         for course_enrollment in enrollments:
             course_keys.append(CourseKey.from_string(course_enrollment['course_id']))
 
-        student_progress = StudentProgress.objects.filter(user=user).values('course_id', 'completions')
-        course_meta_data = CourseAggregatedMetaData.objects.filter(id__in=course_keys).values('id', 'total_assessments')
+        user_grades = StudentGradebook.objects.filter(course_id__in=course_keys, user_id=user.id)\
+            .values('course_id', 'grade')
+        student_progress = StudentProgress.objects.filter(course_id__in=course_keys, user=user)\
+            .values('course_id', 'completions')
+        course_meta_data = CourseAggregatedMetaData.objects.filter(id__in=course_keys)\
+            .values('id', 'total_assessments')
         course_overview = CourseOverview.objects.filter(id__in=course_keys)
         if str2bool(mobile_only):
             course_overview = course_overview.filter(mobile_available=True)
@@ -1649,6 +1665,7 @@ class UsersCourseProgressList(SecureListAPIView):
             'student_progress': student_progress,
             'course_overview': course_overview,
             'course_metadata': course_meta_data,
+            'user_grades': user_grades,
         })
 
         return Response(serializer.data, status=status.HTTP_200_OK)
