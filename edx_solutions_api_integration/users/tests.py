@@ -12,6 +12,7 @@ import uuid
 import mock
 import before_after
 import six
+import json
 
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -30,7 +31,6 @@ from django.utils.translation import ugettext as _
 from courseware import module_render
 from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR, ForumsConfig
-from course_metadata.models import CourseSetting
 from edx_notifications.data import NotificationType, NotificationMessage
 from edx_notifications.lib.consumer import get_notifications_count_for_user
 from edx_notifications.lib.publisher import register_notification_type, publish_notification_to_user
@@ -40,6 +40,7 @@ from instructor.access import allow_access
 from social_engagement.models import StudentSocialEngagementScore
 from student.tests.factories import UserFactory, CourseEnrollmentFactory, GroupFactory
 from student.models import anonymous_id_for_user, CourseEnrollment
+from gradebook.models import StudentGradebook
 
 from openedx.core.djangoapps.user_api.models import UserPreference
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
@@ -2625,6 +2626,22 @@ class UsersProgressApiTests(
         response = self.do_post(completions_uri, completions_data)
         self.assertEqual(response.status_code, 201)
 
+        user_grade, user_proforma_grade = 0.9, 0.91
+        section_breakdown = [
+            {
+                "category": "Homework",
+                "percent": 1.0,
+                "detail": "Homework 1 - New Subsection - 100% (1/1)",
+                "label": "Grade 01"
+            }
+        ]
+        grade_summary = {"section_breakdown": section_breakdown}
+        StudentGradebook.objects.create(
+            user=self.user, course_id=self.course.id,
+            grade=user_grade, proforma_grade=user_proforma_grade,
+            grade_summary=json.dumps(grade_summary)
+        )
+
         test_uri = '{}/{}/courses/progress'.format(self.base_users_uri, self.user.id)
         response = self.do_get(test_uri)
 
@@ -2636,9 +2653,11 @@ class UsersProgressApiTests(
         self.assertIn('created', response_obj)
         self.assertIn('is_active', response_obj)
         self.assertIn('progress', response_obj)
+        self.assertIn('proficiency', response_obj)
         self.assertIn('course', response_obj)
 
         self.assertEqual(response.data[0]['progress'], 50.0)
+        self.assertEqual(response.data[0]['proficiency'], 90)
         self.assertEqual(response.data[0]['is_active'], True)
 
         self.assertIn('course_image_url', response_obj['course'])
@@ -2648,6 +2667,22 @@ class UsersProgressApiTests(
         self.assertIn('id', response_obj['course'])
 
         self.assertEqual(response_obj['course']['language'], self.language)
+
+    def test_users_progress_list_for_active_courses(self):
+        """ Test progress value returned by users progress list api """
+        CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
+
+        test_uri = '{}/{}/courses/progress?is_active=true'.format(self.base_users_uri, self.user.id)
+        response = self.do_get(test_uri)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+
+        test_uri = '{}/{}/courses/progress?is_active=false'.format(self.base_users_uri, self.user.id)
+        response = self.do_get(test_uri)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 0)
 
     def test_users_no_progress_in_course(self):
         """ 
@@ -2663,6 +2698,7 @@ class UsersProgressApiTests(
         self.assertEqual(len(response.data), 1)
 
         self.assertEqual(response.data[0]['progress'], 0.0)
+        self.assertEqual(response.data[0]['proficiency'], 0)
 
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_users_progress_in_mobile_only_courses(self, store):

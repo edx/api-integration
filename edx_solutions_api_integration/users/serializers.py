@@ -177,6 +177,7 @@ class CourseProgressSerializer(serializers.Serializer):
     is_active = serializers.BooleanField()
     progress = serializers.SerializerMethodField()
     course = serializers.SerializerMethodField()
+    proficiency = serializers.SerializerMethodField()
 
     def get_progress(self, enrollment):
         completion_percentage = 0
@@ -209,3 +210,13 @@ class CourseProgressSerializer(serializers.Serializer):
             ), None
         )
         return course_overview
+
+    def get_proficiency(self, enrollment):
+        proficiency = next(
+            (
+                user_grade['grade']
+                for user_grade in self.context['user_grades']
+                if user_grade['course_id'] == enrollment['course_id']
+             ), 0
+        )
+        return int(round((proficiency * 100)))
