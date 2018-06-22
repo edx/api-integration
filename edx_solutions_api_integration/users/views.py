@@ -2,6 +2,7 @@
 
 import json
 import logging
+from datetime import datetime
 
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
@@ -1631,11 +1632,14 @@ class UsersCourseProgressList(SecureListAPIView):
         else:
             enrollments = CourseEnrollment.objects.filter(user=user)
 
-        if is_active:
-            enrollments = enrollments.filter(is_active=str2bool(is_active)).values('course_id', 'created', 'is_active')
-        else:
-            enrollments = enrollments.values('course_id', 'created', 'is_active')
+        if enrollments and is_active:
+            if str2bool(is_active):
+                filtered_courses = CourseOverview.objects.filter(Q(end__gt=datetime.today()) | Q(end__isnull=True)).values_list('id', flat=True)
+            else:
+                filtered_courses = CourseOverview.objects.filter(end__lte=datetime.today()).values_list('id', flat=True)
+            enrollments = enrollments.filter(course_id__in=[CourseKey.from_string(key) for key in filtered_courses])
 
+        enrollments = enrollments.values('course_id', 'created', 'is_active')
         course_keys = []
         for course_enrollment in enrollments:
             course_keys.append(CourseKey.from_string(course_enrollment['course_id']))
