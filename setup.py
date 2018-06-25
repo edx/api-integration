@@ -1,10 +1,11 @@
+
 #!/usr/bin/env python
 
 from setuptools import setup, find_packages
 
 setup(
     name='api-integration',
-    version='1.8.6',
+    version='2.0.0',
     description='RESTful api integration for edX platform',
     long_description=open('README.rst').read(),
     author='edX',

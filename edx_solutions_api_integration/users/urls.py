@@ -22,8 +22,6 @@ urlpatterns = patterns(
     ),
     url(r'^(?P<user_id>[a-zA-Z0-9]+)/courses/{0}/metrics/social/$'.format(COURSE_ID_PATTERN),
         users_views.UsersSocialMetrics.as_view(), name='users-social-metrics'),
-    url(r'^(?P<user_id>[a-zA-Z0-9]+)/courses/{0}/completions/$'.format(COURSE_ID_PATTERN),
-        users_views.UsersCoursesCompletionsList.as_view(), name='users-courses-completions-list'),
     url(r'^(?P<user_id>[a-zA-Z0-9]+)/courses/{0}$'.format(COURSE_ID_PATTERN),
         users_views.UsersCoursesDetail.as_view(), name='users-courses-detail'),
     url(

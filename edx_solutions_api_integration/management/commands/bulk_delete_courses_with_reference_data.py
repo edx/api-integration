@@ -5,6 +5,8 @@ import pytz
 import logging
 from optparse import make_option
 from datetime import datetime, timedelta
+
+from completion.models import BlockCompletion
 from util.prompt import query_yes_no
 
 from django.core.management.base import BaseCommand, CommandError
@@ -18,7 +20,7 @@ from course_metadata.models import CourseAggregatedMetaData
 from openedx.core.djangoapps.content.course_structures.models import CourseStructure
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from courseware.models import StudentModule
-from progress.models import CourseModuleCompletion, StudentProgress, StudentProgressHistory
+from completion_aggregator.models import Aggregator
 from gradebook.models import StudentGradebook, StudentGradebookHistory
 from student.models import CourseAccessRole, CourseEnrollment
 
@@ -57,9 +59,8 @@ class Command(BaseCommand):
         CourseStructure.objects.filter(course_id=course_key).delete()
         CourseOverview.objects.filter(id=course_key).delete()
         StudentModule.objects.filter(course_id=course_key).delete()
-        CourseModuleCompletion.objects.filter(course_id=course_key).delete()
-        StudentProgressHistory.objects.filter(course_id=course_key).delete()
-        StudentProgress.objects.filter(course_id=course_key).delete()
+        BlockCompletion.objects.filter(course_key=course_key).delete()
+        Aggregator.objects.filter(course_key=course_key).delete()
         StudentGradebookHistory.objects.filter(course_id=course_key).delete()
         StudentGradebook.objects.filter(course_id=course_key).delete()
         CourseAccessRole.objects.filter(course_id=course_key).delete()

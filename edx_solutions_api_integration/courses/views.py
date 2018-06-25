@@ -1,96 +1,112 @@
 """ API implementation for course-oriented interactions. """
 
-import sys
-from collections import OrderedDict
-import logging
 import itertools
-from lxml import etree
+import logging
+import sys
 from StringIO import StringIO
+from collections import OrderedDict
 from datetime import timedelta
 
-from django.conf import settings
-from django.contrib.auth.models import Group, User
-from django.core.exceptions import ObjectDoesNotExist
-from django.core.cache import cache
-from django.db.models import Count, Max, Min
-from django.http import Http404
-from django.utils.translation import ugettext_lazy as _
-from django.db.models import Q, F
-from opaque_keys.edx.keys import UsageKey
-
-from requests.exceptions import ConnectionError
-
-from rest_framework import status
-from rest_framework.response import Response
-
-from courseware.courses import get_course_about_section, get_course_info_section, get_course_info_section_module
+from completion.models import BlockCompletion
+from completion_aggregator.models import Aggregator
+from courseware.courses import (
+    get_course_about_section,
+    get_course_info_section,
+    get_course_info_section_module,
+)
 from courseware.models import StudentModule
 from courseware.views.views import get_static_tab_fragment
-from mobile_api.course_info.views import apply_wrappers_to_content
-from openedx.core.lib.xblock_utils import get_course_update_items
-from openedx.core.lib.courses import course_image_url
-from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-
-from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
+from django.conf import settings
+from django.contrib.auth.models import Group, User
+from django.core.cache import cache
+from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Count, F, Max, Min, Q
+from django.http import Http404
+from django.utils.translation import ugettext_lazy as _
 from django_comment_common.models import FORUM_ROLE_MODERATOR
-from gradebook.models import StudentGradebook
 from instructor.access import revoke_access, update_forum_role
-from lms.lib.comment_client.user import get_course_social_stats
-from lms.lib.comment_client.thread import get_course_thread_stats
-from lms.lib.comment_client.utils import CommentClientRequestError, CommentClientMaintenanceError
 from lms.djangoapps.course_api.blocks.api import get_blocks
+from lms.lib.comment_client.thread import get_course_thread_stats
+from lms.lib.comment_client.user import get_course_social_stats
+from lms.lib.comment_client.utils import CommentClientMaintenanceError, CommentClientRequestError
+from lxml import etree
+from mobile_api.course_info.views import apply_wrappers_to_content
 from opaque_keys import InvalidKeyError
-from progress.models import StudentProgress
-from edx_solutions_projects.models import Project, Workgroup
-from edx_solutions_projects.serializers import ProjectSerializer, BasicWorkgroupSerializer
+from opaque_keys.edx.keys import UsageKey
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
+from openedx.core.lib.courses import course_image_url
+from openedx.core.lib.xblock_utils import get_course_update_items
+from requests.exceptions import ConnectionError
+from rest_framework import status
+from rest_framework.response import Response
 from student.models import CourseEnrollment, CourseEnrollmentAllowed
-from student.roles import CourseAccessRole, CourseInstructorRole, CourseStaffRole, CourseObserverRole, \
-    CourseAssistantRole, UserBasedRole
+from student.roles import (
+    CourseAccessRole,
+    CourseAssistantRole,
+    CourseInstructorRole,
+    CourseObserverRole,
+    CourseStaffRole,
+    UserBasedRole,
+)
 from xmodule.modulestore.django import modulestore
-from xmodule.modulestore.search import path_to_location
 from xmodule.modulestore.exceptions import ItemNotFoundError
-from course_metadata.models import CourseAggregatedMetaData, CourseSetting
+from xmodule.modulestore.search import path_to_location
 
-from edx_solutions_api_integration.courses.serializers import UserGradebookSerializer
+from course_metadata.models import CourseAggregatedMetaData
+from edx_solutions_api_integration.courses.serializers import (
+    CourseCompletionsLeadersSerializer,
+    CourseProficiencyLeadersSerializer,
+    CourseSerializer,
+    CourseSocialLeadersSerializer,
+    GradeSerializer,
+    UserGradebookSerializer,
+)
+from edx_solutions_api_integration.courses.utils import (
+    generate_leaderboard,
+    get_num_users_started,
+    get_total_completions,
+    get_user_position,
+)
 from edx_solutions_api_integration.courseware_access import (
+    course_exists,
     get_course,
     get_course_child,
-    get_course_key,
-    course_exists,
     get_course_child_key,
+    get_course_key,
 )
 from edx_solutions_api_integration.models import (
-    CourseGroupRelationship,
     CourseContentGroupRelationship,
+    CourseGroupRelationship,
     GroupProfile,
 )
-from progress.models import CourseModuleCompletion
-from social_engagement.models import StudentSocialEngagementScore
-from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView, MobileAPIView
-from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer
+from edx_solutions_api_integration.permissions import (
+    MobileAPIView,
+    SecureAPIView,
+    SecureListAPIView,
+)
+from edx_solutions_api_integration.users.serializers import (
+    UserCountByCitySerializer,
+    UserSerializer,
+)
 from edx_solutions_api_integration.utils import (
-    generate_base_uri,
-    str2bool,
-    get_time_series_data,
-    parse_datetime,
-    get_ids_from_list_param,
-    strip_xblock_wrapper_div,
-    get_cached_data,
     cache_course_data,
     cache_course_user_data,
-    get_aggregate_exclusion_user_ids,
-    get_user_from_request_params,
     css_param_to_list,
+    generate_base_uri,
+    get_aggregate_exclusion_user_ids,
+    get_cached_data,
+    get_ids_from_list_param,
+    get_time_series_data,
+    get_user_from_request_params,
+    parse_datetime,
+    str2bool,
+    strip_xblock_wrapper_div,
 )
-from edx_solutions_api_integration.courses.serializers import (
-    CourseSerializer,
-    GradeSerializer,
-    CourseCompletionsLeadersSerializer,
-    CourseSocialLeadersSerializer,
-    CourseProficiencyLeadersSerializer,
-)
-from progress.serializers import CourseModuleCompletionSerializer
-
+from edx_solutions_projects.models import Project, Workgroup
+from edx_solutions_projects.serializers import BasicWorkgroupSerializer, ProjectSerializer
+from gradebook.models import StudentGradebook
+from social_engagement.models import StudentSocialEngagementScore
 
 BLOCK_DATA_FIELDS = ['children', 'display_name', 'type', 'due', 'start']
 log = logging.getLogger(__name__)
@@ -317,16 +333,14 @@ def _get_course_progress_metrics(course_key, user_id=None, exclude_users=None, o
     data = {'course_avg': course_avg}
     course_metadata = CourseAggregatedMetaData.get_from_id(course_key)
     total_possible_completions = float(course_metadata.total_assessments)
-    total_actual_completions = StudentProgress.get_total_completions(course_key, exclude_users=exclude_users,
-                                                                     org_ids=org_ids, group_ids=group_ids)
+    total_actual_completions = get_total_completions(
+        course_key,
+        exclude_users=exclude_users,
+        org_ids=org_ids,
+        group_ids=group_ids
+    )
     if user_id:
-        user_data = StudentProgress.get_user_position(course_key, user_id, exclude_users=exclude_users)
-        data['position'] = user_data['position']
-        user_completions = user_data['completions']
-        completion_percentage = 0
-        if total_possible_completions > 0:
-            completion_percentage = min(int(round(100 * user_completions / float(total_possible_completions))), 100)
-        data['completions'] = completion_percentage
+        data.update(get_user_position(course_key, user_id, exclude_users=exclude_users))
 
     total_users_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users)
     if org_ids:
@@ -1188,11 +1202,6 @@ class CoursesUsersList(SecureListAPIView):
                 'courseenrollment_set'
             )
 
-        if 'progress' in additional_fields:
-            users = users.prefetch_related(
-                'studentprogress_set'
-            )
-
         users = users.select_related('profile')
         return users
 
@@ -1475,102 +1484,6 @@ class CourseContentUsersList(SecureAPIView):
         return Response(serializer.data)  # pylint: disable=E1101
 
 
-class CourseModuleCompletionList(SecureListAPIView):
-    """
-    ### The CourseModuleCompletionList allows clients to view user's course module completion entities
-    to monitor a user's progression throughout the duration of a course,
-    - URI: ```/api/courses/{course_id}/completions```
-    - GET: Returns a JSON representation of the course, content and user and timestamps
-    - GET Example:
-        {
-            "count":"1",
-            "num_pages": "1",
-            "previous": null
-            "next": null
-            "results": [
-                {
-                    "id": 2,
-                    "user_id": "3",
-                    "course_id": "32fgdf",
-                    "content_id": "324dfgd",
-                    "stage": "First",
-                    "created": "2014-06-10T13:14:49.878Z",
-                    "modified": "2014-06-10T13:14:49.914Z"
-                }
-            ]
-        }
-
-    Filters can also be applied
-    ```/api/courses/{course_id}/completions/?user_id={user_id}```
-    ```/api/courses/{course_id}/completions/?content_id={content_id}&stage={stage}```
-    ```/api/courses/{course_id}/completions/?user_id={user_id}&content_id={content_id}```
-    - POST: Creates a Course-Module completion entity
-    - POST Example:
-        {
-            "content_id":"i4x://the/content/location",
-            "user_id":4,
-            "stage": "First"
-        }
-    ### Use Cases/Notes:
-    * Use GET operation to retrieve list of course completions by user
-    * Use GET operation to verify user has completed specific course module
-    """
-    serializer_class = CourseModuleCompletionSerializer
-
-    def get_queryset(self):
-        """
-        GET /api/courses/{course_id}/completions/
-        """
-        content_id = self.request.query_params.get('content_id', None)
-        stage = self.request.query_params.get('stage', None)
-        course_id = self.kwargs['course_id']
-        if not course_exists(self.request, self.request.user, course_id):
-            raise Http404
-        course_key = get_course_key(course_id)
-        queryset = CourseModuleCompletion.objects.filter(course_id=course_key).select_related('user')
-        user_ids = get_ids_from_list_param(self.request, 'user_id')
-        if user_ids:
-            queryset = queryset.filter(user__in=user_ids)
-
-        if content_id:
-            content_descriptor, content_key, existing_content = get_course_child(self.request, self.request.user, course_key, content_id)  # pylint: disable=W0612,C0301
-            if not content_descriptor:
-                raise Http404
-            queryset = queryset.filter(content_id=content_key)
-
-        if stage:
-            queryset = queryset.filter(stage=stage)
-
-        return queryset
-
-    def post(self, request, course_id):
-        """
-        POST /api/courses/{course_id}/completions/
-        """
-        content_id = request.data.get('content_id', None)
-        user_id = request.data.get('user_id', None)
-        stage = request.data.get('stage', None)
-        if not content_id:
-            return Response({'message': _('content_id is missing')}, status.HTTP_400_BAD_REQUEST)
-        if not user_id:
-            return Response({'message': _('user_id is missing')}, status.HTTP_400_BAD_REQUEST)
-        if not course_exists(request, request.user, course_id):
-            return Response({}, status=status.HTTP_404_NOT_FOUND)
-        course_key = get_course_key(course_id)
-        content_descriptor, content_key, existing_content = get_course_child(request, request.user, course_key, content_id)  # pylint: disable=W0612,C0301
-        if not content_descriptor:
-            return Response({'message': _('content_id is invalid')}, status.HTTP_400_BAD_REQUEST)
-
-        completion, created = CourseModuleCompletion.objects.get_or_create(user_id=user_id,
-                                                                           course_id=course_key,
-                                                                           content_id=content_key,
-                                                                           stage=stage)
-        serializer = CourseModuleCompletionSerializer(completion)
-        if created:
-            return Response(serializer.data, status=status.HTTP_201_CREATED)  # pylint: disable=E1101
-        else:
-            return Response({'message': _('Resource already exists')}, status=status.HTTP_409_CONFLICT)
-
 
 class CoursesMetricsGradesList(SecureListAPIView):
     """
@@ -1695,7 +1608,7 @@ class CoursesMetrics(SecureAPIView):
         }
 
         if 'users_started' in metrics_required:
-            users_started = StudentProgress.get_num_users_started(
+            users_started = get_num_users_started(
                 course_key,
                 exclude_users=exclude_users,
                 org_ids=org_ids,
@@ -1705,7 +1618,7 @@ class CoursesMetrics(SecureAPIView):
             data['users_not_started'] = data['users_enrolled'] - users_started
 
         if 'modules_completed' in metrics_required:
-            modules_completed = StudentProgress.get_total_completions(
+            modules_completed = get_total_completions(
                 course_key, exclude_users=exclude_users, org_ids=org_ids, group_ids=group_ids
             )
             data['modules_completed'] = modules_completed
@@ -1792,24 +1705,31 @@ class CoursesTimeSeriesMetrics(SecureAPIView):
         course_key = get_course_key(course_id)
         exclude_users = get_aggregate_exclusion_user_ids(course_key)
         grade_complete_match_range = getattr(settings, 'GRADEBOOK_GRADE_COMPLETE_PROFORMA_MATCH_RANGE', 0.01)
-        grades_qs = StudentGradebook.objects.filter(course_id__exact=course_key, user__is_active=True,
-                                                    user__courseenrollment__is_active=True,
-                                                    user__courseenrollment__course_id__exact=course_key).\
-            exclude(user_id__in=exclude_users)
+        grades_qs = StudentGradebook.objects.filter(
+            course_id__exact=course_key,
+            user__is_active=True,
+            user__courseenrollment__is_active=True,
+            user__courseenrollment__course_id__exact=course_key
+        ).exclude(user_id__in=exclude_users)
         grades_complete_qs = grades_qs.filter(proforma_grade__lte=F('grade') + grade_complete_match_range,
                                               proforma_grade__gt=0)
         enrolled_qs = CourseEnrollment.objects.filter(course_id__exact=course_key, user__is_active=True,
                                                       is_active=True).exclude(user_id__in=exclude_users)
-        users_started_qs = StudentProgress.objects.filter(course_id__exact=course_key, user__is_active=True,
-                                                          user__courseenrollment__is_active=True,
-                                                          user__courseenrollment__course_id__exact=course_key)\
-            .exclude(user_id__in=exclude_users)
-        modules_completed_qs = CourseModuleCompletion.get_actual_completions()\
-            .filter(course_id__exact=course_key,
-                    user__courseenrollment__is_active=True,
-                    user__courseenrollment__course_id__exact=course_key,
-                    user__is_active=True)\
-            .exclude(user_id__in=exclude_users)
+        users_started_qs = Aggregator.objects.filter(
+            course_key__exact=course_key,
+            user__is_active=True,
+            user__courseenrollment__is_active=True,
+            user__courseenrollment__course_id__exact=course_key,
+            aggregation_name='course',
+            earned__gt=0.0,
+        ).exclude(user_id__in=exclude_users)
+        modules_completed_qs = BlockCompletion.objects.filter(
+            course_key__exact=course_key,
+            user__courseenrollment__is_active=True,
+            user__courseenrollment__course_id__exact=course_key,
+            user__is_active=True,
+            completion__gt=0.0,
+        ).exclude(user_id__in=exclude_users)
         active_users_qs = StudentModule.objects\
             .filter(course_id__exact=course_key, student__is_active=True,
                     student__courseenrollment__is_active=True,
@@ -1842,7 +1762,7 @@ class CoursesTimeSeriesMetrics(SecureAPIView):
         )
         started_series = get_time_series_data(
             users_started_qs, start_dt, end_dt, interval=interval,
-            date_field='created', date_field_model=StudentProgress,
+            date_field='created', date_field_model=Aggregator,
             aggregate=Count('user', distinct=True)
         )
         completed_series = get_time_series_data(
@@ -1852,7 +1772,7 @@ class CoursesTimeSeriesMetrics(SecureAPIView):
         )
         modules_completed_series = get_time_series_data(
             modules_completed_qs, start_dt, end_dt, interval=interval,
-            date_field='created', date_field_model=CourseModuleCompletion,
+            date_field='created', date_field_model=BlockCompletion,
             aggregate=Count('id', distinct=True)
         )
 
@@ -2014,13 +1934,16 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
             course_key, user_id=user_id, exclude_users=exclude_users, org_ids=org_ids, group_ids=group_ids
         )
         total_users = data['total_users']
-        total_possible_completions = data['total_possible_completions']
 
         if not skipleaders and 'leaders' not in data:
-            queryset = StudentProgress.generate_leaderboard(course_key, count=count, exclude_users=exclude_users,
-                                                            org_ids=org_ids, group_ids=group_ids)
-            serializer = CourseCompletionsLeadersSerializer(queryset, many=True,
-                                                            context={'total_completions': total_possible_completions})
+            queryset = generate_leaderboard(
+                course_key,
+                count=count,
+                exclude_users=exclude_users,
+                org_ids=org_ids,
+                group_ids=group_ids
+            )
+            serializer = CourseCompletionsLeadersSerializer(queryset, many=True)
             data['leaders'] = serializer.data  # pylint: disable=E1101
             leader_boards_cache_cohort_size = getattr(settings, 'LEADER_BOARDS_CACHE_COHORT_SIZE', 5000)
             if total_users > leader_boards_cache_cohort_size:

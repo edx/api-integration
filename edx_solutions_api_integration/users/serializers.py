@@ -6,8 +6,7 @@ from django.core.exceptions import ObjectDoesNotExist
 
 from edx_solutions_api_integration.models import APIUser
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
-from edx_solutions_api_integration.utils import get_profile_image_urls_by_username, string_list_to_list
-from student.roles import CourseAccessRole
+from edx_solutions_api_integration.utils import get_profile_image_urls_by_username
 
 
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
@@ -46,7 +45,6 @@ class UserSerializer(DynamicFieldsModelSerializer):
     courses_enrolled = serializers.SerializerMethodField()
     roles = serializers.SerializerMethodField('get_user_roles')
     grades = serializers.SerializerMethodField('get_user_grades')
-    progress = serializers.SerializerMethodField('get_user_progress')
 
     def get_profile_image(self, user):
         """
@@ -99,28 +97,6 @@ class UserSerializer(DynamicFieldsModelSerializer):
 
         return {'grade': grade, 'proforma_grade': proforma_grade, 'section_breakdown': section_breakdown}
 
-    def get_user_progress(self, user):
-        """ returns user progress against course """
-        completion_percentage = 0
-        progress = user.studentprogress_set.all()
-        if 'course_id' in self.context and progress:
-            course_id = self.context['course_id']
-            actual_completions = next(
-                (
-                    progress_item.completions
-                    for progress_item in progress
-                    if progress_item.course_id == course_id
-                 ), 0
-            )
-            if self.context['course_meta_data']:
-                total_possible_completions = self.context['course_meta_data'].total_assessments
-                if total_possible_completions > 0:
-                    completion_percentage = min(
-                        int(round(100 * actual_completions / float(total_possible_completions))),
-                        100
-                    )
-        return completion_percentage
-
     class Meta(object):
         """ Serializer/field specification """
         model = APIUser
@@ -143,7 +119,6 @@ class UserSerializer(DynamicFieldsModelSerializer):
             "organizations",
             "roles",
             "grades",
-            "progress",
         )
         read_only_fields = ("id", "email", "username")
 
@@ -180,26 +155,8 @@ class CourseProgressSerializer(serializers.Serializer):
     proficiency = serializers.SerializerMethodField()
 
     def get_progress(self, enrollment):
-        completion_percentage = 0
-
-        actual_completions = next(
-            (
-                progress['completions']
-                for progress in self.context['student_progress']
-                if progress['course_id'] == enrollment['course_id']
-             ), 0
-        )
-        total_possible_completions = next(
-            (
-                metadata['total_assessments']
-                for metadata in self.context['course_metadata']
-                if metadata['id'] == enrollment['course_id']
-            ), 0
-        )
-
-        if total_possible_completions > 0:
-            completion_percentage = min(100 * (actual_completions / float(total_possible_completions)), 100)
-        return completion_percentage
+        course_id = enrollment['course_id']
+        return self.context['student_progress'].get(course_id, {}).get('percent', 0.) * 100
 
     def get_course(self, enrollment):
         course_overview = next(
@@ -217,6 +174,6 @@ class CourseProgressSerializer(serializers.Serializer):
                 user_grade['grade']
                 for user_grade in self.context['user_grades']
                 if user_grade['course_id'] == enrollment['course_id']
-             ), 0
+            ), 0
         )
         return int(round((proficiency * 100)))

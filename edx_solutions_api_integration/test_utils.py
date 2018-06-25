@@ -1,35 +1,29 @@
 """ This module has utility methods to be used in tests. """
-import uuid
-import json
-import mock
 import StringIO
-from PIL import Image
-from functools import wraps
+import json
+import uuid
 from datetime import datetime, timedelta
+from functools import wraps
 
-from django.conf import settings
-from django.core.files.uploadedfile import InMemoryUploadedFile
-from django.db.models.signals import post_save
-from django.test import Client
-from django.utils.http import urlencode
-
-from util.db import OuterAtomic
-from capa.tests.response_xml_factory import StringResponseXMLFactory
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
-from xmodule.modulestore.django import SignalHandler
+import mock
+from PIL import Image
 from courseware import module_render
 from courseware.model_data import FieldDataCache
+from django.conf import settings
+from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.test import Client
+from django.utils.http import urlencode
 from lms.djangoapps.grades.signals.signals import PROBLEM_WEIGHTED_SCORE_CHANGED
+from oauth2_provider import models as dot_models
+from student.tests.factories import UserFactory
+from util.db import OuterAtomic
+from xmodule.modulestore.django import SignalHandler
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
+
 from course_metadata.signals import (
     course_publish_handler_in_course_metadata as listener_in_course_metadata
 )
 from gradebook.signals import on_course_grade_changed
-from progress.models import CourseModuleCompletion
-from progress.signals import (
-    handle_cmc_post_save_signal as cmc_post_save_listener
-)
-from oauth2_provider import models as dot_models
-from student.tests.factories import UserFactory
 
 
 def get_temporary_image():
@@ -56,12 +50,15 @@ def make_non_atomic(*args):
     """
     Disables outer atomic restriction in testcase
     """
+
     def _wrap(func):
         @wraps(func)
         def _wrapped_func(*args, **kwargs):
             OuterAtomic.atomic_for_testcase_calls = number_of_calls
             func(*args, **kwargs)
+
         return _wrapped_func
+
     if len(args) == 1 and callable(args[0]):
         number_of_calls = 100
         return _wrap(args[0])
@@ -74,6 +71,7 @@ class CourseGradingMixin(object):
     """
     Mixin class to setup a course with grading to be used in tests
     """
+
     def setup_course_with_grading(self, start=None, end=None):
         grading_course = CourseFactory.create(
             start=start,
@@ -253,7 +251,8 @@ class APIClientMixin(Client):
             'X-Edx-Api-Key': str(self.TEST_API_KEY),
         }
         json_data = json.dumps(data)
-        return self.client.delete(uri, content_type='application/json', data=json_data, headers=headers)
+        return self.client.delete(uri, content_type='application/json', data=json_data,
+                                  headers=headers)
 
 
 class SignalDisconnectTestMixin(object):
@@ -279,9 +278,6 @@ class SignalDisconnectTestMixin(object):
         SignalHandler.course_published.connect(
             listener_in_course_metadata, dispatch_uid='course_metadata'
         )
-        post_save.connect(
-            cmc_post_save_listener, sender=CourseModuleCompletion, dispatch_uid='lms.progress.post_save_cms'
-        )
         PROBLEM_WEIGHTED_SCORE_CHANGED.connect(on_course_grade_changed)
 
     @staticmethod
@@ -291,9 +287,6 @@ class SignalDisconnectTestMixin(object):
         """
         SignalHandler.course_published.disconnect(
             listener_in_course_metadata, dispatch_uid='course_metadata'
-        )
-        post_save.disconnect(
-            cmc_post_save_listener, sender=CourseModuleCompletion, dispatch_uid='lms.progress.post_save_cms'
         )
         PROBLEM_WEIGHTED_SCORE_CHANGED.disconnect(on_course_grade_changed)
 

@@ -44,7 +44,7 @@ from openedx.core.djangoapps.user_api.models import UserPreference
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from edx_notifications.lib.consumer import mark_notification_read
 from course_metadata.models import CourseAggregatedMetaData, CourseSetting
-from progress.models import StudentProgress
+from completion_aggregator.models import Aggregator
 from student.models import CourseEnrollment, CourseEnrollmentException, PasswordHistory, UserProfile
 from student.roles import (
     CourseAccessRole,
@@ -61,7 +61,6 @@ from util.password_policy_validators import (
 )
 from xmodule.modulestore import InvalidLocationError
 
-from progress.serializers import CourseModuleCompletionSerializer
 from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
 from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView, IdsInFilterBackend, \
     HasOrgsFilterBackend, TokenBasedAPIView
@@ -72,7 +71,6 @@ from edx_solutions_api_integration.utils import (
     dict_has_items,
     extract_data_params,
     get_user_from_request_params,
-    get_aggregate_exclusion_user_ids,
     get_profile_image_urls_by_username,
     str2bool,
     css_param_to_list,
@@ -339,7 +337,7 @@ class UsersList(SecureListAPIView):
             if courses:
                 courses = map(CourseKey.from_string, courses)
                 queryset = queryset.filter(courseenrollment__course_id__in=courses).distinct()
-                
+
         queryset = queryset.prefetch_related(
             'organizations',
             'courseaccessrole_set',
@@ -1332,37 +1330,6 @@ class UsersWorkgroupsList(SecureListAPIView):
         return queryset
 
 
-class UsersCoursesCompletionsList(SecureListAPIView):
-    """
-    ### The UsersCoursesCompletionsList view allows clients to retrieve a list of course completions
-    for a user
-    - URI: ```/api/users/{user_id}/courses/{course_id}/completions/```
-    - GET: Provides paginated list of course completions a user
-    To filter the user's course completions by course content
-    GET ```/api/users/{user_id}/courses/{course_id}/completions/?content_id={content_id}```
-    """
-
-    serializer_class = CourseModuleCompletionSerializer
-
-    def get_queryset(self):
-        user_id = self.kwargs['user_id']
-        course_id = self.kwargs.get('course_id', None)
-        content_id = self.request.query_params.get('content_id', None)
-        try:
-            user = User.objects.get(id=user_id)
-        except ObjectDoesNotExist:
-            raise Http404
-
-        queryset = user.course_completions.all()
-
-        if course_id:
-            queryset = queryset.filter(course_id=course_id)
-        if content_id:
-            queryset = queryset.filter(content_id=content_id)
-
-        return queryset
-
-
 class UsersSocialMetrics(SecureListAPIView):
     """
     ### The UsersSocialMetrics view allows clients to query about the activity of a user in the
@@ -1668,8 +1635,14 @@ class UsersCourseProgressList(SecureListAPIView):
 
         user_grades = StudentGradebook.objects.filter(course_id__in=course_keys, user_id=user.id)\
             .values('course_id', 'grade')
-        student_progress = StudentProgress.objects.filter(course_id__in=course_keys, user=user)\
-            .values('course_id', 'completions')
+        student_progress = {
+            str(progress['course_key']): progress
+            for progress in Aggregator.objects.filter(
+                course_key__in=course_keys,
+                user=user,
+                aggregation_name='course'
+            ).values('course_key', 'earned', 'possible', 'percent')
+        }
         course_meta_data = CourseAggregatedMetaData.objects.filter(id__in=course_keys)\
             .values('id', 'total_assessments')
         course_overview = CourseOverview.objects.filter(id__in=course_keys)

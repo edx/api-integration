@@ -1,34 +1,40 @@
 """
 Tests to support bulk_delete_courses_with_reference_data django management command
 """
+from datetime import datetime, timedelta
+
 import mock
 import pytz
-from datetime import datetime, timedelta
-from freezegun import freeze_time
-from mock import PropertyMock
-
+from completion.waffle import ENABLE_COMPLETION_TRACKING, WAFFLE_NAMESPACE
+from completion_aggregator.models import Aggregator
+from courseware.models import StudentModule
 from django.conf import settings
 from django.core.management import call_command
-from django.test.utils import override_settings
 from django.core.management.base import CommandError
-
-from edx_solutions_api_integration.models import CourseGroupRelationship
-from gradebook.models import StudentGradebook
-from progress.models import StudentProgress, CourseModuleCompletion
-from student.models import CourseEnrollment, CourseAccessRole
-from course_metadata.models import CourseAggregatedMetaData
-from openedx.core.djangoapps.content.course_structures.models import CourseStructure
+from django.test.utils import override_settings
+from freezegun import freeze_time
+from mock import PropertyMock
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from courseware.models import StudentModule
-from student.tests.factories import UserFactory, GroupFactory
+from openedx.core.djangoapps.content.course_structures.models import CourseStructure
+from student.models import CourseAccessRole, CourseEnrollment
+from student.tests.factories import GroupFactory, UserFactory
+from waffle.testutils import override_switch
+from xmodule.course_module import CourseDescriptor
+from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_store_config
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
-from xmodule.modulestore.django import modulestore
-from xmodule.course_module import CourseDescriptor
+
+from course_metadata.models import CourseAggregatedMetaData
+from edx_solutions_api_integration.models import CourseGroupRelationship
+from gradebook.models import StudentGradebook
 
 MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 
 
+@override_switch(
+    '{}.{}'.format(WAFFLE_NAMESPACE, ENABLE_COMPLETION_TRACKING),
+    active=True,
+)
 @override_settings(MODULESTORE=MODULESTORE_CONFIG)
 class BulkCourseDeleteTests(ModuleStoreTestCase):
     """
@@ -53,10 +59,11 @@ class BulkCourseDeleteTests(ModuleStoreTestCase):
         return course
 
     @staticmethod
-    def create_course_reference_data(course_key):
+    def create_course_reference_data(course):
         """
         Populates DB with test data
         """
+        course_key = course.id
         user = UserFactory()
         group = GroupFactory()
         CourseGroupRelationship(course_id=course_key, group=group).save()
@@ -69,8 +76,6 @@ class BulkCourseDeleteTests(ModuleStoreTestCase):
             grade_summary='test',
             grading_policy='test',
         ).save()
-        StudentProgress(user=user, course_id=course_key, completions=1).save()
-        CourseModuleCompletion(user=user, course_id=course_key, content_id='test', stage='test').save()
         CourseEnrollment(user=user, course_id=course_key).save()
         CourseAccessRole(user=user, course_id=course_key, org='test', role='TA').save()
         handouts_usage_key = course_key.make_usage_key('course_info', 'handouts')
@@ -94,8 +99,6 @@ class BulkCourseDeleteTests(ModuleStoreTestCase):
         """
         self.assertEqual(1, CourseGroupRelationship.objects.filter(course_id=course_id).count())
         self.assertEqual(1, StudentGradebook.objects.filter(course_id=course_id).count())
-        self.assertEqual(1, StudentProgress.objects.filter(course_id=course_id).count())
-        self.assertEqual(1, CourseModuleCompletion.objects.filter(course_id=course_id).count())
         self.assertEqual(1, CourseEnrollment.objects.filter(course_id=course_id).count())
         self.assertEqual(1, CourseAccessRole.objects.filter(course_id=course_id).count())
         self.assertEqual(1, StudentModule.objects.filter(course_id=course_id).count())
@@ -113,8 +116,7 @@ class BulkCourseDeleteTests(ModuleStoreTestCase):
         """
         self.assertEqual(0, CourseGroupRelationship.objects.filter(course_id=course_id).count())
         self.assertEqual(0, StudentGradebook.objects.filter(course_id=course_id).count())
-        self.assertEqual(0, StudentProgress.objects.filter(course_id=course_id).count())
-        self.assertEqual(0, CourseModuleCompletion.objects.filter(course_id=course_id).count())
+        self.assertEqual(0, Aggregator.objects.filter(course_key=course_id).count())
         self.assertEqual(0, CourseEnrollment.objects.filter(course_id=course_id).count())
         self.assertEqual(0, CourseAccessRole.objects.filter(course_id=course_id).count())
         self.assertEqual(0, StudentModule.objects.filter(course_id=course_id).count())
@@ -134,7 +136,7 @@ class BulkCourseDeleteTests(ModuleStoreTestCase):
         with freeze_time(past_datetime):
             while len(course_ids) < number_of_courses:
                 course = BulkCourseDeleteTests.create_course()
-                BulkCourseDeleteTests.create_course_reference_data(course.id)
+                BulkCourseDeleteTests.create_course_reference_data(course)
                 course_ids.append(course.id)
         return course_ids
 
