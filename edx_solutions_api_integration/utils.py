@@ -29,6 +29,10 @@ USER_METRICS_CACHE_TTL = 60 * 60
 COURSE_METRICS_CACHE_TTL = 30 * 60
 
 
+PERMISSION_GROUPS = {
+    'MCKA_COURSE_OPS_ADMIN': 'mcka_role_course_ops_admin',
+}
+
 def address_exists_in_network(ip_address, net_n_bits):
     """
     return True if the ip address exists in the subnet address
