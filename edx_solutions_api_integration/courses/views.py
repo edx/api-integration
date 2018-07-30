@@ -23,6 +23,23 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Count, F, Max, Min, Q
 from django.http import Http404
 from django.utils.translation import ugettext_lazy as _
+from django.db.models import Q, F
+from opaque_keys.edx.keys import UsageKey
+
+from requests.exceptions import ConnectionError
+
+from rest_framework import status
+from rest_framework.response import Response
+
+from courseware.courses import get_course_about_section, get_course_info_section, get_course_info_section_module
+from courseware.models import StudentModule
+from courseware.views.views import get_static_tab_fragment
+from mobile_api.course_info.views import apply_wrappers_to_content
+from openedx.core.lib.xblock_utils import get_course_update_items
+from openedx.core.lib.courses import course_image_url
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from openedx.core.djangoapps.user_api.models import UserPreference
+from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
 from django_comment_common.models import FORUM_ROLE_MODERATOR
 from instructor.access import revoke_access, update_forum_role
 from lms.djangoapps.course_api.blocks.api import get_blocks
@@ -89,6 +106,9 @@ from edx_solutions_api_integration.users.serializers import (
     UserCountByCitySerializer,
     UserSerializer,
 )
+from progress.models import CourseModuleCompletion
+from social_engagement.models import StudentSocialEngagementScore
+from edx_solutions_api_integration.users.views import UsersPreferences
 from edx_solutions_api_integration.utils import (
     cache_course_data,
     cache_course_user_data,
@@ -1153,6 +1173,7 @@ class CoursesUsersList(SecureListAPIView):
             "full_name",
             "is_staff",
             "last_login",
+            "attributes",
         ])
         serializer_context.update({
             'course_id': self.course_key,
@@ -1167,6 +1188,9 @@ class CoursesUsersList(SecureListAPIView):
         """
         # Get a list of all enrolled students
         users = CourseEnrollment.objects.users_enrolled_in(self.course_key)
+
+        attribute_keys = css_param_to_list(self.request, 'attribute_keys')
+        attribute_values = css_param_to_list(self.request, 'attribute_values')
 
         orgs = get_ids_from_list_param(self.request, 'organizations')
         if orgs:
@@ -1202,7 +1226,16 @@ class CoursesUsersList(SecureListAPIView):
                 'courseenrollment_set'
             )
 
+        if 'progress' in additional_fields:
+            users = users.prefetch_related(
+                'studentprogress_set'
+            )
+
+        for i, attribute_key in enumerate(attribute_keys):
+            users = users.filter(preferences__key=attribute_key, preferences__value=attribute_values[i]).all()
+
         users = users.select_related('profile')
+        users = users.prefetch_related('preferences')
         return users
 
 
@@ -2059,8 +2092,11 @@ class CoursesMetricsSocial(SecureListAPIView):
 
         try:
             slash_course_id = get_course_key(course_id, slashseparated=True)
-            organization = request.query_params.get('organization', None)
             # the forum service expects the legacy slash separated string format
+
+            organization = request.query_params.get('organization', None)
+            attribute_keys = css_param_to_list(self.request, 'attribute_keys')
+            attribute_values = css_param_to_list(self.request, 'attribute_values')
 
             # load the course so that we can see when the course end date is
             course_descriptor, course_key, course_content = get_course(self.request, self.request.user, course_id)  # pylint: disable=W0612,C0301
@@ -2081,6 +2117,13 @@ class CoursesMetricsSocial(SecureListAPIView):
                     del data[str(user_id)]
             enrollment_qs = CourseEnrollment.objects.users_enrolled_in(course_key).filter(is_active=True)\
                 .exclude(id__in=exclude_users)
+
+            for i, attribute_key in enumerate(attribute_keys):
+                enrollment_qs = enrollment_qs.filter(
+                    preferences__key=attribute_key,
+                    preferences__value=attribute_values[i]
+                ).all()
+
             actual_data = {}
             if organization:
                 enrollment_qs = enrollment_qs.filter(organizations=organization)
