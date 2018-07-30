@@ -63,8 +63,15 @@ from xmodule.modulestore import InvalidLocationError
 
 from progress.serializers import CourseModuleCompletionSerializer
 from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
-from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView, IdsInFilterBackend, \
-    HasOrgsFilterBackend
+from edx_solutions_organizations.models import Organization, OrganizationGroupUser
+from edx_solutions_api_integration.permissions import (
+    SecureAPIView,
+    SecureListAPIView,
+    IdsInFilterBackend,
+    HasOrgsFilterBackend,
+    MobileAPIView,
+    IsOpsAdminOrReadOnlyView
+)
 from edx_solutions_api_integration.models import GroupProfile, APIUser as User
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from edx_solutions_api_integration.utils import (
@@ -1714,3 +1721,98 @@ class UsersListWithEnrollment(UsersList):  # pylint: disable=too-many-ancestors
                 else:
                     response.data['courses'].append(course_key_string)
         return response
+
+
+class ClientSpecificAttributesView(MobileAPIView):
+    """
+    **Use Case**
+
+        Add client specific fields against user.
+
+    **Example Requests**
+
+        GET /api/users/{user_id}/attributes
+        POST /api/users/{user_id}/attributes
+
+        **POST Parameters**
+
+        The body of the POST request must include the following parameters.
+
+        "name": "Sample Name"
+        "value": "Value"
+
+    **Response Values**
+
+        **GET**
+
+        If the request is successful, the request returns an HTTP 200 "OK" response.
+
+        * name: Name
+        * value: Value
+
+        **POST**
+
+        If the request is successful, the request returns an HTTP 201 "CREATED" response.
+    """
+
+    def __init__(self):
+        self.permission_classes += (IsOpsAdminOrReadOnlyView,)
+
+    def get(self, request, user_id):
+        """
+        GET /api/users/{user_id}/attributes
+        """
+        name_list = css_param_to_list(self.request, 'name_list')
+
+        response = []
+        for item in UserPreference.objects.filter(user_id=user_id, key__in=name_list):
+            response.append({
+                "name": item.key,
+                "value": item.value,
+            })
+
+        return Response(response, status.HTTP_200_OK)
+
+    def post(self, request, user_id):
+        """
+        POST /api/users/{user_id}/attributes
+        """
+        organization_id = request.data.get('organization_id')
+
+        name = request.data.get('name')
+        value = request.data.get('value')
+
+        try:
+            organization = Organization.objects.get(id=organization_id)
+        except ObjectDoesNotExist:
+            return Response({
+                "detail": 'Organization with {}, does not exists.'.format(organization_id)
+            }, status.HTTP_404_NOT_FOUND)
+
+        if not organization.is_attribute_exists(name):
+            return Response({
+                "detail": 'Name with {} does not exists.'.format(name)
+            }, status.HTTP_404_NOT_FOUND)
+
+        UserPreference.objects.create(key=name, value=value, user_id=user_id)
+
+        return Response({}, status=status.HTTP_201_CREATED)
+
+    def put(self, request, user_id):
+        """
+        PUT /api/users/{user_id}/attributes
+        """
+        name = request.data.get('name')
+        value = request.data.get('value')
+
+        try:
+            item = UserPreference.objects.get(key=name, user_id=user_id)
+        except ObjectDoesNotExist:
+            return Response({
+                "detail": 'Field with name {}, does not exists.'.format(name)
+            }, status.HTTP_404_NOT_FOUND)
+
+        item.value = value
+        item.save()
+
+        return Response({}, status=status.HTTP_200_OK)
