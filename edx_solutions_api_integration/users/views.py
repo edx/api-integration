@@ -64,7 +64,7 @@ from xmodule.modulestore import InvalidLocationError
 from progress.serializers import CourseModuleCompletionSerializer
 from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
 from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView, IdsInFilterBackend, \
-    HasOrgsFilterBackend, TokenBasedAPIView
+    HasOrgsFilterBackend, TokenBasedAPIView, UsernamesInFilterBackend
 from edx_solutions_api_integration.models import GroupProfile, APIUser as User
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from edx_solutions_api_integration.utils import (
@@ -240,8 +240,9 @@ class UsersList(SecureListAPIView):
         GET /api/users?email={john@example}&match=partial
         GET /api/users?name={john doe}
         GET /api/users?name={joh}&match=partial
-        GET /api/users?organization_display_name={xyz}&match=partial
         GET /api/users?username={john}
+        GET /api/users?username=john,mark
+        GET /api/users?organization_display_name={xyz}&match=partial
             * email: string, filters user set by email address
             * username: string, filters user set by username
             * name: string, filters user set by full name
@@ -293,8 +294,7 @@ class UsersList(SecureListAPIView):
     """
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    filter_backends = (filters.DjangoFilterBackend, IdsInFilterBackend, HasOrgsFilterBackend)
-    filter_fields = ('username', )
+    filter_backends = (filters.DjangoFilterBackend, IdsInFilterBackend, UsernamesInFilterBackend, HasOrgsFilterBackend)
 
     def get_queryset(self):
         """

@@ -139,6 +139,24 @@ class IdsInFilterBackend(filters.BaseFilterBackend):
         return queryset
 
 
+class UsernamesInFilterBackend(filters.BaseFilterBackend):
+    """
+    This backend support filtering queryset by a list of usernames
+    """
+    def filter_queryset(self, request, queryset, view):
+        """
+        Parse querystring to get ids and the filter the queryset
+        Max of 800 values are allowed for performance reasons
+        (800 satisfies a specific client integration use case)
+        """
+        upper_bound = getattr(settings, 'API_LOOKUP_UPPER_BOUND', 800)
+        usernames = request.query_params.get('username')
+        if usernames:
+            usernames = usernames.split(",")[:upper_bound]
+            return queryset.filter(username__in=usernames)
+        return queryset
+
+
 class HasOrgsFilterBackend(filters.BaseFilterBackend):
     """
         This backend support filtering users with and organization association or not
