@@ -14,7 +14,7 @@ import before_after
 import six
 import json
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from random import randint
 from urllib import urlencode
@@ -2438,13 +2438,10 @@ class TokenBasedUsersApiTests(CacheIsolationTestCase, APIClientMixin, OAuth2Toke
     def setUp(self):
         super(TokenBasedUsersApiTests, self).setUp()
 
-        self.users_base_uri = '/api/server/users'
         self.token_based_user_uri = '/api/server/users/validate-token/'
 
         self.client = Client()
-
         self.user_id = UserFactory.create().id
-
         self.user = User.objects.get(id=self.user_id)
         self.bearer_token = self.create_oauth2_token(self.user)
 
