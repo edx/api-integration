@@ -14,7 +14,7 @@ import before_after
 import six
 import json
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from random import randint
 from urllib import urlencode
@@ -24,6 +24,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.test.utils import override_settings
+from django.test import Client
 from django.utils import timezone
 from django.db import transaction
 from django.utils.translation import ugettext as _
@@ -59,6 +60,7 @@ from edx_solutions_api_integration.test_utils import (
     CourseGradingMixin,
     APIClientMixin,
     SignalDisconnectTestMixin,
+    OAuth2TokenMixin,
 )
 
 from notification_prefs import NOTIFICATION_PREF_KEY
@@ -2427,6 +2429,41 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['first_name'], test_first_name)
         self.assertEqual(response.data['last_name'], test_last_name)
         self.assertEqual(response.data['full_name'], u'{} {}'.format(test_first_name, test_last_name))
+
+
+@ddt.ddt
+class TokenBasedUsersApiTests(CacheIsolationTestCase, APIClientMixin, OAuth2TokenMixin):
+    """ Test suite for Token Based Users API views """
+
+    def setUp(self):
+        super(TokenBasedUsersApiTests, self).setUp()
+
+        self.users_base_uri = '/api/server/users'
+        self.token_based_user_uri = '/api/server/users/validate-token/'
+
+        self.client = Client()
+
+        self.user_id = UserFactory.create().id
+
+        self.user = User.objects.get(id=self.user_id)
+        self.bearer_token = self.create_oauth2_token(self.user)
+
+    def test_token_based_user_details_get(self):
+
+        response = self.client.get(self.token_based_user_uri,
+                                   HTTP_AUTHORIZATION="Bearer {0}".format(self.bearer_token))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(response.data['id'], 0)
+        self.assertEqual(response.data['email'], self.user.email)
+        self.assertEqual(response.data['username'], self.user.username)
+        self.assertEqual(response.data['is_active'], True)
+
+    def test_fake_token_user_details_get(self):
+        response = self.client.get(self.token_based_user_uri,
+                                   HTTP_AUTHORIZATION="Bearer {0}".format('fake-bearer-token'))
+
+        self.assertEqual(response.status_code, 401)
 
 
 @ddt.ddt
