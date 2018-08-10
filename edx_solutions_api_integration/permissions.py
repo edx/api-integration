@@ -176,6 +176,13 @@ class MobilePermissionMixin(object):
     permission_classes = (permissions.IsAuthenticated, )
 
 
+class TokenBasedAuthenticationMixin(object):
+    """
+    Mixin to set custom authentication_classes
+    """
+    authentication_classes = (OAuth2AuthenticationAllowInactiveUser, )
+
+
 class FilterBackendMixin(object):
     """
     Mixin to set custom filter_backends
@@ -277,6 +284,13 @@ class MobileListAPIView(MobilePermissionMixin, FilterBackendMixin, PaginationMix
 
 
 class MobileAPIView(MobilePermissionMixin, APIView):
+    """
+    Inherited from APIView
+    """
+    pass
+
+
+class TokenBasedAPIView(TokenBasedAuthenticationMixin, APIView):
     """
     Inherited from APIView
     """

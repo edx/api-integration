@@ -52,5 +52,7 @@ urlpatterns = patterns(
     url(r'^(?P<user_id>[a-zA-Z0-9]+)/courses/progress',
         users_views.UsersCourseProgressList.as_view(), name='users-courses-progress'),
     url(r'^integration-test-users/$', users_views.UsersListWithEnrollment.as_view(), name='integration-test-users'),
+    url(r'validate-token/$', users_views.TokenBasedUserDetails.as_view(),
+        name='validate-bearer-token'),
 )
 urlpatterns = format_suffix_patterns(urlpatterns)

@@ -3,10 +3,8 @@ Tests for user related use cases in mobile APIs
 """
 import ddt
 from capa.tests.response_xml_factory import MultipleChoiceResponseXMLFactory
-from datetime import datetime, timedelta
 
 from mobileapps.models import Theme, MobileApp
-from oauth2_provider import models as dot_models
 import urllib
 
 from mobile_api.testutils import MobileAPITestCase
@@ -16,30 +14,9 @@ from student.tests.factories import UserFactory, CourseEnrollmentFactory
 from lms.djangoapps.grades.tests.utils import answer_problem
 from gradebook.models import StudentGradebook
 from xmodule.modulestore.tests.factories import ItemFactory
-
-
-def _create_oauth2_token(user):
-    """
-    Create an OAuth2 Access Token for the specified user,
-    to test OAuth2-based API authentication
-    Returns the token as a string.
-    """
-    # Use django-oauth-toolkit (DOT) models to create the app and token:
-    dot_app = dot_models.Application.objects.create(
-        name='test app',
-        user=UserFactory.create(),
-        client_type='confidential',
-        authorization_grant_type='authorization-code',
-        redirect_uris='http://none.none'
-    )
-    dot_access_token = dot_models.AccessToken.objects.create(
-        user=user,
-        application=dot_app,
-        expires=datetime.utcnow() + timedelta(weeks=1),
-        scope='read',
-        token='s3cur3t0k3n12345678901234567890'
-    )
-    return dot_access_token.token
+from edx_solutions_api_integration.test_utils import (
+    OAuth2TokenMixin,
+)
 
 
 class TestUserOrganizationsApi(MobileAPITestCase):
@@ -268,7 +245,7 @@ class TestUserDiscussionMetricsApi(MobileAPITestCase):
 
 
 @ddt.ddt
-class TestUserCourseGradesApi(MobileAPITestCase):
+class TestUserCourseGradesApi(MobileAPITestCase, OAuth2TokenMixin):
     """
     Tests for /api/server/mobile/v1/users/courses/grades?username=<username>&course_id=<course_id>
     """
@@ -488,7 +465,7 @@ class TestUserCourseGradesApi(MobileAPITestCase):
             }
         )
         # Now, try with a valid token header:
-        token = _create_oauth2_token(self.user)
+        token = self.create_oauth2_token(self.user)
         response = self.client.get(url, HTTP_AUTHORIZATION="Bearer {0}".format(token))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['course_grade'], user_grade)

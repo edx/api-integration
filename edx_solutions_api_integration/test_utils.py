@@ -5,6 +5,7 @@ import mock
 import StringIO
 from PIL import Image
 from functools import wraps
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
@@ -27,6 +28,8 @@ from progress.models import CourseModuleCompletion
 from progress.signals import (
     handle_cmc_post_save_signal as cmc_post_save_listener
 )
+from oauth2_provider import models as dot_models
+from student.tests.factories import UserFactory
 
 
 def get_temporary_image():
@@ -293,3 +296,32 @@ class SignalDisconnectTestMixin(object):
             cmc_post_save_listener, sender=CourseModuleCompletion, dispatch_uid='lms.progress.post_save_cms'
         )
         PROBLEM_WEIGHTED_SCORE_CHANGED.disconnect(on_course_grade_changed)
+
+
+class OAuth2TokenMixin(object):
+    """
+       Mixin for tests to create bearer token.
+    """
+
+    def create_oauth2_token(self, user):
+        """
+        Create an OAuth2 Access Token for the specified user,
+        to test OAuth2-based API authentication
+        Returns the token as a string.
+        """
+        # Use django-oauth-toolkit (DOT) models to create the app and token:
+        dot_app = dot_models.Application.objects.create(
+            name='test app',
+            user=UserFactory.create(),
+            client_type='confidential',
+            authorization_grant_type='authorization-code',
+            redirect_uris='http://none.none'
+        )
+        dot_access_token = dot_models.AccessToken.objects.create(
+            user=user,
+            application=dot_app,
+            expires=datetime.utcnow() + timedelta(weeks=1),
+            scope='read',
+            token='s3cur3t0k3n12345678901234567890'
+        )
+        return dot_access_token.token

@@ -64,7 +64,7 @@ from xmodule.modulestore import InvalidLocationError
 from progress.serializers import CourseModuleCompletionSerializer
 from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
 from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView, IdsInFilterBackend, \
-    HasOrgsFilterBackend
+    HasOrgsFilterBackend, TokenBasedAPIView
 from edx_solutions_api_integration.models import GroupProfile, APIUser as User
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from edx_solutions_api_integration.utils import (
@@ -457,6 +457,32 @@ class UsersList(SecureListAPIView):
         response_data = _serialize_user(response_data, user)
         response_data['uri'] = '{}/{}'.format(base_uri, str(user.id))
         return Response(response_data, status=status.HTTP_201_CREATED)
+
+
+class TokenBasedUserDetails(TokenBasedAPIView):
+    """
+    ### The TokenBasedUserDetails view allows clients to interact with a specific User entity
+    - URI: ```/api/server/users/validate-token```
+    - GET: Returns a JSON representation of the specified User entity
+
+    ### Use Cases/Notes:
+    * Use the TokenBasedUserDetails view to obtain the current state for a specific User
+      by providing Bearer token in request
+    """
+
+    def get(self, request):
+        """
+        GET /api/server/users/validate-token
+        """
+        response_data = {}
+        try:
+            existing_user = User.objects.get(id=request.user.id)
+        except ObjectDoesNotExist:
+            return Response(response_data, status=status.HTTP_404_NOT_FOUND)
+
+        _serialize_user(response_data, existing_user)
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class UsersDetail(SecureAPIView):
