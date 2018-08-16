@@ -2441,7 +2441,7 @@ class TokenBasedUsersApiTests(CacheIsolationTestCase, APIClientMixin, OAuth2Toke
         self.token_based_user_uri = '/api/server/users/validate-token/'
 
         self.client = Client()
-        self.user = UserFactory.create().id
+        self.user = UserFactory.create()
         self.bearer_token = self.create_oauth2_token(self.user)
 
     def test_token_based_user_details_get(self):
