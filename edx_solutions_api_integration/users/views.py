@@ -475,12 +475,8 @@ class TokenBasedUserDetails(TokenBasedAPIView):
         GET /api/server/users/validate-token
         """
         response_data = {}
-        try:
-            existing_user = User.objects.get(id=request.user.id)
-        except ObjectDoesNotExist:
-            return Response(response_data, status=status.HTTP_404_NOT_FOUND)
 
-        _serialize_user(response_data, existing_user)
+        _serialize_user(response_data, request.user)
 
         return Response(response_data, status=status.HTTP_200_OK)
 
