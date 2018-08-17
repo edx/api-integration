@@ -63,7 +63,7 @@ from xmodule.modulestore import InvalidLocationError
 
 from progress.serializers import CourseModuleCompletionSerializer
 from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
-from edx_solutions_organizations.models import Organization, OrganizationGroupUser
+from edx_solutions_organizations.models import Organization, OrganizationGroupUser, OrganizationUsersAttributes
 from edx_solutions_api_integration.permissions import (
     SecureAPIView,
     SecureListAPIView,
@@ -1762,12 +1762,22 @@ class ClientSpecificAttributesView(MobileAPIView):
         """
         GET /api/users/{user_id}/attributes
         """
-        name_list = css_param_to_list(self.request, 'name_list')
-
         response = []
-        for item in UserPreference.objects.filter(user_id=user_id, key__in=name_list):
+
+        key_list = css_param_to_list(self.request, 'key_list')
+        organization_id = request.query_params.get('organization_id', None)
+
+        try:
+            organization = Organization.objects.get(id=organization_id)
+        except ObjectDoesNotExist:
+            return Response({
+                "detail": 'Organization with {}, does not exists.'.format(organization_id)
+            }, status.HTTP_404_NOT_FOUND)
+
+        key_list = [key for key in key_list if organization.is_key_exists(key)]
+        for item in OrganizationUsersAttributes.objects.filter(user_id=user_id, key__in=key_list):
             response.append({
-                "name": item.key,
+                "key": item.key,
                 "value": item.value,
             })
 
@@ -1779,7 +1789,7 @@ class ClientSpecificAttributesView(MobileAPIView):
         """
         organization_id = request.data.get('organization_id')
 
-        name = request.data.get('name')
+        key = request.data.get('key')
         value = request.data.get('value')
 
         try:
@@ -1789,27 +1799,50 @@ class ClientSpecificAttributesView(MobileAPIView):
                 "detail": 'Organization with {}, does not exists.'.format(organization_id)
             }, status.HTTP_404_NOT_FOUND)
 
-        if not organization.is_attribute_exists(name):
+        if not organization.is_key_exists(key):
             return Response({
-                "detail": 'Name with {} does not exists.'.format(name)
+                "detail": 'Key with {} does not exists.'.format(key)
             }, status.HTTP_404_NOT_FOUND)
 
-        UserPreference.objects.create(key=name, value=value, user_id=user_id)
-
+        try:
+            OrganizationUsersAttributes.objects.create(
+                key=key,
+                value=value,
+                user_id=user_id,
+                organization_id=organization_id
+            )
+        except IntegrityError:
+            return Response({
+                "detail": 'Key with {}, already exists.'.format(key)
+            }, status.HTTP_409_CONFLICT)
         return Response({}, status=status.HTTP_201_CREATED)
 
     def put(self, request, user_id):
         """
         PUT /api/users/{user_id}/attributes
         """
-        name = request.data.get('name')
+        organization_id = request.data.get('organization_id')
+
+        key = request.data.get('key')
         value = request.data.get('value')
 
         try:
-            item = UserPreference.objects.get(key=name, user_id=user_id)
+            organization = Organization.objects.get(id=organization_id)
         except ObjectDoesNotExist:
             return Response({
-                "detail": 'Field with name {}, does not exists.'.format(name)
+                "detail": 'Organization with {}, does not exists.'.format(organization_id)
+            }, status.HTTP_404_NOT_FOUND)
+
+        if not organization.is_key_exists(key):
+            return Response({
+                "detail": 'Key with {} does not exists.'.format(key)
+            }, status.HTTP_404_NOT_FOUND)
+
+        try:
+            item = OrganizationUsersAttributes.objects.get(key=key, user_id=user_id)
+        except ObjectDoesNotExist:
+            return Response({
+                "detail": 'Field with key {}, does not exists.'.format(key)
             }, status.HTTP_404_NOT_FOUND)
 
         item.value = value
