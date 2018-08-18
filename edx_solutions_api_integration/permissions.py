@@ -160,7 +160,7 @@ class PermissionMixin(object):
     """
     Mixin to set custom permission_classes
     """
-    permission_classes = (ApiKeyHeaderPermission, IPAddressRestrictedPermission)
+    # permission_classes = (ApiKeyHeaderPermission, IPAddressRestrictedPermission)
 
 
 class MobilePermissionMixin(object):
