@@ -479,6 +479,17 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['id'], unicode(course1.id))
 
+        # fetch user data by exact course id match, and filter by list of usernames
+        response = self.do_get('{}?username={}&course={}'.format(
+            test_uri,
+            ','.join([user.username for user in users[0:2]]),
+            unicode(course1.id),
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 2)
+        self.assertEqual(response.data['results'][0]['full_name'], 'John Doe')
+        self.assertEqual(response.data['results'][1]['full_name'], 'Micheal Mcdonald')
+
     def test_user_list_get_courses_enrolled_per_course(self):
         test_uri = self.users_base_uri
         # create a 2 new users
