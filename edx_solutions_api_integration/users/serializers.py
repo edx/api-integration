@@ -52,7 +52,17 @@ class UserSerializer(DynamicFieldsModelSerializer):
         """
         Returns metadata about a user's attributes
         """
-        return user.preferences.all().values_list('key', 'value')
+        attributes = []
+        if 'active_attributes' in self.context:
+            active_keys = [item['key'] for item in self.context['active_attributes']]
+            attributes = [
+                        {
+                            'key': item.key,
+                            'value': item.value,
+                            'organization_id': item.organization_id,
+                        } for item in user.user_attributes.all() if item.key in active_keys
+                    ]
+        return attributes
 
     def get_profile_image(self, user):
         """
