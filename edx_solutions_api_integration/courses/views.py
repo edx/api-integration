@@ -30,7 +30,6 @@ from mobile_api.course_info.views import apply_wrappers_to_content
 from openedx.core.lib.xblock_utils import get_course_update_items
 from openedx.core.lib.courses import course_image_url
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-
 from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
 from django_comment_common.models import FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
@@ -68,6 +67,7 @@ from progress.models import CourseModuleCompletion
 from social_engagement.models import StudentSocialEngagementScore
 from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView, MobileAPIView
 from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer
+from edx_solutions_organizations.models import Organization
 from edx_solutions_api_integration.utils import (
     generate_base_uri,
     str2bool,
@@ -1069,6 +1069,7 @@ class CoursesUsersList(SecureListAPIView):
     serializer_class = UserSerializer
     course_key = None
     course_meta_data = None
+    user_organizations = []
 
     def post(self, request, course_id):
         """
@@ -1139,12 +1140,20 @@ class CoursesUsersList(SecureListAPIView):
             "full_name",
             "is_staff",
             "last_login",
+            "attributes",
         ])
+
+        active_attributes = []
+        for organization in self.user_organizations:
+            active_attributes = active_attributes + organization.get_all_attributes()
+
         serializer_context.update({
             'course_id': self.course_key,
             'default_fields': default_fields,
-            'course_meta_data': self.course_meta_data
+            'course_meta_data': self.course_meta_data,
+            'active_attributes': active_attributes,
         })
+
         return serializer_context
 
     def get_queryset(self):
@@ -1153,6 +1162,9 @@ class CoursesUsersList(SecureListAPIView):
         """
         # Get a list of all enrolled students
         users = CourseEnrollment.objects.users_enrolled_in(self.course_key)
+
+        attribute_keys = css_param_to_list(self.request, 'attribute_keys')
+        attribute_values = css_param_to_list(self.request, 'attribute_values')
 
         orgs = get_ids_from_list_param(self.request, 'organizations')
         if orgs:
@@ -1192,6 +1204,19 @@ class CoursesUsersList(SecureListAPIView):
             users = users.prefetch_related(
                 'studentprogress_set'
             )
+
+        if 'attributes' in additional_fields:
+            users = users.prefetch_related(
+                'user_attributes'
+            )
+
+        self.user_organizations = Organization.objects.filter(users__in=users).distinct()
+        if orgs:
+            self.user_organizations.filter(id__in=orgs).distinct()
+
+        users = Organization.get_all_users_by_organization_attribute_filter(
+            users, self.user_organizations, attribute_keys, attribute_values
+        )
 
         users = users.select_related('profile')
         return users
@@ -2136,8 +2161,11 @@ class CoursesMetricsSocial(SecureListAPIView):
 
         try:
             slash_course_id = get_course_key(course_id, slashseparated=True)
-            organization = request.query_params.get('organization', None)
             # the forum service expects the legacy slash separated string format
+
+            organization = request.query_params.get('organization', None)
+            attribute_keys = css_param_to_list(self.request, 'attribute_keys')
+            attribute_values = css_param_to_list(self.request, 'attribute_values')
 
             # load the course so that we can see when the course end date is
             course_descriptor, course_key, course_content = get_course(self.request, self.request.user, course_id)  # pylint: disable=W0612,C0301
@@ -2158,10 +2186,16 @@ class CoursesMetricsSocial(SecureListAPIView):
                     del data[str(user_id)]
             enrollment_qs = CourseEnrollment.objects.users_enrolled_in(course_key).filter(is_active=True)\
                 .exclude(id__in=exclude_users)
-            actual_data = {}
+
             if organization:
                 enrollment_qs = enrollment_qs.filter(organizations=organization)
 
+            user_organizations = Organization.objects.filter(users__id__in=enrollment_qs).distinct()
+            enrollment_qs = Organization.get_all_users_by_organization_attribute_filter(
+                enrollment_qs, user_organizations, attribute_keys, attribute_values
+            )
+
+            actual_data = {}
             actual_users = enrollment_qs.values_list('id', flat=True)
             for user_id in actual_users:
                 if str(user_id) in data:

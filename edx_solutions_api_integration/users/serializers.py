@@ -47,6 +47,23 @@ class UserSerializer(DynamicFieldsModelSerializer):
     roles = serializers.SerializerMethodField('get_user_roles')
     grades = serializers.SerializerMethodField('get_user_grades')
     progress = serializers.SerializerMethodField('get_user_progress')
+    attributes = serializers.SerializerMethodField('get_organization_attributes')
+
+    def get_organization_attributes(self, user):
+        """
+        Returns metadata about a user's attributes
+        """
+        attributes = []
+        if 'active_attributes' in self.context:
+            active_keys = [item['key'] for item in self.context['active_attributes']]
+            attributes = [
+                        {
+                            'key': item.key,
+                            'value': item.value,
+                            'organization_id': item.organization_id,
+                        } for item in user.user_attributes.all() if item.key in active_keys
+                    ]
+        return attributes
 
     def get_profile_image(self, user):
         """
@@ -144,6 +161,7 @@ class UserSerializer(DynamicFieldsModelSerializer):
             "roles",
             "grades",
             "progress",
+            "attributes",
         )
         read_only_fields = ("id", "email", "username")
 
