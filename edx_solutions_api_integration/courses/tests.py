@@ -4,59 +4,65 @@ Run these tests @ Devstack:
     paver test_system -s lms --fasttest
         --fail_fast --verbose --test_id=lms/djangoapps/edx_solutions_api_integration/courses
 """
-from datetime import datetime, timedelta
-import ddt
 import json
 import uuid
-import pytz
-from django.utils import timezone
-import mock
+from datetime import datetime, timedelta
 from random import randint
 from urllib import urlencode
-from freezegun import freeze_time
-from dateutil.relativedelta import relativedelta
 
-from requests.exceptions import ConnectionError
+import ddt
+import mock
+import pytz
+from completion.models import BlockCompletion
+from completion.waffle import (
+    ENABLE_COMPLETION_TRACKING,
+    WAFFLE_NAMESPACE as WAFFLE_COMPLETION_NAMESPACE,
+)
+from completion_aggregator.models import Aggregator
+from courseware import module_render
+from courseware.model_data import FieldDataCache
+from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.cache import cache
-from django.core.urlresolvers import reverse
 from django.core.exceptions import ObjectDoesNotExist
-from django.test.utils import override_settings
+from django.core.urlresolvers import reverse
 from django.test.client import Client
-from rest_framework import status
-
-from courseware import module_render
-from courseware.model_data import FieldDataCache
-from django_comment_common.models import Role, FORUM_ROLE_MODERATOR
-from gradebook.models import StudentGradebook
-from progress.models import StudentProgress
-from course_metadata.models import CourseAggregatedMetaData, CourseSetting
-from social_engagement.models import StudentSocialEngagementScore
+from django.test.utils import override_settings
+from django.utils import timezone
+from django_comment_common.models import FORUM_ROLE_MODERATOR, Role
+from freezegun import freeze_time
 from instructor.access import allow_access
-from edx_solutions_organizations.models import Organization
-from edx_solutions_projects.models import Workgroup, Project
-from student.tests.factories import UserFactory, CourseEnrollmentFactory, GroupFactory
+from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
+from requests.exceptions import ConnectionError
+from rest_framework import status
 from student.models import CourseEnrollment
+from student.tests.factories import CourseEnrollmentFactory, GroupFactory, UserFactory
+from waffle.testutils import override_switch
+from xmodule.modulestore import ModuleStoreEnum
 from xmodule.modulestore.django import modulestore
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 from xmodule.modulestore.tests.django_utils import (
     SharedModuleStoreTestCase,
     TEST_DATA_SPLIT_MODULESTORE,
-    mixed_store_config
+    mixed_store_config,
 )
-from xmodule.modulestore import ModuleStoreEnum
-from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
-from edx_solutions_api_integration.courseware_access import get_course_key, get_course_descriptor
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
+
+from course_metadata.models import CourseAggregatedMetaData
+from edx_solutions_api_integration.courseware_access import get_course_descriptor, get_course_key
 from edx_solutions_api_integration.test_utils import (
-    APIClientMixin,
-    SignalDisconnectTestMixin,
-    CourseGradingMixin,
+    APIClientMixin, CourseGradingMixin, SignalDisconnectTestMixin,
     make_non_atomic,
 )
 from edx_solutions_api_integration.utils import strip_whitespaces_and_newlines
-from .content import TEST_COURSE_OVERVIEW_CONTENT, TEST_COURSE_UPDATES_CONTENT, TEST_COURSE_UPDATES_CONTENT_LEGACY
-from .content import TEST_STATIC_TAB1_CONTENT, TEST_STATIC_TAB2_CONTENT
+from edx_solutions_organizations.models import Organization
+from edx_solutions_projects.models import Project, Workgroup
+from gradebook.models import StudentGradebook
+from social_engagement.models import StudentSocialEngagementScore
+from .content import (
+    TEST_COURSE_OVERVIEW_CONTENT, TEST_COURSE_UPDATES_CONTENT, TEST_COURSE_UPDATES_CONTENT_LEGACY,
+    TEST_STATIC_TAB1_CONTENT, TEST_STATIC_TAB2_CONTENT,
+)
 
 MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 USER_COUNT = 6
@@ -103,6 +109,10 @@ def _fake_get_service_unavailability(course_id, end_date=None):
     raise ConnectionError
 
 
+@override_switch(
+    '{}.{}'.format(WAFFLE_COMPLETION_NAMESPACE, ENABLE_COMPLETION_TRACKING),
+    active=True,
+)
 @mock.patch("edx_solutions_api_integration.courses.views.get_course_thread_stats", _fake_get_course_thread_stats)
 @mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': False,
                                                    'ADVANCED_SECURITY': False,
@@ -350,7 +360,6 @@ class CoursesApiTests(
             CourseEnrollmentFactory.create(user=user, course_id=self.course.id)
 
         test_course_id = unicode(course.id)
-        completion_uri = '{}/{}/completions/'.format(self.base_courses_uri, test_course_id)
         leaders_uri = '{}/{}/metrics/completions/leaders/'.format(self.base_courses_uri, test_course_id)
         # Make last user as observer to make sure that data is being filtered out
         allow_access(course, users[user_count - 1], 'observer')
@@ -363,31 +372,41 @@ class CoursesApiTests(
                 parent_location=unit.location,
                 display_name=local_content_name
             )
-            contents.append(local_content)
+            # Add a child that can be completed so the completion can bubble up to the Aggregator
+            local_content_child = ItemFactory.create(
+                category="video",
+                parent_location=local_content.location,
+                data='<html>{}</html>'.format(i),
+                display_name="Video_{}".format(i),
+            )
+            contents.append(local_content_child)
             if i < 3:
-                user_id = users[0].id
+                user = users[0]
             elif i < 10:
-                user_id = users[1].id
+                user = users[1]
             elif i < 17:
-                user_id = users[2].id
+                user = users[2]
             else:
-                user_id = users[3].id
+                user = users[3]
 
-            content_id = unicode(local_content.scope_ids.usage_id)
-            completions_data = {'content_id': content_id, 'user_id': user_id}
-            response = self.do_post(completion_uri, completions_data)
-            self.assertEqual(response.status_code, 201)
+            BlockCompletion.objects.submit_completion(
+                user=user,
+                course_key=course.id,
+                block_key=local_content_child.scope_ids.usage_id,
+                completion=1.0,
+            )
 
             # observer should complete everything, so we can assert that it is filtered out
-            response = self.do_post(completion_uri, {
-                'content_id': content_id, 'user_id': users[user_count - 1].id
-            })
-            self.assertEqual(response.status_code, 201)
+            BlockCompletion.objects.submit_completion(
+                user=users[user_count - 1],
+                course_key=course.id,
+                block_key=local_content_child.scope_ids.usage_id,
+                completion=1.0,
+            )
         return {
             'leaders_uri': leaders_uri,
             'users': users,
             'contents': contents,
-            'completion_uri': completion_uri,
             'groups': groups,
             'course': course,
         }
@@ -1367,12 +1386,14 @@ class CoursesApiTests(
             grade_summary=json.dumps(grade_summary)
         )
 
-        StudentProgress.objects.update_or_create(
+        Aggregator.objects.submit_completion(
             user=user,
-            course_id=course.id,
-            defaults={
-                'completions': user_completions,
-            }
+            course_key=course.id,
+            block_key=course.location,
+            aggregation_name='course',
+            possible=course_total_assesments,
+            earned=user_completions,
+            last_modified=timezone.now(),
         )
 
         data = {
@@ -1413,7 +1434,6 @@ class CoursesApiTests(
                 'section_breakdown': section_breakdown
             }
         )
-        self.assertEqual(response.data['results'][0]['progress'], 50.0)
 
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_courses_users_list_with_fields(self, store):
@@ -1956,158 +1976,6 @@ class CoursesApiTests(
         response = self.do_get(invalid_content_uri)
         self.assertEqual(response.status_code, 404)
 
-    def test_coursemodulecompletions_post(self):
-
-        data = {
-            'email': 'test@example.com',
-            'username': 'test_user',
-            'password': 'test_pass',
-            'first_name': 'John',
-            'last_name': 'Doe'
-        }
-        response = self.do_post(self.base_users_uri, data)
-        self.assertEqual(response.status_code, 201)
-        created_user_id = response.data['id']
-        completions_uri = '{}/{}/completions/'.format(self.base_courses_uri, unicode(self.course.id))
-        stage = 'First'
-        completions_data = {
-            'content_id': unicode(self.course_content.scope_ids.usage_id),
-            'user_id': created_user_id,
-            'stage': stage
-        }
-        response = self.do_post(completions_uri, completions_data)
-        self.assertEqual(response.status_code, 201)
-        coursemodulecomp_id = response.data['id']
-        self.assertGreater(coursemodulecomp_id, 0)
-        self.assertEqual(response.data['user_id'], created_user_id)
-        self.assertEqual(response.data['course_id'], unicode(self.course.id))
-        self.assertEqual(response.data['content_id'], unicode(self.course_content.scope_ids.usage_id))
-        self.assertEqual(response.data['stage'], stage)
-        self.assertIsNotNone(response.data['created'])
-        self.assertIsNotNone(response.data['modified'])
-
-        # test to create course completion with same attributes
-        response = self.do_post(completions_uri, completions_data)
-        self.assertEqual(response.status_code, 409)
-
-        # test to create course completion with empty user_id
-        completions_data['user_id'] = None
-        response = self.do_post(completions_uri, completions_data)
-        self.assertEqual(response.status_code, 400)
-
-        # test to create course completion with empty content_id
-        completions_data['content_id'] = None
-        response = self.do_post(completions_uri, completions_data)
-        self.assertEqual(response.status_code, 400)
-
-        # test to create course completion with invalid content_id
-        completions_data['content_id'] = self.test_bogus_content_id
-        response = self.do_post(completions_uri, completions_data)
-        self.assertEqual(response.status_code, 400)
-
-    def test_course_module_completions_post_invalid_course(self):
-        completions_uri = '{}/{}/completions/'.format(self.base_courses_uri, self.test_bogus_course_id)
-        completions_data = {
-            'content_id': unicode(self.course_content.scope_ids.usage_id),
-            'user_id': self.users[0].id
-        }
-        response = self.do_post(completions_uri, completions_data)
-        self.assertEqual(response.status_code, 404)
-
-    def test_course_module_completions_post_invalid_content(self):
-        completions_uri = '{}/{}/completions/'.format(self.base_courses_uri, self.test_course_id)
-        completions_data = {'content_id': self.test_bogus_content_id, 'user_id': self.users[0].id}
-        response = self.do_post(completions_uri, completions_data)
-        self.assertEqual(response.status_code, 400)
-
-    def test_coursemodulecompletions_filters(self):  # pylint: disable=R0915
-        completion_uri = '{}/{}/completions/'.format(self.base_courses_uri, unicode(self.course.id))
-        for i in xrange(1, 3):
-            data = {
-                'email': 'test{}@example.com'.format(i),
-                'username': 'test_user{}'.format(i),
-                'password': 'test_pass',
-                'first_name': 'John{}'.format(i),
-                'last_name': 'Doe{}'.format(i)
-            }
-            response = self.do_post(self.base_users_uri, data)
-            self.assertEqual(response.status_code, 201)
-            created_user_id = response.data['id']
-
-        content_ids = []
-        for i in xrange(1, 26):
-            local_content_name = 'Video_Sequence_competions{}'.format(i)
-            local_content = ItemFactory.create(
-                category="videosequence",
-                parent_location=self.content_child2.location,
-                display_name=local_content_name
-            )
-            content_ids.append(local_content.scope_ids.usage_id)
-            if i < 25:
-                content_id = unicode(local_content.scope_ids.usage_id)
-                stage = None
-            else:
-                content_id = unicode(self.course_content.scope_ids.usage_id)
-                stage = 'Last'
-            completions_data = {'content_id': content_id, 'user_id': created_user_id, 'stage': stage}
-            response = self.do_post(completion_uri, completions_data)
-            self.assertEqual(response.status_code, 201)
-
-        #filter course module completion by user
-        user_filter_uri = '{}?user_id={}&page_size=10&page=3'.format(completion_uri, created_user_id)
-        response = self.do_get(user_filter_uri)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['count'], 25)
-        self.assertEqual(len(response.data['results']), 5)
-        self.assertEqual(response.data['num_pages'], 3)
-
-        #filter course module completion by multiple user ids
-        user_filter_uri = '{}?user_id={}'.format(completion_uri, str(created_user_id) + ',10001,10003')
-        response = self.do_get(user_filter_uri)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['count'], 25)
-        self.assertEqual(len(response.data['results']), 20)
-        self.assertEqual(response.data['num_pages'], 2)
-
-        #filter course module completion by user who has not completed any course module
-        user_filter_uri = '{}?user_id={}'.format(completion_uri, 10001)
-        response = self.do_get(user_filter_uri)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data['results']), 0)
-
-        #filter course module completion by course_id
-        course_filter_uri = '{}?course_id={}&page_size=10'.format(completion_uri, unicode(self.course.id))
-        response = self.do_get(course_filter_uri)
-        self.assertEqual(response.status_code, 200)
-        self.assertGreaterEqual(response.data['count'], 25)
-        self.assertEqual(len(response.data['results']), 10)
-
-        #filter course module completion by content_id
-        content_id = {'content_id': '{}'.format(unicode(content_ids[0]))}
-        content_filter_uri = '{}?{}'.format(completion_uri, urlencode(content_id))
-        response = self.do_get(content_filter_uri)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['count'], 1)
-        self.assertEqual(len(response.data['results']), 1)
-
-        #filter course module completion by invalid content_id
-        content_id = {'content_id': '{}1'.format(self.test_bogus_content_id)}
-        content_filter_uri = '{}?{}'.format(completion_uri, urlencode(content_id))
-        response = self.do_get(content_filter_uri)
-        self.assertEqual(response.status_code, 404)
-
-        #filter course module completion by stage
-        content_filter_uri = '{}?stage={}'.format(completion_uri, 'Last')
-        response = self.do_get(content_filter_uri)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['count'], 1)
-        self.assertEqual(len(response.data['results']), 1)
-
-    def test_coursemodulecompletions_get_invalid_course(self):
-        completion_uri = '{}/{}/completions/'.format(self.base_courses_uri, self.test_bogus_course_id)
-        response = self.do_get(completion_uri)
-        self.assertEqual(response.status_code, 404)
-
     def test_courses_metrics_social_check_service_availability(self):
         test_uri = '{}/{}/metrics/social/'.format(self.base_courses_uri, self.test_course_id)
         response = self.do_get(test_uri)
@@ -2169,7 +2037,7 @@ class CoursesApiTests(
         for user in users:
             self.assertTrue(result_users.get(str(user.id)))
 
-    def test_courses_users_list_courses_enrolled(self):
+    def test_courses_completions_leaders(self):
         setup_data = self._setup_courses_completions_leaders()
         expected_course_avg = '25.000'
         test_uri = '{}?count=6'.format(setup_data['leaders_uri'])
@@ -2228,13 +2096,15 @@ class CoursesApiTests(
         self.assertEqual(response.status_code, 200)
 
         # test a case where completions are greater than total course modules. it should not be more than 100
-        setup_data['contents'].append(self.course_content)
+        course = setup_data['course']
+        setup_data['contents'].append(self.content_child)
         for content in setup_data['contents'][2:]:
-            user_id = setup_data['users'][0].id
-            content_id = unicode(content.scope_ids.usage_id)
-            completions_data = {'content_id': content_id, 'user_id': user_id}
-            response = self.do_post(setup_data['completion_uri'], completions_data)
-            self.assertEqual(response.status_code, 201)
+            BlockCompletion.objects.submit_completion(
+                user=setup_data['users'][0],
+                course_key=course.id,
+                block_key=content.scope_ids.usage_id,
+                completion=1.0,
+            )
 
         test_uri = '{}?user_id={}'.format(setup_data['leaders_uri'], setup_data['users'][0].id)
         response = self.do_get(test_uri)
@@ -2259,19 +2129,20 @@ class CoursesApiTests(
         """
         setup_data = self._setup_courses_completions_leaders()
         local_content = setup_data['contents'][0]
-        completion_uri = setup_data['completion_uri']
         course = setup_data['course']
-        content_id = unicode(local_content.scope_ids.usage_id)
 
         # create couple of users, assign them observer and assistant roles and add content completion for them
         users = UserFactory.create_batch(2)
-        for idx, user in enumerate(users):
+        roles = ['observer', 'assistant']
+        for role, user in zip(roles, users):
             CourseEnrollmentFactory.create(user=user, course_id=unicode(course.id))
-            roles = ['observer', 'assistant']
-            allow_access(course, user, roles[idx])
-            completions_data = {'content_id': content_id, 'user_id': user.id}
-            response = self.do_post(completion_uri, completions_data)
-            self.assertEqual(response.status_code, 201)
+            allow_access(course, user, role)
+            BlockCompletion.objects.submit_completion(
+                user=user,
+                course_key=course.id,
+                block_key=local_content.scope_ids.usage_id,
+                completion=1.0,
+            )
 
         # test both users are excluded from progress calculations
         test_uri = '{}?exclude_roles=observer,assistant'.format(setup_data['leaders_uri'])
@@ -2350,12 +2221,14 @@ class CoursesApiTests(
             )
 
             # add progress for users
-            StudentProgress.objects.update_or_create(
+            Aggregator.objects.submit_completion(
                 user=user,
-                course_id=course.id,
-                defaults={
-                    'completions': user_completions,
-                }
+                course_key=course.id,
+                block_key=course.location,
+                aggregation_name='course',
+                possible=total_assessments,
+                earned=user_completions,
+                last_modified=timezone.now(),
             )
 
         # create an organization and add last created user in it
@@ -2434,16 +2307,14 @@ class CoursesApiTests(
 
         # create course completions
         for i, user in enumerate(users):
-            completions_uri = '{}/{}/completions/'.format(self.base_courses_uri, self.test_course_id)
-            completions_data = {
-                'content_id': unicode(self.course_content.scope_ids.usage_id),
-                'user_id': user.id,
-                'stage': 'First'
-            }
-            response = self.do_post(completions_uri, completions_data)
-            self.assertEqual(response.status_code, 201)
-
             # mark two users a complete
+            BlockCompletion.objects.submit_completion(
+                user=user,
+                course_key=self.course.id,
+                block_key=self.content_child.scope_ids.usage_id,
+                completion=1.0,
+            )
+
             if i % 2 == 0:
                 StudentGradebook.objects.get_or_create(
                     user=user,
@@ -2479,14 +2350,12 @@ class CoursesApiTests(
 
         # create course completions
         for user in users:
-            completions_uri = '{}/{}/completions/'.format(self.base_courses_uri, self.test_course_id)
-            completions_data = {
-                'content_id': unicode(self.course_content.scope_ids.usage_id),
-                'user_id': user.id,
-                'stage': 'First'
-            }
-            response = self.do_post(completions_uri, completions_data)
-            self.assertEqual(response.status_code, 201)
+            BlockCompletion.objects.submit_completion(
+                user=user,
+                course_key=self.course.id,
+                block_key=self.content_child.scope_ids.usage_id,
+                completion=1.0,
+            )
 
         course_metrics_uri = '{}/{}/metrics/?metrics_required={}&groups={},{}'.format(
             self.base_courses_uri,
@@ -2749,6 +2618,10 @@ class CoursesApiTests(
         self.assertEqual(response.data['position'], None)
 
 
+@override_switch(
+    '{}.{}'.format(WAFFLE_COMPLETION_NAMESPACE, ENABLE_COMPLETION_TRACKING),
+    active=True,
+)
 @mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': False,
                                                    'ADVANCED_SECURITY': False,
                                                    'PREVENT_CONCURRENT_LOGINS': False,

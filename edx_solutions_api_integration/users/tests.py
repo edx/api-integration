@@ -15,6 +15,9 @@ import six
 import json
 
 from datetime import datetime
+
+from completion.models import BlockCompletion
+from completion.waffle import WAFFLE_NAMESPACE, ENABLE_COMPLETION_TRACKING
 from dateutil.relativedelta import relativedelta
 from random import randint
 from urllib import urlencode
@@ -32,6 +35,8 @@ from django.utils.translation import ugettext as _
 from courseware import module_render
 from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR, ForumsConfig
+from waffle.testutils import override_switch
+
 from edx_notifications.data import NotificationType, NotificationMessage
 from edx_notifications.lib.consumer import get_notifications_count_for_user
 from edx_notifications.lib.publisher import register_notification_type, publish_notification_to_user
@@ -97,6 +102,10 @@ def _fake_get_service_unavailability(user_id, course_id, end_date=None):
     raise ConnectionError
 
 
+@override_switch(
+    '{}.{}'.format(WAFFLE_NAMESPACE, ENABLE_COMPLETION_TRACKING),
+    active=True,
+)
 @override_settings(DEBUG=True)
 @override_settings(PASSWORD_MIN_LENGTH=4)
 @mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': True})
@@ -1818,71 +1827,6 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['count'], 0)
         self.assertEqual(len(response.data['results']), 0)
 
-    def test_user_completions_list(self):
-        user_id = self.user.id
-        another_user_id = UserFactory().id
-        completion_uri = '{}/{}/completions/'.format(self.courses_base_uri, unicode(self.course.id))
-
-        for i in xrange(1, 26):
-            if i > 12:
-                course_user_id = another_user_id
-            else:
-                course_user_id = user_id
-            local_content_name = 'Video_Sequence{}'.format(i)
-            local_content = ItemFactory.create(
-                category="videosequence",
-                parent_location=self.course_content.location,
-                display_name=local_content_name
-            )
-            completions_data = {'content_id': unicode(local_content.scope_ids.usage_id), 'user_id': course_user_id}
-            response = self.do_post(completion_uri, completions_data)
-            self.assertEqual(response.status_code, 201)
-
-        # Get course module completion by user
-        completion_list_uri = '{}/{}/courses/{}/completions/?page_size=6'.format(
-            self.users_base_uri,
-            user_id,
-            unicode(self.course.id)
-        )
-        response = self.do_get(completion_list_uri)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['count'], 12)
-        self.assertEqual(len(response.data['results']), 6)  # 12 matches, but only 6 per page
-        self.assertEqual(response.data['results'][0]['user_id'], user_id)
-        self.assertEqual(response.data['results'][0]['course_id'], unicode(self.course.id))
-        self.assertEqual(response.data['num_pages'], 2)
-
-        # Get course module completion by other user
-        completion_list_uri = '{}/{}/courses/{}/completions/'.format(
-            self.users_base_uri,
-            another_user_id,
-            unicode(self.course.id)
-        )
-        response = self.do_get(completion_list_uri)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['count'], 13)
-
-        # Get course module completion by other user and course module id (content_id)
-        content_id = {'content_id': unicode(local_content.scope_ids.usage_id)}
-        completion_list_uri = '{}/{}/courses/{}/completions/?{}'.format(
-            self.users_base_uri,
-            course_user_id,
-            unicode(self.course.id),
-            urlencode(content_id)
-        )
-        response = self.do_get(completion_list_uri)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['count'], 1)
-
-        # Get course module completion by bogus user
-        completion_list_uri = '{}/{}/courses/{}/completions/'.format(
-            self.users_base_uri,
-            '34323422',
-            unicode(self.course.id)
-        )
-        response = self.do_get(completion_list_uri)
-        self.assertEqual(response.status_code, 404)
-
     def test_user_count_by_city(self):
         test_uri = self.users_base_uri
 
@@ -2570,6 +2514,10 @@ class UsersGradesApiTests(
         self.assertEqual(response.data[0]['complete_status'], False)
 
 
+@override_switch(
+    '{}.{}'.format(WAFFLE_NAMESPACE, ENABLE_COMPLETION_TRACKING),
+    active=True,
+)
 @ddt.ddt
 class UsersProgressApiTests(
     SignalDisconnectTestMixin, SharedModuleStoreTestCase, APIClientMixin, CourseGradingMixin
@@ -2650,14 +2598,12 @@ class UsersProgressApiTests(
         """ Test progress value returned by users progress list api """
         CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
 
-        completions_uri = '{}/{}/completions/'.format(self.base_courses_uri, self.course.id)
-        completions_data = {
-            'content_id': unicode(self.course_content.scope_ids.usage_id),
-            'user_id': self.user.id,
-            'stage': 'First'
-        }
-        response = self.do_post(completions_uri, completions_data)
-        self.assertEqual(response.status_code, 201)
+        BlockCompletion.objects.submit_completion(
+            user=self.user,
+            course_key=self.course.id,
+            block_key=self.content_child.scope_ids.usage_id,
+            completion=1.0,
+        )
 
         user_grade, user_proforma_grade = 0.9, 0.91
         section_breakdown = [
@@ -2730,7 +2676,6 @@ class UsersProgressApiTests(
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
 
-        self.assertEqual(response.data[0]['progress'], 0.0)
         self.assertEqual(response.data[0]['proficiency'], 0)
 
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
@@ -2750,23 +2695,19 @@ class UsersProgressApiTests(
         CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
         CourseEnrollmentFactory.create(user=self.user, course_id=mobile_course.id)
 
-        completions_uri = '{}/{}/completions/'.format(self.base_courses_uri, self.course.id)
-        completions_data = {
-            'content_id': unicode(self.course_content.scope_ids.usage_id),
-            'user_id': self.user.id,
-            'stage': 'First'
-        }
-        response = self.do_post(completions_uri, completions_data)
-        self.assertEqual(response.status_code, 201)
+        BlockCompletion.objects.submit_completion(
+            user=self.user,
+            course_key=self.course.id,
+            block_key=self.content_child.scope_ids.usage_id,
+            completion=1.0,
+        )
 
-        completions_uri = '{}/{}/completions/'.format(self.base_courses_uri, mobile_course.id)
-        completions_data = {
-            'content_id': unicode(mobile_course_content.scope_ids.usage_id),
-            'user_id': self.user.id,
-            'stage': 'First'
-        }
-        response = self.do_post(completions_uri, completions_data)
-        self.assertEqual(response.status_code, 201)
+        BlockCompletion.objects.submit_completion(
+            user=self.user,
+            course_key=self.course.id,
+            block_key=mobile_course_content.scope_ids.usage_id,
+            completion=1.0,
+        )
 
         test_uri = '{}/{}/courses/progress'.format(self.base_users_uri, self.user.id)
         response = self.do_get(test_uri)

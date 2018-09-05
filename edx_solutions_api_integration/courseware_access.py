@@ -129,13 +129,13 @@ def get_course_child_key(content_id):
     Returns course child key
     """
     try:
-        content_key = UsageKey.from_string(content_id)
+        content_id = UsageKey.from_string(content_id)
     except InvalidKeyError:
         try:
-            content_key = Location.from_deprecated_string(content_id)
+            content_id = Location.from_deprecated_string(content_id)
         except (InvalidLocationError, InvalidKeyError):
-            content_key = None
-    return content_key
+            content_id = None
+    return content_id
 
 
 def get_course_child_descriptor(child_key):

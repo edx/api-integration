@@ -1701,39 +1701,6 @@ Returns a JSON representation of the paginated list of workgroups for a user
             "next": null
         }
 
-
-## User Course Completions List [/users/{user_id}/courses/{course_id}/completions{?content_id}]
-
-It allows clients to retrieve a list of course completions for a user
-
-### User Course Completions List [GET]
-
-Provides paginated list of course completions for a user. Use content_id parameter to filter the user's course completions by course content
-
-+ Parameters
-    + content_id (optional)
-
-+ Response 200 (application/json)
-
-        {
-            "count": 1,
-            "previous": null,
-            "num_pages": 1,
-            "results": [
-                {
-                    "id": 1,
-                    "user_id": 8,
-                    "course_id": "course-v1:edX+DemoX+Demo_Course",
-                    "content_id": "block-v1:edX+DemoX+Demo_Course+type@about+block@overview",
-                    "stage": null,
-                    "created": "2017-05-11T13:15:54.338039Z",
-                    "modified": "2017-05-11T13:15:54.338455Z"
-                }
-            ],
-            "next": null
-        }
-
-
 ## User Social Metrics [/users/{user_id}/courses/{course_id}/metrics/social?include_stats=true]
 
 It allows clients to query about the activity of a user in the forums in the specified course
@@ -2530,79 +2497,6 @@ It allows clients to list users enrolled and users not enrolled for course withi
                 }
             }
         ]
-
-
-## Course Module Completion List [/courses/{course_id}/completions{?user_id}{?content_id}{?stage}]
-
-It allows clients to view user's course module completion entities to monitor a user's progression throughout the duration of a course
-
-### Course Module Completion List [GET]
-
-Returns a JSON representation of the course, content and user and timestamps, user_id, content_id and stage filters can also be applied
-+ Parameters
-    + user_id (optional)
-    + content_id (optional)
-    + stage (optional)
-
-+ Response 200 (application/json)
-
-        {
-            "count": 2,
-            "previous": null,
-            "num_pages": 1,
-            "results": [
-                {
-                    "id": 1,
-                    "user_id": 8,
-                    "course_id": "course-v1:edX+DemoX+Demo_Course",
-                    "content_id": "block-v1:edX+DemoX+Demo_Course+type@about+block@overview",
-                    "stage": null,
-                    "created": "2017-05-11T13:15:54.338039Z",
-                    "modified": "2017-05-11T13:15:54.338455Z"
-                },
-                {
-                    "id": 2,
-                    "user_id": 15,
-                    "course_id": "course-v1:edX+DemoX+Demo_Course",
-                    "content_id": "block-v1:edX+DemoX+Demo_Course+type@html+block@6bcccc2d7343416e9e03fd7325b2f232",
-                    "stage": null,
-                    "created": "2017-05-11T14:14:31.159051Z",
-                    "modified": "2017-05-11T14:14:31.159561Z"
-                }
-            ],
-            "next": null
-        }
-
-
-### Create a Course Module Completion entity [POST]
-
-Mark the Course content as completed for the specified user
-+ Attributes
-    + user_id (required)
-    + content_id (required)
-    + stage (optional)
-
-+ Request (application/json)
-
-        {
-          "user_id": 15,
-          "content_id": "block-v1:edX+DemoX+Demo_Course+type@html+block@6bcccc2d7343416e9e03fd7325b2f232",
-          "stage": "First"
-        }
-
-
-+ Response 201 (application/json)
-
-        {
-            "id": 12,
-            "user_id": 15,
-            "course_id": "course-v1:edX+DemoX+Demo_Course",
-            "content_id": "block-v1:edX+DemoX+Demo_Course+type@html+block@6bcccc2d7343416e9e03fd7325b2f232",
-            "stage": "First",
-            "created": "2017-05-17T14:09:24.482953Z",
-            "modified": "2017-05-17T14:09:24.483682Z"
-        }
-
 
 ## Courses Metrics Grades List [/courses/{course_id}/grades{?user_id}{?groups}]
 
@@ -4609,11 +4503,7 @@ Returns list of Peer Reviews
 # Group Progress APIs
 Resources related to Progress in the API.
 
-[Course Module Completion List](#reference/courses/course-module-completion-list)
-
 [Courses Metrics Completions Leaders List](#reference/courses/courses-metrics-completions-leaders-list)
-
-[User Course Completions List](#reference/users/user-course-completions-list)
 
 
 # Group Engagement APIs

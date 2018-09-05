@@ -1,11 +1,10 @@
 """ Django REST Framework Serializers """
 from django.conf import settings
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.lib.courses import course_image_url
-
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
-from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from edx_solutions_api_integration.utils import get_profile_image_urls_by_username
 
 
@@ -45,12 +44,7 @@ class CourseCompletionsLeadersSerializer(BaseCourseLeadersSerializer):
         """
         formats get completions as percentage
         """
-        total_completions = self.context['total_completions'] or 0
-        completions = obj['completions'] or 0
-        completion_percentage = 0
-        if total_completions > 0:
-            completion_percentage = min(int(round(100 * completions / float(total_completions))), 100)
-        return completion_percentage
+        return (obj['percent'] or 0) * 100
 
 
 class CourseSocialLeadersSerializer(BaseCourseLeadersSerializer):

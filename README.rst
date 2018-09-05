@@ -18,5 +18,5 @@ Open edX Platform Integration
 
 .. code-block:: bash
 
-   $ python manage.py lms --settings test test edx_solutions_api_integration
+   $ paver test_system -s lms -t edx_solutions_api_integration
 
