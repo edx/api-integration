@@ -350,3 +350,14 @@ class IsOpsAdminOrReadOnlyView(permissions.BasePermission):
             groups = request.user.groups.filter(name__icontains=PERMISSION_GROUPS['MCKA_COURSE_OPS_ADMIN'])
             return True if groups else False
         return True
+
+
+class IsClientAdminOrReadOnlyView(permissions.BasePermission):
+    """
+    Permission that checks to see if the user is client admin and the view is POST.
+    """
+    def has_permission(self, request, view):
+        if not request.method == 'GET':
+            groups = request.user.groups.filter(name__icontains=PERMISSION_GROUPS['MCKA_CLIENT_ADMIN'])
+            return True if groups else False
+        return True

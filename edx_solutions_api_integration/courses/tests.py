@@ -309,6 +309,11 @@ class CoursesApiTests(
         self.client = Client()
         self.client.login(username=self.user.username, password='test_password')
 
+    def staff_login(self):
+        self.user = UserFactory.create(username='staff', email='test@edx.org', password='test_password', is_staff=True)
+        self.client = Client()
+        self.client.login(username=self.user.username, password='test_password')
+
     def _find_item_by_class(self, items, class_name):
         """Helper method to match a single matching item"""
         for item in items:
@@ -492,7 +497,7 @@ class CoursesApiTests(
         self.assertEqual(response.data['language'], self.language)
 
     def test_courses_detail_get_with_child_content(self):
-        self.login()
+        self.staff_login()
         test_uri = self.base_courses_uri + '/' + self.test_course_id
         response = self.do_get('{}?depth=100'.format(test_uri))
         self.assertEqual(response.status_code, 200)
@@ -1136,6 +1141,7 @@ class CoursesApiTests(
 
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_courses_users_list_get_no_students(self, store):
+        self.staff_login()
         course = CourseFactory.create(display_name="TEST COURSE", org='TESTORG', default_store=store)
         test_uri = self.base_courses_uri + '/' + unicode(course.id) + '/users'
         response = self.do_get(test_uri)
@@ -1147,6 +1153,7 @@ class CoursesApiTests(
         self.assertEqual(len(enrollments), 0)
 
     def test_courses_users_list_invalid_course(self):
+        self.staff_login()
         test_uri = self.base_courses_uri + '/' + self.test_bogus_course_id + '/users'
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
@@ -1154,6 +1161,7 @@ class CoursesApiTests(
     def test_courses_users_list_post_nonexisting_user_deny(self):
         # enroll a non-existing student
         # first, don't allow non-existing
+        self.staff_login()
         test_uri = self.base_courses_uri + '/' + self.test_course_id + '/users'
         post_data = {
             'email': 'test+pending@tester.com',
@@ -1167,6 +1175,7 @@ class CoursesApiTests(
 
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_courses_users_list_post_nonexisting_user_allow(self, store):
+        self.staff_login()
         course = CourseFactory.create(display_name="TEST COURSE", org='TESTORG2', default_store=store)
         test_uri = self.base_courses_uri + '/' + unicode(course.id) + '/users'
         post_data = {}
@@ -1180,6 +1189,7 @@ class CoursesApiTests(
 
     def test_courses_users_list_post_existing_user(self):
         # create a new user (note, this calls into the /users/ subsystem)
+        self.staff_login()
         test_uri = self.base_courses_uri + '/' + self.test_course_id + '/users'
         test_user_uri = self.base_users_uri
         local_username = "some_test_user" + str(randint(11, 99))
@@ -1213,6 +1223,7 @@ class CoursesApiTests(
         self.assertContains(response, local_email)
 
     def test_courses_users_list_post_invalid_course(self):
+        self.login()
         test_uri = self.base_courses_uri + '/' + self.test_bogus_course_id + '/users'
         post_data = {}
         post_data['email'] = 'test+pending@tester.com'
@@ -1221,6 +1232,7 @@ class CoursesApiTests(
         self.assertEqual(response.status_code, 404)
 
     def test_courses_users_list_post_invalid_user(self):
+        self.login()
         test_uri = self.base_courses_uri + '/' + self.test_course_id + '/users'
         post_data = {}
         post_data['user_id'] = '123123124'
@@ -1229,6 +1241,7 @@ class CoursesApiTests(
         self.assertEqual(response.status_code, 404)
 
     def test_courses_users_list_post_invalid_payload(self):
+        self.login()
         test_uri = self.base_courses_uri + '/' + self.test_course_id + '/users'
         post_data = {}
         response = self.do_post(test_uri, post_data)
@@ -1236,6 +1249,7 @@ class CoursesApiTests(
 
     def test_courses_users_list_get(self):
         # create a new user (note, this calls into the /users/ subsystem)
+        self.staff_login()
         test_uri = self.base_courses_uri + '/' + self.test_course_id + '/users'
         test_user_uri = self.base_users_uri
         local_username = "some_test_user" + str(randint(11, 99))
@@ -1354,6 +1368,7 @@ class CoursesApiTests(
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_courses_users_list_get_attributes(self, store):
         """ Test presence of newly added attributes to courses users list api """
+        self.staff_login()
         course = CourseFactory.create(
             number='3035',
             name='metrics_grades_leaders',
@@ -1438,6 +1453,7 @@ class CoursesApiTests(
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_courses_users_list_with_fields(self, store):
         """ Tests when fields param is given it should return only those fields """
+        self.staff_login()
         course = CourseFactory.create(default_store=store)
         users = UserFactory.create_batch(3)
         for user in users:
@@ -1456,6 +1472,7 @@ class CoursesApiTests(
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_courses_users_list_pagination(self, store):
         """ Tests users list API has pagination enabled """
+        self.staff_login()
         course = CourseFactory.create(default_store=store)
         users = UserFactory.create_batch(3)
         for user in users:
@@ -1470,6 +1487,7 @@ class CoursesApiTests(
         self.assertEqual(response.data['count'], 3)
 
     def test_courses_users_list_get_filter_by_orgs(self):
+        self.staff_login()
         # create 5 users
         users = []
         for i in xrange(1, 6):
@@ -1520,6 +1538,7 @@ class CoursesApiTests(
         self.assertEqual(len(response.data['results']), 3)
 
     def test_courses_users_list_get_filter_by_groups(self):
+        self.staff_login()
         # create 2 groups
         group_ids = []
         for i in xrange(1, 3):  # pylint: disable=C7620
@@ -1570,6 +1589,7 @@ class CoursesApiTests(
 
     def test_courses_users_list_get_filter_by_workgroups(self):
         """ Test courses users list workgroup filter """
+        self.staff_login()
         test_uri = self.base_courses_uri + '/' + self.test_course_id + '/users'
         organization = Organization.objects.create(
             name="Test Organization",
@@ -1605,6 +1625,7 @@ class CoursesApiTests(
         self.assertGreaterEqual(len(response.data['results']), 5)
 
     def test_courses_users_detail_get(self):
+        self.login()
         test_uri = self.base_courses_uri + '/' + self.test_course_id + '/users'
         test_user_uri = self.base_users_uri
         local_username = "some_test_user" + str(randint(11, 99))
@@ -1649,6 +1670,7 @@ class CoursesApiTests(
         self.assertGreater(len(response.data), 0)
 
     def test_courses_users_detail_delete(self):
+        self.login()
         test_uri = self.base_courses_uri + '/' + self.test_course_id + '/users'
         test_user_uri = self.base_users_uri
         local_username = "some_test_user" + str(randint(11, 99))
@@ -1886,6 +1908,7 @@ class CoursesApiTests(
         self.assertEqual(response.status_code, 404)
 
     def test_course_content_users_list_get(self):
+        self.login()
         test_uri = '{}/{}/groups'.format(
             self.base_course_content_uri,
             unicode(self.course_project.scope_ids.usage_id)
@@ -1977,12 +2000,14 @@ class CoursesApiTests(
         self.assertEqual(response.status_code, 404)
 
     def test_courses_metrics_social_check_service_availability(self):
+        self.staff_login()
         test_uri = '{}/{}/metrics/social/'.format(self.base_courses_uri, self.test_course_id)
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
 
     @mock.patch("edx_solutions_api_integration.courses.views.get_course_social_stats", _fake_get_service_unavailability)
     def test_courses_social_metrics_get_service_unavailability(self):
+        self.staff_login()
         test_uri = '{}/{}/metrics/social/'.format(self.base_courses_uri, self.test_course_id)
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
@@ -1992,6 +2017,7 @@ class CoursesApiTests(
         _fake_get_course_social_stats_date_expected
     )
     def test_courses_metrics_social_get(self):
+        self.staff_login()
         test_uri = '{}/{}/metrics/social/'.format(self.base_courses_uri, self.test_course_id)
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
@@ -2017,6 +2043,7 @@ class CoursesApiTests(
     @mock.patch("edx_solutions_api_integration.courses.views.get_course_social_stats", _fake_get_course_social_stats)
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_courses_metrics_social_get_no_date(self,store):
+        self.staff_login()
         course = CourseFactory.create(
             start=datetime(2014, 6, 16, 14, 30),
             default_store=store
@@ -2405,6 +2432,7 @@ class CoursesApiTests(
 
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_course_users_count_by_city(self, store):
+        self.login()
         test_uri = self.base_users_uri
         course = CourseFactory(default_store=store)
         test_course_id = unicode(course.id)
@@ -2599,6 +2627,7 @@ class CoursesApiTests(
 
     def test_courses_users_list_valid_email_enroll_user(self):
         # Test with valid email in request data, it should return response status HTTP_201_CREATED
+        self.login()
         test_uri = '{}/{}/users'.format(self.base_courses_uri, self.course.id)
         response = self.do_post(test_uri, {'email': self.users[0].email})
         self.assertEqual(response.status_code, 201)

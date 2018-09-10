@@ -107,6 +107,14 @@ from edx_solutions_api_integration.users.serializers import (
 )
 from progress.models import CourseModuleCompletion
 from social_engagement.models import StudentSocialEngagementScore
+from edx_solutions_api_integration.permissions import (
+    SecureAPIView,
+    SecureListAPIView,
+    MobileAPIView,
+    MobileListAPIView,
+    IsStaffView,
+)
+from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer
 from edx_solutions_organizations.models import Organization
 from edx_solutions_api_integration.users.views import UsersPreferences
 from edx_solutions_api_integration.utils import (
@@ -1058,7 +1066,7 @@ class CoursesStaticTabsDetail(SecureAPIView):
         return Response({}, status=status.HTTP_404_NOT_FOUND)
 
 
-class CoursesUsersList(SecureListAPIView):
+class CoursesUsersList(MobileListAPIView):
     """
     **Use Case**
 
@@ -1145,6 +1153,9 @@ class CoursesUsersList(SecureListAPIView):
         """
         GET /api/courses/{course_id}/users
         """
+        if not request.user.is_staff:
+            return Response({}, status=status.HTTP_401_UNAUTHORIZED)
+
         if not course_exists(request, request.user, course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         self.course_key = get_course_key(course_id)
@@ -1152,6 +1163,7 @@ class CoursesUsersList(SecureListAPIView):
             self.course_meta_data = CourseAggregatedMetaData.objects.get(id=self.course_key)
         except CourseAggregatedMetaData.DoesNotExist:
             self.course_meta_data = None
+
         return super(CoursesUsersList, self).list(request)
 
     def get_serializer_context(self):
@@ -2094,7 +2106,7 @@ class CoursesWorkgroupsList(SecureListAPIView):
         return queryset
 
 
-class CoursesMetricsSocial(SecureListAPIView):
+class CoursesMetricsSocial(MobileListAPIView):
     """
     ### The CoursesMetricsSocial view allows clients to query about the activity of all users in the
     forums
@@ -2103,6 +2115,8 @@ class CoursesMetricsSocial(SecureListAPIView):
     """
 
     def get(self, request, course_id):  # pylint: disable=arguments-differ
+        if not request.user.is_staff:
+            return Response({}, status=status.HTTP_401_UNAUTHORIZED)
 
         total_enrollments = 0
         data = {}
