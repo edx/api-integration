@@ -5690,3 +5690,328 @@ Will return settings of the course
             "created": "2018-01-05T13:39:16.074502Z",
             "modified": "2018-01-05T14:53:11.397642Z"
         }
+
+# Manager Dashboard
+APIs related to manager dashboard.
+
+## Organization Fields [/organizations/{organization_id}/attributes]
+
+Manage all organization fields of a specific organization.
+
+### Organization Fields [POST]
+
+Add a single organization field of a specific organization
+
++ Request
+
+    {
+	    "name": "phone"
+    }
+
++ Response 201 (application/json)
+
+### Organization Fields [GET]
+
+Get organization fields of a specific organization
+
++ Response 200 (application/json)
+
+    {
+        "attributes": {
+            "phone": {
+                "is_active": true,
+                "order": 2,
+                "label": "phone"
+            }
+        },
+        "id": 1
+    }
+
+### Organization Fields [PUT]
+
+Update label of any organization field of a specific organization
+
++ Request
+
+    {
+	    "key": "phone",
+	    "name": "telephone"
+    }
+
++ Response 200 (application/json)
+
+### Organization Fields [DELETE]
+
+Delete any organization field of a specific organization
+
++ Request
+
+    {
+	    "key": "phone"
+    }
+
++ Response 200 (application/json)
+
+## User Organization Fields [/organizations/{organization_id}/attributes]
+
+Manage all organization fields of a specific organization.
+
+### Organization Fields [POST]
+
+Add a single organization field of a specific organization
+
++ Request
+
+    {
+	    "name": "phone"
+    }
+
++ Response 201 (application/json)
+
+### Organization Fields [GET]
+
+Get organization fields of a specific organization
+
++ Response 200 (application/json)
+
+    [
+        {
+            "key": "phone",
+            "label": "telephone"
+        },
+        {
+            "key": "address",
+            "label": "home"
+        }
+    ]
+
+### Organization Fields [PUT]
+
+Update label of any organization field of a specific organization
+
++ Request
+
+    {
+	    "key": "phone",
+	    "name": "telephone"
+    }
+
++ Response 200 (application/json)
+
+### Organization Fields [DELETE]
+
+Delete any organization field of a specific organization
+
++ Request
+
+    {
+	    "key": "phone"
+    }
+
++ Response 200 (application/json)
+
+## Organization User Values [/users/{user_id}/attributes/]
+
+Manage all organization fields values against users. (Logged in User must be Course Ops Admin) - 'MCKA_COURSE_OPS_ADMIN': 'mcka_role_course_ops_admin'
+
+### Organization Field Values[GET]
+
+Get all(mentioned in key list) active organization field values against a user.
+
++ Request
+
+    Query Params: key_list=phone,address&organization_id={organization_id}
+
+    [
+        {
+            "value": "12345",
+            "key": "phone"
+        },
+        {
+            "value": "johar town",
+            "key": "address"
+        }
+    ]
+
++ Response 200 (application/json)
+
+### Organization Field Values[POST]
+
+Add a single organization field value against a user.
+
++ Request
+
+    {
+      "key": "address",
+      "value": "johar town",
+      "organization_id": 1
+    }
+
++ Response 201 (application/json)
+
+### Organization Field Values[PUT]
+
+update a single organization field value against a user.
+
++ Request
+
+    {
+      "key": "phone",
+      "value": "355676543",
+      "organization_id": 1
+    }
+
++ Response 200 (application/json)
+
+## Course Users List [/courses/{course_id}/users{?fields}{?organizations}{?groups}{?workgroups}{?exclude_groups}]
+
+It returns a collection of users enrolled in the course. It can also be used to enroll a new user in the course.
+
+(Logged in User must be Client Admin) - 'MCKA_CLIENT_ADMIN': 'mcka_role_client_admin'
+
+### Course Users List [GET]
+
+Returns a JSON representation of users enrolled in the course, It supports dynamic fields which means we can pass list of fields we want. It aslo supports filtering by organizations, groups, workgroups and exclude_groups.
+
++ Parameters
+    + fields (optional)
+    + organizations (optional)
+    + groups (optional)
+    + workgroups (optional)
+    + exclude_groups (optional)
+    + additional_fields (optional) comma separated values. Possible values: organizations,grades,roles,progress
+    + username (for filtering on organization fields) (Comma Separated)
+    + attribute_keys (for filtering on organization fields) (Comma Separated)
+    + attribute_values (for filtering on organization fields) (Comma Separated)
+
+    Sample: /api/server/courses/UniX/Un506/2018_Un/users?username=aamish88&attribute_keys=address&attribute_values=12345&count=&page_size=100&per_page=100&page=1&additional_fields=grades,roles,organizations,progress&_=1524477198382
+
++ Response 200 (application/json)
+
+        {
+            "count": 3,
+            "previous": null,
+            "num_pages": 1,
+            "results": [
+                {
+                    "id": 15,
+                    "email": "client_observer_user@mckinseyacademy.com",
+                    "username": "client_observer_user",
+                    "first_name": "client_observer_user",
+                    "last_name": "Tester",
+                    "created": "2017-05-11T12:37:16.335511Z",
+                    "is_active": true,
+                    "avatar_url": null,
+                    "city": "Seatle",
+                    "title": "",
+                    "country": "",
+                    "full_name": "client_observer_user Tester",
+                    "is_staff": false,
+                    "last_login": "2017-05-17T13:33:52.036866Z",
+                    "attributes": [
+                        {
+                            "organization_id": 1,
+                            "value": "12345",
+                            "key": "address"
+                        },
+                        {
+                            "organization_id": 1,
+                            "value": "12345",
+                            "key": "phone"
+                        }
+                    ]
+                },
+                {
+                    "id": 14,
+                    "email": "client_ta_user@mckinseyacademy.com",
+                    "username": "client_ta_user",
+                    "first_name": "client_ta_user",
+                    "last_name": "Tester",
+                    "created": "2017-05-11T12:37:16.093740Z",
+                    "is_active": true,
+                    "avatar_url": null,
+                    "city": "",
+                    "title": "",
+                    "country": "",
+                    "full_name": "client_ta_user Tester",
+                    "is_staff": false,
+                    "last_login": "2017-05-18T09:36:10.935897Z",
+                    "attributes": [
+                        {
+                            "organization_id": 1,
+                            "value": "12345",
+                            "key": "address"
+                        },
+                        {
+                            "organization_id": 1,
+                            "value": "12345",
+                            "key": "phone"
+                        }
+                    ]
+                },
+                {
+                    "id": 2,
+                    "email": "honor@example.com",
+                    "username": "honor",
+                    "first_name": "",
+                    "last_name": "",
+                    "created": "2016-09-01T19:18:14.237644Z",
+                    "is_active": true,
+                    "avatar_url": "",
+                    "city": "Boston",
+                    "title": "Software Engineer",
+                    "country": "US",
+                    "full_name": "Honor Student",
+                    "is_staff": false,
+                    "last_login": "2017-05-18T09:34:17.762289Z",
+                    "attributes": []
+                }
+            ],
+            "next": null
+        }
+
+## Courses Metrics Social List [/courses/{course_id}/metrics/social]
+
+It allows clients to query about the activity of all users in the forums.
+
+(Logged in User must be Client Admin) - 'MCKA_CLIENT_ADMIN': 'mcka_role_client_admin'
+
+### Courses Metrics Social List [GET]
+
+Returns a list of social metrics for users in the specified course. Results can be filtered by organization
++ Parameters
+    + organization (optional)
+    + attribute_keys (for filtering on organization fields) (Comma Separated)
+    + attribute_values (for filtering on organization fields) (Comma Separated)
+
+    Sample: /api/server/courses/UniX/Un506/2018_Un/metrics/social?attribute_keys=aamish&attribute_values=12345
+
++ Response 200 (application/json)
+
+        {
+            "total_enrollments": 4,
+            "users": {
+                "2": {
+                    "num_threads": 1,
+                    "num_thread_followers": 0,
+                    "num_replies": 0,
+                    "num_flagged": 0,
+                    "num_comments": 0,
+                    "num_threads_read": 0,
+                    "num_downvotes": 0,
+                    "num_upvotes": 0,
+                    "num_comments_generated": 0
+                },
+                "8": {
+                    "num_threads": 1,
+                    "num_thread_followers": 0,
+                    "num_replies": 0,
+                    "num_flagged": 0,
+                    "num_comments": 0,
+                    "num_threads_read": 0,
+                    "num_downvotes": 0,
+                    "num_upvotes": 0,
+                    "num_comments_generated": 0
+                }
+            }
+        }
