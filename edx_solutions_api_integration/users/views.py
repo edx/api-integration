@@ -83,6 +83,7 @@ from edx_solutions_api_integration.utils import (
     get_profile_image_urls_by_username,
     str2bool,
     css_param_to_list,
+    css_data_to_list,
     get_aggregate_exclusion_user_ids,
     cache_course_data,
     cache_course_user_data,
@@ -386,6 +387,11 @@ class UsersList(SecureListAPIView):
         year_of_birth = request.data.get('year_of_birth', '')
         gender = request.data.get('gender', '')
         title = request.data.get('title', '')
+
+        organization_id = request.data.get('organization_id', '')
+        attribute_keys = css_data_to_list(request, 'attribute_keys')
+        attribute_values = css_data_to_list(request, 'attribute_values')
+
         # enforce password complexity as an optional feature
         if settings.FEATURES.get('ENFORCE_PASSWORD_POLICY', False):
             try:
@@ -445,6 +451,25 @@ class UsersList(SecureListAPIView):
             profile.year_of_birth = None
 
         profile.save()
+
+        if organization_id:
+            try:
+                organization = Organization.objects.get(id=organization_id)
+            except ObjectDoesNotExist:
+                return Response({
+                    "detail": 'Organization with {}, does not exists.'.format(organization_id)
+                }, status.HTTP_404_NOT_FOUND)
+
+            active_attribute_keys = organization.get_all_attribute_keys()
+
+            for index, key in enumerate(attribute_keys):
+                if key in active_attribute_keys:
+                    OrganizationUsersAttributes.objects.create(
+                        key=key,
+                        value=attribute_values[index],
+                        user_id=user.id,
+                        organization_id=organization_id
+                    )
 
         set_user_preference(user, LANGUAGE_KEY, get_language())
         if settings.FEATURES.get('ENABLE_DISCUSSION_EMAIL_DIGEST'):
@@ -689,6 +714,29 @@ class UsersDetail(SecureAPIView):
             existing_user_profile.year_of_birth = birth_year if birth_year else existing_user_profile.year_of_birth
 
             existing_user_profile.save()
+
+        organization_id = request.data.get('organization_id', '')
+        attribute_keys = css_data_to_list(request, 'attribute_keys')
+        attribute_values = css_data_to_list(request, 'attribute_values')
+
+        if organization_id:
+            try:
+                organization = Organization.objects.get(id=organization_id)
+            except ObjectDoesNotExist:
+                return Response({
+                    "detail": 'Organization with {}, does not exists.'.format(organization_id)
+                }, status.HTTP_404_NOT_FOUND)
+
+            active_attribute_keys = organization.get_all_attribute_keys()
+
+            for index, key in enumerate(attribute_keys):
+                if key in active_attribute_keys:
+                    OrganizationUsersAttributes.objects.filter(
+                        key=key,
+                        user_id=existing_user.id,
+                        organization_id=organization_id
+                    ).update(value=attribute_values[index])
+
         return Response(response_data, status=status.HTTP_200_OK)
 
 
