@@ -5905,3 +5905,130 @@ Returns a list of social metrics for users in the specified course. Results can 
                 }
             }
         }
+
+## User Add/Update [api/server/users]
+
+### Create a New User [POST]
+You can create new user and add the organization fields data using this end point.
+It takes a JSON object containing user information.
+
++ Attributes
+    + email (string, required)
+    + username (required)
+    + password (required)
+    + title (optional)
+    + first_name (optional)
+    + last_name (optional)
+    + is_active (optional, boolean)
+    + is_staff (optional, boolean)
+    + city (optional)
+    + country (optional)
+    + level_of_education
+    + year_of_birth (optional)
+    + gender (optional)
+    + avatar_url (optional)
+
+    (optional)
+    + attribute_keys (Comma Separated)
+    + attribute_values (Comma Separated)
+    + organization_id (Comma Separated)
+
++ Request (application/json)
+
+        {
+            "email" : "honor@edx.org",
+            "username" : "honor",
+            "password" : "edx!@#",
+            "title" : "Software Engineer",
+            "first_name" : "Honor",
+            "last_name" : "Student",
+            "is_active" : "False",
+            "is_staff" : "False",
+            "city" : "Boston",
+            "country" : "US",
+            "level_of_education" : "hs",
+            "year_of_birth" : "1996",
+            "gender" : "F",
+            "avatar_url" : "http://example.com/avatar.png",
+            "attribute_keys": "address,phone",
+            "attribute_values": "ABCD,123456789",
+            "organization_id": 1
+        }
+
++ Response 201 (application/json)
+
+        {
+            "username": "honor",
+            "first_name": "Honor",
+            "last_name": "Student",
+            "created": "2017-05-17T10:03:30.086Z",
+            "is_active": "False",
+            "uri": "http://lms.mcka.local/api/server/users/17",
+            "id": 17,
+            "is_staff": "False",
+            "last_login": null,
+            "email": "honor@edx.org"
+        }
+
+### Update User [POST] [api/server/users/{user_id}]
+You can update a user data and the organization fields using this end point.
+It takes a JSON object containing user information.
+
++ Attributes
+    + email (string, required)
+    + username (required)
+    + password (required)
+    + title (optional)
+    + first_name (optional)
+    + last_name (optional)
+    + is_active (optional, boolean)
+    + is_staff (optional, boolean)
+    + city (optional)
+    + country (optional)
+    + level_of_education
+    + year_of_birth (optional)
+    + gender (optional)
+    + avatar_url (optional)
+
+    (optional)
+    + attribute_keys (Comma Separated)
+    + attribute_values (Comma Separated)
+    + organization_id (Comma Separated)
+
++ Request (application/json)
+
+        {
+            "email" : "honor@edx.org",
+            "username" : "honor",
+            "password" : "edx!@#",
+            "title" : "Software Engineer",
+            "first_name" : "Honor",
+            "last_name" : "Student",
+            "is_active" : "False",
+            "is_staff" : "False",
+            "city" : "Boston",
+            "country" : "US",
+            "level_of_education" : "hs",
+            "year_of_birth" : "1996",
+            "gender" : "F",
+            "avatar_url" : "http://example.com/avatar.png",
+            "attribute_keys": "address,phone",
+            "attribute_values": "ABCD,123456789",
+            "organization_id": 1
+        }
+
++ Response 201 (application/json)
+
+        {
+            "username": "honor",
+            "first_name": "Honor",
+            "last_name": "Student",
+            "created": "2017-05-17T10:03:30.086Z",
+            "is_active": "False",
+            "uri": "http://lms.mcka.local/api/server/users/17",
+            "id": 17,
+            "is_staff": "False",
+            "last_login": null,
+            "email": "honor@edx.org"
+        }
+
