@@ -23,7 +23,6 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Count, F, Max, Min, Q
 from django.http import Http404
 from django.utils.translation import ugettext_lazy as _
-from django.db.models import Q, F
 from opaque_keys.edx.keys import UsageKey
 
 from requests.exceptions import ConnectionError
@@ -96,11 +95,6 @@ from edx_solutions_api_integration.models import (
     CourseGroupRelationship,
     GroupProfile,
 )
-from edx_solutions_api_integration.permissions import (
-    MobileAPIView,
-    SecureAPIView,
-    SecureListAPIView,
-)
 from edx_solutions_api_integration.users.serializers import (
     UserCountByCitySerializer,
     UserSerializer,
@@ -113,6 +107,7 @@ from edx_solutions_api_integration.permissions import (
     MobileAPIView,
     MobileListAPIView,
     IsStaffView,
+    TokenBasedAPIView,
 )
 from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer
 from edx_solutions_organizations.models import Organization

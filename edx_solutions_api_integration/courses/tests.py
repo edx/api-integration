@@ -2078,7 +2078,8 @@ class CoursesApiTests(
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['leaders']), 4)
-        self.assertEqual(response.data['position'], 2)
+        # Two users have the same completions, so position could be either 2 or 3
+        self.assertIn(response.data['position'], (2, 3))
         self.assertEqual('{0:.3f}'.format(response.data['completions']), '28.000')
 
         # with skipleaders filter
