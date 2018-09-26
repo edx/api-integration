@@ -27,7 +27,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.test.utils import override_settings
-from django.test import Client
+from django.test.client import Client
 from django.utils import timezone
 from django.db import transaction
 from django.utils.translation import ugettext as _
@@ -42,6 +42,7 @@ from edx_notifications.lib.consumer import get_notifications_count_for_user
 from edx_notifications.lib.publisher import register_notification_type, publish_notification_to_user
 from edx_solutions_organizations.models import Organization
 from edx_solutions_projects.models import Project, Workgroup
+from edx_solutions_api_integration.utils import PERMISSION_GROUPS
 from instructor.access import allow_access
 from social_engagement.models import StudentSocialEngagementScore
 from student.tests.factories import UserFactory, CourseEnrollmentFactory, GroupFactory
@@ -2720,3 +2721,269 @@ class UsersProgressApiTests(
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
+
+
+@ddt.ddt
+class UserAttributesApiTests(ModuleStoreTestCase, APIClientMixin):
+    """ Test suite for User Attributes API views """
+
+    MODULESTORE = TEST_DATA_SPLIT_MODULESTORE
+
+    def setUp(self):
+        super(UserAttributesApiTests, self).setUp()
+        self.test_server_prefix = 'https://testserver'
+        self.test_username = str(uuid.uuid4())
+        self.test_password = 'Test.Me64!'
+        self.test_email = str(uuid.uuid4()) + '@test.org'
+        self.test_first_name = str(uuid.uuid4())
+        self.test_last_name = str(uuid.uuid4())
+        self.test_city = str(uuid.uuid4())
+        self.base_courses_uri = '/api/server/courses'
+        self.base_users_uri = '/api/server/users'
+        self.base_organizations_uri = '/api/server/organizations/'
+        self.test_organization_name = str(uuid.uuid4())
+        self.test_organization_display_name = 'Test Org'
+        self.test_organization_contact_name = 'John Org'
+        self.test_organization_contact_email = 'john@test.org'
+        self.test_organization_contact_phone = '+1 332 232 24234'
+        self.test_organization_logo_url = 'org_logo.jpg'
+        self.test_organization_attributes = "{'1': 'phone', '2': 'address'}"
+
+        self.course = CourseFactory.create()
+
+        self.client = Client()
+        self.user = UserFactory.create(username='test', email='test@edx.org', password='test_password')
+        self.user.groups.create(name=PERMISSION_GROUPS['MCKA_COURSE_OPS_ADMIN'])
+        self.client.login(username=self.user.username, password='test_password')
+
+        cache.clear()
+
+    def setup_test_organization(self, org_data=None):
+        """
+        Creates a new organization with given org_data
+        if org_data is not present it would create organization with test values
+        :param org_data: Dictionary witch each item represents organization attribute
+        :return: newly created organization
+        """
+        org_data = org_data if org_data else {}
+        data = {
+            'name': org_data.get('name', self.test_organization_name),
+            'display_name': org_data.get('display_name', self.test_organization_display_name),
+            'contact_name': org_data.get('contact_name', self.test_organization_contact_name),
+            'contact_email': org_data.get('contact_email', self.test_organization_contact_email),
+            'contact_phone': org_data.get('contact_phone', self.test_organization_contact_phone),
+            'logo_url': org_data.get('logo_url', self.test_organization_logo_url),
+            'attributes': org_data.get('attributes', self.test_organization_attributes),
+            'users': org_data.get('users', []),
+            'groups': org_data.get('groups', []),
+        }
+        response = self.do_post(self.base_organizations_uri, data)
+        self.assertEqual(response.status_code, 201)
+        return response.data
+
+    def _add_sample_attributes_in_organization(self, organization_id):
+        test_uri = '{}{}/attributes'.format(self.base_organizations_uri, organization_id)
+        data = {
+            'name': 'phone'
+        }
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 201)
+
+        data = {
+            'name': 'address'
+        }
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 201)
+
+    def login_with_non_ops_admin(self):
+        self.client.logout()
+        user = UserFactory.create(username='test_non_ops', email='test_non_ops@edx.org', password='test_password')
+        self.client.login(username=user.username, password='test_password')
+
+    def test_users_attribute_values_add(self):
+        organization = self.setup_test_organization()
+
+        test_uri = '{}{}/attributes'.format(self.base_organizations_uri, organization['id'])
+        data = {
+            'name': 'phone'
+        }
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 201)
+
+        test_uri = '{}/{}/attributes/'.format(self.base_users_uri, self.user.id)
+        data = {
+            'key': 'phone',
+	        'value': '123456789',
+	        'organization_id': organization['id']
+        }
+
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 201)
+
+    def test_users_attribute_values_add_with_non_ops_admin(self):
+        organization = self.setup_test_organization()
+        test_uri = '{}{}/attributes'.format(self.base_organizations_uri, organization['id'])
+        data = {
+            'name': 'phone'
+        }
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 201)
+
+        self.login_with_non_ops_admin()
+
+        test_uri = '{}/{}/attributes/'.format(self.base_users_uri, self.user.id)
+        data = {
+            'key': 'phone',
+	        'value': '123456789',
+	        'organization_id': organization['id']
+        }
+
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 403)
+
+    def test_users_attribute_values_get(self):
+        organization = self.setup_test_organization()
+
+        test_uri = '{}{}/attributes'.format(self.base_organizations_uri, organization['id'])
+        data = {
+            'name': 'phone'
+        }
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 201)
+
+        test_uri = '{}/{}/attributes/'.format(self.base_users_uri, self.user.id)
+        data = {
+            'key': 'phone',
+	        'value': '123456789',
+	        'organization_id': organization['id']
+        }
+
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 201)
+
+        test_uri = '{}/{}/attributes/?key_list=phone&organization_id={}'.format(
+            self.base_users_uri, self.user.id, organization['id'])
+
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(response.data[0]['key'], 'phone')
+        self.assertEqual(response.data[0]['value'], '123456789')
+
+    def test_users_attribute_values_update(self):
+        organization = self.setup_test_organization()
+
+        test_uri = '{}{}/attributes'.format(self.base_organizations_uri, organization['id'])
+        data = {
+            'name': 'phone'
+        }
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 201)
+
+        test_uri = '{}/{}/attributes/'.format(self.base_users_uri, self.user.id)
+        data = {
+            'key': 'phone',
+	        'value': '123456789',
+	        'organization_id': organization['id']
+        }
+
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 201)
+
+        test_uri = '{}/{}/attributes/?key_list=phone&organization_id={}'.format(
+            self.base_users_uri, self.user.id, organization['id'])
+
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(response.data[0]['key'], 'phone')
+        self.assertEqual(response.data[0]['value'], '123456789')
+
+        test_uri = '{}/{}/attributes/'.format(self.base_users_uri, self.user.id)
+        data = {
+            'key': 'phone',
+	        'value': '123000000',
+	        'organization_id': organization['id']
+        }
+
+        response = self.do_put(test_uri, data)
+        self.assertEqual(response.status_code, 200)
+
+        test_uri = '{}/{}/attributes/?key_list=phone&organization_id={}'.format(
+            self.base_users_uri, self.user.id, organization['id'])
+
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(response.data[0]['key'], 'phone')
+        self.assertEqual(response.data[0]['value'], '123000000')
+
+    def test_create_user_with_attributes(self):
+        organization = self.setup_test_organization()
+        self._add_sample_attributes_in_organization(organization['id'])
+
+        local_username = self.test_username + str(randint(11, 99))
+        data = {'email': self.test_email, 'username': local_username, 'password':
+                self.test_password, 'first_name': self.test_first_name, 'last_name': self.test_last_name,
+                'attribute_keys': 'address,phone', 'attribute_values': 'ABC Town,123456789',
+                'organization_id': organization['id']}
+        response = self.do_post(self.base_users_uri, data)
+        self.assertEqual(response.status_code, 201)
+        self.assertGreater(response.data['id'], 0)
+        confirm_uri = self.base_users_uri + '/' + str(response.data['id'])
+        self.assertIn(confirm_uri, response.data['uri'])
+        self.assertEqual(response.data['email'], self.test_email)
+        self.assertEqual(response.data['username'], local_username)
+        self.assertEqual(response.data['first_name'], self.test_first_name)
+        self.assertEqual(response.data['last_name'], self.test_last_name)
+        self.assertIsNotNone(response.data['created'])
+
+        test_uri = '{}/{}/attributes/?key_list=phone&organization_id={}'.format(
+            self.base_users_uri, response.data['id'], organization['id'])
+
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(response.data[0]['key'], 'phone')
+        self.assertEqual(response.data[0]['value'], '123456789')
+
+    def test_user_attributes_update(self):
+        organization = self.setup_test_organization()
+        self._add_sample_attributes_in_organization(organization['id'])
+
+        local_username = self.test_username + str(randint(11, 99))
+        data = {'email': self.test_email, 'username': local_username, 'password':
+                self.test_password, 'first_name': self.test_first_name, 'last_name': self.test_last_name,
+                'attribute_keys': 'address,phone', 'attribute_values': 'ABC Town,123456789',
+                'organization_id': organization['id']}
+        response = self.do_post(self.base_users_uri, data)
+        user_id = response.data['id']
+        self.assertEqual(response.status_code, 201)
+        self.assertGreater(response.data['id'], 0)
+        confirm_uri = self.base_users_uri + '/' + str(user_id)
+        self.assertIn(confirm_uri, response.data['uri'])
+        self.assertEqual(response.data['email'], self.test_email)
+        self.assertEqual(response.data['username'], local_username)
+        self.assertEqual(response.data['first_name'], self.test_first_name)
+        self.assertEqual(response.data['last_name'], self.test_last_name)
+        self.assertIsNotNone(response.data['created'])
+
+        test_uri = '{}/{}/attributes/?key_list=phone&organization_id={}'.format(
+            self.base_users_uri, user_id, organization['id'])
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]['key'], 'phone')
+        self.assertEqual(response.data[0]['value'], '123456789')
+
+        test_uri = self.base_users_uri + '/' + str(user_id)
+        data = {'attribute_keys': 'phone', 'attribute_values': '1234567890',
+                'organization_id': organization['id']}
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 200)
+
+        test_uri = '{}/{}/attributes/?key_list=phone&organization_id={}'.format(
+            self.base_users_uri, user_id, organization['id'])
+        response = self.do_get(test_uri)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]['key'], 'phone')
+        self.assertEqual(response.data[0]['value'], '1234567890')

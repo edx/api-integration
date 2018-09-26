@@ -62,8 +62,16 @@ from util.password_policy_validators import (
 from xmodule.modulestore import InvalidLocationError
 
 from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
-from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView, IdsInFilterBackend, \
-    HasOrgsFilterBackend, TokenBasedAPIView
+from edx_solutions_organizations.models import Organization, OrganizationGroupUser, OrganizationUsersAttributes
+from edx_solutions_api_integration.permissions import (
+    TokenBasedAPIView,
+    SecureAPIView,
+    SecureListAPIView,
+    IdsInFilterBackend,
+    HasOrgsFilterBackend,
+    MobileAPIView,
+    IsOpsAdminOrReadOnlyView
+)
 from edx_solutions_api_integration.models import GroupProfile, APIUser as User
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from edx_solutions_api_integration.utils import (
@@ -74,6 +82,7 @@ from edx_solutions_api_integration.utils import (
     get_profile_image_urls_by_username,
     str2bool,
     css_param_to_list,
+    css_data_to_list,
     get_aggregate_exclusion_user_ids,
     cache_course_data,
     cache_course_user_data,
@@ -377,6 +386,11 @@ class UsersList(SecureListAPIView):
         year_of_birth = request.data.get('year_of_birth', '')
         gender = request.data.get('gender', '')
         title = request.data.get('title', '')
+
+        organization_id = request.data.get('organization_id', '')
+        attribute_keys = css_data_to_list(request, 'attribute_keys')
+        attribute_values = css_data_to_list(request, 'attribute_values')
+
         # enforce password complexity as an optional feature
         if settings.FEATURES.get('ENFORCE_PASSWORD_POLICY', False):
             try:
@@ -436,6 +450,25 @@ class UsersList(SecureListAPIView):
             profile.year_of_birth = None
 
         profile.save()
+
+        if organization_id:
+            try:
+                organization = Organization.objects.get(id=organization_id)
+            except ObjectDoesNotExist:
+                return Response({
+                    "detail": 'Organization with {}, does not exists.'.format(organization_id)
+                }, status.HTTP_404_NOT_FOUND)
+
+            active_attribute_keys = organization.get_all_attribute_keys()
+
+            for index, key in enumerate(attribute_keys):
+                if key in active_attribute_keys:
+                    OrganizationUsersAttributes.objects.create(
+                        key=key,
+                        value=attribute_values[index],
+                        user_id=user.id,
+                        organization_id=organization_id
+                    )
 
         set_user_preference(user, LANGUAGE_KEY, get_language())
         if settings.FEATURES.get('ENABLE_DISCUSSION_EMAIL_DIGEST'):
@@ -702,6 +735,29 @@ class UsersDetail(SecureAPIView):
             existing_user_profile.year_of_birth = birth_year if birth_year else existing_user_profile.year_of_birth
 
             existing_user_profile.save()
+
+        organization_id = request.data.get('organization_id', '')
+        attribute_keys = css_data_to_list(request, 'attribute_keys')
+        attribute_values = css_data_to_list(request, 'attribute_values')
+
+        if organization_id:
+            try:
+                organization = Organization.objects.get(id=organization_id)
+            except ObjectDoesNotExist:
+                return Response({
+                    "detail": 'Organization with {}, does not exists.'.format(organization_id)
+                }, status.HTTP_404_NOT_FOUND)
+
+            active_attribute_keys = organization.get_all_attribute_keys()
+
+            for index, key in enumerate(attribute_keys):
+                if key in active_attribute_keys:
+                    OrganizationUsersAttributes.objects.filter(
+                        key=key,
+                        user_id=existing_user.id,
+                        organization_id=organization_id
+                    ).update(value=attribute_values[index])
+
         return Response(response_data, status=status.HTTP_200_OK)
 
 
@@ -1709,3 +1765,131 @@ class UsersListWithEnrollment(UsersList):  # pylint: disable=too-many-ancestors
                 else:
                     response.data['courses'].append(course_key_string)
         return response
+
+
+class ClientSpecificAttributesView(MobileAPIView):
+    """
+    **Use Case**
+
+        Add client specific fields against user.
+
+    **Example Requests**
+
+        GET /api/users/{user_id}/attributes
+        POST /api/users/{user_id}/attributes
+
+        **POST Parameters**
+
+        The body of the POST request must include the following parameters.
+
+        "name": "Sample Name"
+        "value": "Value"
+
+    **Response Values**
+
+        **GET**
+
+        If the request is successful, the request returns an HTTP 200 "OK" response.
+
+        * name: Name
+        * value: Value
+
+        **POST**
+
+        If the request is successful, the request returns an HTTP 201 "CREATED" response.
+    """
+
+    def __init__(self):
+        self.permission_classes += (IsOpsAdminOrReadOnlyView,)
+
+    def get(self, request, user_id):
+        """
+        GET /api/users/{user_id}/attributes
+        """
+        response = []
+
+        key_list = css_param_to_list(self.request, 'key_list')
+        organization_id = request.query_params.get('organization_id', None)
+
+        try:
+            organization = Organization.objects.get(id=organization_id)
+        except ObjectDoesNotExist:
+            return Response({
+                "detail": 'Organization with {}, does not exists.'.format(organization_id)
+            }, status.HTTP_404_NOT_FOUND)
+
+        key_list = [key for key in key_list if organization.is_key_exists(key)]
+        for item in OrganizationUsersAttributes.objects.filter(user_id=user_id, key__in=key_list):
+            response.append({
+                "key": item.key,
+                "value": item.value,
+            })
+
+        return Response(response, status.HTTP_200_OK)
+
+    def post(self, request, user_id):
+        """
+        POST /api/users/{user_id}/attributes
+        """
+        organization_id = request.data.get('organization_id')
+
+        key = request.data.get('key')
+        value = request.data.get('value')
+
+        try:
+            organization = Organization.objects.get(id=organization_id)
+        except ObjectDoesNotExist:
+            return Response({
+                "detail": 'Organization with {}, does not exists.'.format(organization_id)
+            }, status.HTTP_404_NOT_FOUND)
+
+        if not organization.is_key_exists(key):
+            return Response({
+                "detail": 'Key with {} does not exists.'.format(key)
+            }, status.HTTP_404_NOT_FOUND)
+
+        try:
+            OrganizationUsersAttributes.objects.create(
+                key=key,
+                value=value,
+                user_id=user_id,
+                organization_id=organization_id
+            )
+        except IntegrityError:
+            return Response({
+                "detail": 'Key with {}, already exists.'.format(key)
+            }, status.HTTP_409_CONFLICT)
+        return Response({}, status=status.HTTP_201_CREATED)
+
+    def put(self, request, user_id):
+        """
+        PUT /api/users/{user_id}/attributes
+        """
+        organization_id = request.data.get('organization_id')
+
+        key = request.data.get('key')
+        value = request.data.get('value')
+
+        try:
+            organization = Organization.objects.get(id=organization_id)
+        except ObjectDoesNotExist:
+            return Response({
+                "detail": 'Organization with {}, does not exists.'.format(organization_id)
+            }, status.HTTP_404_NOT_FOUND)
+
+        if not organization.is_key_exists(key):
+            return Response({
+                "detail": 'Key with {} does not exists.'.format(key)
+            }, status.HTTP_404_NOT_FOUND)
+
+        try:
+            item = OrganizationUsersAttributes.objects.get(key=key, user_id=user_id)
+        except ObjectDoesNotExist:
+            return Response({
+                "detail": 'Field with key {}, does not exists.'.format(key)
+            }, status.HTTP_404_NOT_FOUND)
+
+        item.value = value
+        item.save()
+
+        return Response({}, status=status.HTTP_200_OK)

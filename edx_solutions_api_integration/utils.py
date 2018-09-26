@@ -29,6 +29,11 @@ USER_METRICS_CACHE_TTL = 60 * 60
 COURSE_METRICS_CACHE_TTL = 30 * 60
 
 
+PERMISSION_GROUPS = {
+    'MCKA_COURSE_OPS_ADMIN': 'mcka_role_course_ops_admin',
+    'MCKA_CLIENT_ADMIN': 'mcka_role_client_admin',
+}
+
 def address_exists_in_network(ip_address, net_n_bits):
     """
     return True if the ip address exists in the subnet address
@@ -351,6 +356,20 @@ def css_param_to_list(request, param_name):
     :return: list of values in param
     """
     values = request.query_params.get(param_name, [])
+    if isinstance(values, basestring):
+        upper_bound = getattr(settings, 'API_LOOKUP_UPPER_BOUND', 100)
+        values = [value.strip() for value in filter(None, values.split(',')[:upper_bound])]
+    return values
+
+
+def css_data_to_list(request, param_name):
+    """
+    Converst comma separated string parameter in a request to a list
+    :param request:
+    :param param_name:
+    :return: list of values in param
+    """
+    values = request.data.get(param_name, [])
     if isinstance(values, basestring):
         upper_bound = getattr(settings, 'API_LOOKUP_UPPER_BOUND', 100)
         values = [value.strip() for value in filter(None, values.split(',')[:upper_bound])]

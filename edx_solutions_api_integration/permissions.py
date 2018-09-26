@@ -4,7 +4,7 @@ import logging
 from django.conf import settings
 from student.models import CourseEnrollment
 from edx_solutions_api_integration.courseware_access import get_course_key
-from edx_solutions_api_integration.utils import get_client_ip_address, address_exists_in_network
+from edx_solutions_api_integration.utils import get_client_ip_address, address_exists_in_network, PERMISSION_GROUPS
 from rest_framework import permissions, generics, filters, pagination, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -31,7 +31,6 @@ class ApiKeyHeaderPermission(permissions.BasePermission):
         settings.EDX_API_KEY is set and the X-Edx-Api-Key HTTP header is
         present in the request and matches the setting.
         """
-
         debug_enabled = settings.DEBUG
         api_key = getattr(settings, "EDX_API_KEY", None)
 
@@ -340,3 +339,25 @@ class SecurePaginatedModelViewSet(PaginationMixin, SecureModelViewSet):
     ModelViewSet used for pagination and protecting access to specific workflows
     """
     pass
+
+
+class IsOpsAdminOrReadOnlyView(permissions.BasePermission):
+    """
+    Permission that checks to see if the user is course ops admin and the view is POST.
+    """
+    def has_permission(self, request, view):
+        if not request.method == 'GET':
+            groups = request.user.groups.filter(name__icontains=PERMISSION_GROUPS['MCKA_COURSE_OPS_ADMIN'])
+            return True if groups else False
+        return True
+
+
+class IsClientAdminOrReadOnlyView(permissions.BasePermission):
+    """
+    Permission that checks to see if the user is client admin and the view is POST.
+    """
+    def has_permission(self, request, view):
+        if not request.method == 'GET':
+            groups = request.user.groups.filter(name__icontains=PERMISSION_GROUPS['MCKA_CLIENT_ADMIN'])
+            return True if groups else False
+        return True
