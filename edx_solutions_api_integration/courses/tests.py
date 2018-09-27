@@ -1274,10 +1274,11 @@ class CoursesApiTests(
 
     def test_courses_users_list_courses_enrolled(self):
         """ Test courses_enrolled value returned by courses users list api """
+        self.staff_login()
         course = CourseFactory.create()
         course2 = CourseFactory.create()
         test_uri = self.base_courses_uri + '/{course_id}/users?additional_fields=courses_enrolled'
-        # create a 2 new users
+        # create 2 new users
         users = UserFactory.create_batch(2)
 
         # create course enrollments
