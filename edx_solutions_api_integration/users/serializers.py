@@ -45,7 +45,6 @@ class UserSerializer(DynamicFieldsModelSerializer):
     courses_enrolled = serializers.SerializerMethodField()
     roles = serializers.SerializerMethodField('get_user_roles')
     grades = serializers.SerializerMethodField('get_user_grades')
-    progress = serializers.SerializerMethodField('get_user_progress')
     attributes = serializers.SerializerMethodField('get_organization_attributes')
 
     def get_organization_attributes(self, user):
@@ -137,7 +136,6 @@ class UserSerializer(DynamicFieldsModelSerializer):
             "organizations",
             "roles",
             "grades",
-            "progress",
             "attributes",
         )
         read_only_fields = ("id", "email", "username")

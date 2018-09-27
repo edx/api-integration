@@ -1241,11 +1241,6 @@ class CoursesUsersList(MobileListAPIView):
                 'courseenrollment_set'
             )
 
-        if 'progress' in additional_fields:
-            users = users.prefetch_related(
-                'studentprogress_set'
-            )
-
         if 'attributes' in additional_fields:
             users = users.prefetch_related(
                 'user_attributes'
