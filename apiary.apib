@@ -5702,7 +5702,7 @@ Delete any organization field of a specific organization
 
 ## Organization User Values [/users/{user_id}/attributes/]
 
-Manage all organization fields values against users. (Logged in User must be Course Ops Admin) - 'MCKA_COURSE_OPS_ADMIN': 'mcka_role_course_ops_admin'
+Manage all organization fields values against users.
 
 ### Organization Field Values[GET]
 
@@ -5756,8 +5756,6 @@ update a single organization field value against a user.
 ## Course Users List [/courses/{course_id}/users{?fields}{?organizations}{?groups}{?workgroups}{?exclude_groups}]
 
 It returns a collection of users enrolled in the course. It can also be used to enroll a new user in the course.
-
-(Logged in User must be Client Admin) - 'MCKA_CLIENT_ADMIN': 'mcka_role_client_admin'
 
 ### Course Users List [GET]
 
@@ -5863,8 +5861,6 @@ Returns a JSON representation of users enrolled in the course, It supports dynam
 ## Courses Metrics Social List [/courses/{course_id}/metrics/social]
 
 It allows clients to query about the activity of all users in the forums.
-
-(Logged in User must be Client Admin) - 'MCKA_CLIENT_ADMIN': 'mcka_role_client_admin'
 
 ### Courses Metrics Social List [GET]
 
