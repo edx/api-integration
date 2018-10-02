@@ -42,7 +42,6 @@ from edx_notifications.lib.consumer import get_notifications_count_for_user
 from edx_notifications.lib.publisher import register_notification_type, publish_notification_to_user
 from edx_solutions_organizations.models import Organization
 from edx_solutions_projects.models import Project, Workgroup
-from edx_solutions_api_integration.utils import PERMISSION_GROUPS
 from instructor.access import allow_access
 from social_engagement.models import StudentSocialEngagementScore
 from student.tests.factories import UserFactory, CourseEnrollmentFactory, GroupFactory
@@ -2753,7 +2752,6 @@ class UserAttributesApiTests(ModuleStoreTestCase, APIClientMixin):
 
         self.client = Client()
         self.user = UserFactory.create(username='test', email='test@edx.org', password='test_password')
-        self.user.groups.create(name=PERMISSION_GROUPS['MCKA_COURSE_OPS_ADMIN'])
         self.client.login(username=self.user.username, password='test_password')
 
         cache.clear()
@@ -2795,11 +2793,6 @@ class UserAttributesApiTests(ModuleStoreTestCase, APIClientMixin):
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
 
-    def login_with_non_ops_admin(self):
-        self.client.logout()
-        user = UserFactory.create(username='test_non_ops', email='test_non_ops@edx.org', password='test_password')
-        self.client.login(username=user.username, password='test_password')
-
     def test_users_attribute_values_add(self):
         organization = self.setup_test_organization()
 
@@ -2819,27 +2812,6 @@ class UserAttributesApiTests(ModuleStoreTestCase, APIClientMixin):
 
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
-
-    def test_users_attribute_values_add_with_non_ops_admin(self):
-        organization = self.setup_test_organization()
-        test_uri = '{}{}/attributes'.format(self.base_organizations_uri, organization['id'])
-        data = {
-            'name': 'phone'
-        }
-        response = self.do_post(test_uri, data)
-        self.assertEqual(response.status_code, 201)
-
-        self.login_with_non_ops_admin()
-
-        test_uri = '{}/{}/attributes/'.format(self.base_users_uri, self.user.id)
-        data = {
-            'key': 'phone',
-	        'value': '123456789',
-	        'organization_id': organization['id']
-        }
-
-        response = self.do_post(test_uri, data)
-        self.assertEqual(response.status_code, 403)
 
     def test_users_attribute_values_get(self):
         organization = self.setup_test_organization()
