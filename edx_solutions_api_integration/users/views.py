@@ -70,7 +70,6 @@ from edx_solutions_api_integration.permissions import (
     IdsInFilterBackend,
     HasOrgsFilterBackend,
     MobileAPIView,
-    IsOpsAdminOrReadOnlyView
 )
 from edx_solutions_api_integration.models import GroupProfile, APIUser as User
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
@@ -1798,9 +1797,6 @@ class ClientSpecificAttributesView(MobileAPIView):
 
         If the request is successful, the request returns an HTTP 201 "CREATED" response.
     """
-
-    def __init__(self):
-        self.permission_classes += (IsOpsAdminOrReadOnlyView,)
 
     def get(self, request, user_id):
         """
