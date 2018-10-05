@@ -21,6 +21,7 @@ from completion.waffle import (
     WAFFLE_NAMESPACE as WAFFLE_COMPLETION_NAMESPACE,
 )
 from completion_aggregator.models import Aggregator
+from completion_aggregator.tasks import aggregation_tasks
 from courseware import module_render
 from courseware.model_data import FieldDataCache
 from dateutil.relativedelta import relativedelta
@@ -3518,3 +3519,81 @@ class CoursesSocialMetricsApiTests(
         self.assertEqual(len(response.data['leaders']), 3)
         self.assertEqual(response.data['position'], 1)
         self.assertEqual(response.data['score'], self.scores[-1])
+
+
+class CompletionEndpointTestCase(SharedModuleStoreTestCase, APIClientMixin):
+    """
+    Test get and post behavior on Completion endpoint.
+    """
+
+    MODULESTORE = TEST_DATA_SPLIT_MODULESTORE
+
+    @classmethod
+    def setUpClass(cls):
+        super(CompletionEndpointTestCase, cls).setUpClass()
+
+        cls.course = CourseFactory.create()
+        cls.chapter = ItemFactory.create(
+            category="chapter",
+            parent_location=cls.course.location,
+        )
+        cls.html1 = ItemFactory.create(
+            category="html",
+            parent_location=cls.chapter.location,
+        )
+        cls.html2 = ItemFactory.create(
+            category="html",
+            parent_location=cls.chapter.location,
+        )
+        cls.html3 = ItemFactory.create(
+            category="html",
+            parent_location=cls.chapter.location,
+        )
+        cls.completion_uri = "/api/server/courses/{}/completions".format(cls.course.id)
+        cls.test_user = UserFactory.create()
+        CourseEnrollmentFactory(user=cls.test_user, course_id=cls.course.id)
+        with override_switch('completion.enable_completion_tracking', active=True):
+            for loc in (cls.html1.location, cls.html2.location):
+                BlockCompletion.objects.submit_completion(
+                    user=cls.test_user,
+                    course_key=cls.course.id,
+                    block_key=loc,
+                    completion=1.0,
+                )
+
+    def test_completion_get_endpoint(self):
+        response = self.do_get(self.completion_uri, query_parameters={"content_id": unicode(self.html2.location)})
+        self.assertEqual(response.status_code, 200)
+        response.data['results'][0].pop('created')
+        response.data['results'][0].pop('modified')
+        response.data['results'][0].pop('id')
+        self.assertEqual(response.data, {
+            'count': 1,
+            'next': None,
+            'num_pages': 1,
+            'previous': None,
+            'results': [
+                {
+                    'user_id': self.test_user.id,
+                    'content_id': unicode(self.html2.location),
+                    'course_id': unicode(self.course.id),
+                    'stage': None,
+                    'course_key': unicode(self.course.id),
+                    'block_key': unicode(self.html2.location),
+                    'block_type': u'html',
+                    'completion': 1.0,
+                    'user': self.test_user.id,
+                }
+            ]
+        })
+
+    def test_completion_post_endpoint(self):
+        with override_switch("completion.enable_completion_tracking", active=True):
+            self.do_post(self.completion_uri, {
+                "content_id": unicode(self.html3.location),
+                "user_id": self.test_user.id,
+            })
+        self.assertEqual(
+            BlockCompletion.objects.get(user_id=self.test_user.id, block_key=self.html3.location).completion,
+            1.0
+        )

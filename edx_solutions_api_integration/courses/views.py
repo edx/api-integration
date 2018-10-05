@@ -2,13 +2,12 @@
 
 import itertools
 import logging
+import warnings
 import sys
 from StringIO import StringIO
 from collections import OrderedDict
 from datetime import timedelta
 
-from completion.models import BlockCompletion
-from completion_aggregator.models import Aggregator
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.cache import cache
@@ -17,26 +16,35 @@ from django.db.models import Count, F, Max, Min, Q
 from django.http import Http404
 from django.utils.translation import ugettext_lazy as _
 
-from courseware.courses import get_course_about_section, get_course_info_section, get_course_info_section_module
+from lxml import etree
+from requests.exceptions import ConnectionError
+from rest_framework import status
+from rest_framework.response import Response
+
+from completion.models import BlockCompletion
+from completion_aggregator.models import Aggregator
+from course_metadata.models import CourseAggregatedMetaData
+from courseware.courses import (
+    get_course_about_section,
+    get_course_info_section,
+    get_course_info_section_module,
+)
 from courseware.models import StudentModule
 from courseware.views.views import get_static_tab_fragment
 from openedx.core.djangoapps.course_groups.cohorts import get_cohort_user_ids
 from django_comment_common.models import FORUM_ROLE_MODERATOR
+from gradebook.models import StudentGradebook
 from instructor.access import revoke_access, update_forum_role
 from lms.djangoapps.course_api.blocks.api import get_blocks
 from lms.lib.comment_client.thread import get_course_thread_stats
 from lms.lib.comment_client.utils import CommentClientMaintenanceError, CommentClientRequestError
-from lxml import etree
 from mobile_api.course_info.views import apply_wrappers_to_content
-from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import UsageKey
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
 from openedx.core.lib.courses import course_image_url
 from openedx.core.lib.xblock_utils import get_course_update_items
-from requests.exceptions import ConnectionError
-from rest_framework import status
-from rest_framework.response import Response
+from social_engagement.models import StudentSocialEngagementScore
 from student.models import CourseEnrollment, CourseEnrollmentAllowed
 from student.roles import (
     CourseAccessRole,
@@ -50,8 +58,8 @@ from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.exceptions import ItemNotFoundError
 from xmodule.modulestore.search import path_to_location
 
-from course_metadata.models import CourseAggregatedMetaData
 from edx_solutions_api_integration.courses.serializers import (
+    BlockCompletionSerializer,
     CourseCompletionsLeadersSerializer,
     CourseProficiencyLeadersSerializer,
     CourseSerializer,
@@ -78,13 +86,13 @@ from edx_solutions_api_integration.models import (
     GroupProfile,
 )
 from edx_solutions_api_integration.permissions import (
-    SecureAPIView,
-    SecureListAPIView,
+    IsStaffView,
     MobileAPIView,
     MobileListAPIView,
+    SecureAPIView,
+    SecureListAPIView,
 )
 from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer
-from edx_solutions_organizations.models import Organization
 from edx_solutions_api_integration.utils import (
     cache_course_data,
     cache_course_user_data,
@@ -99,10 +107,12 @@ from edx_solutions_api_integration.utils import (
     str2bool,
     strip_xblock_wrapper_div,
 )
+from edx_solutions_organizations.models import Organization
 from edx_solutions_projects.models import Project, Workgroup
-from edx_solutions_projects.serializers import BasicWorkgroupSerializer, ProjectSerializer
-from gradebook.models import StudentGradebook
-from social_engagement.models import StudentSocialEngagementScore
+from edx_solutions_projects.serializers import (
+    BasicWorkgroupSerializer,
+    ProjectSerializer,
+)
 
 BLOCK_DATA_FIELDS = ['children', 'display_name', 'type', 'due', 'start']
 log = logging.getLogger(__name__)
@@ -205,7 +215,7 @@ def _manage_role(course_descriptor, user, role, action):
             user=user,
             role=role,
             course_id=course_descriptor.id,
-            org=course_descriptor.org
+            org=course_descriptor.org,
         )
         if not existing_role:
             new_role = CourseAccessRole(user=user, role=role, course_id=course_descriptor.id, org=course_descriptor.org)
@@ -2013,6 +2023,120 @@ class CoursesMetricsGradesLeadersList(SecureListAPIView):
         data = _get_courses_metrics_grades_leaders_list(course_key, **params)
 
         return Response(data, status=status.HTTP_200_OK)
+
+
+class CompletionList(SecureListAPIView):  # pylint: disable=too-many-ancestors
+    """
+    ### The CompletionList allows clients to view user's course module completion entities
+    to monitor a user's progression throughout the duration of a course,
+    -   URI: ```/api/courses/{course_id}/completions```
+    -   GET: Returns a JSON representation of the course, content and user and timestamps.
+        Note that it contains duplicate fields to support new and old naming schemes.
+    -   GET Example:
+            {
+                "count":"1",
+                "num_pages": "1",
+                "previous": null
+                "next": null
+                "results": [
+                    {
+                        "id": 18,
+                        "block_key": "block-v1:edX+DemoX+Demo_Course+type@poll+block@44cc060f582743899d70b850097cf029",
+                        "block_type": "poll",
+                        "completion": 1,
+                        "content_id": "block-v1:edX+DemoX+Demo_Course+type@poll+block@44cc060f582743899d70b850097cf029",
+                        "course_id": "course-v1:edX+DemoX+Demo_Course",
+                        "course_key": "course-v1:edX+DemoX+Demo_Course",
+                        "created": "2018-10-26T18:22:59.416943Z",
+                        "modified": "2018-10-26T18:22:59.417711Z",
+                        "stage": null,
+                        "user": 5
+                        "user_id": 5,
+                    }
+                ]
+            }
+
+        Filters can also be applied:
+
+        `/api/courses/{course_id}/completions/?user_id={user_id}`
+        `/api/courses/{course_id}/completions/?content_id={content_id}`
+        `/api/courses/{course_id}/completions/?user_id={user_id}&content_id={content_id}`
+
+    - POST: Creates a Course-Module completion entity
+    - POST Example:
+        {
+            "content_id":"i4x://the/content/location",
+            "user_id":4,
+        }
+    ### Use Cases/Notes:
+    * Use GET operation to retrieve list of course completions by user
+    * Use GET operation to verify user has completed specific course module
+    """
+    serializer_class = BlockCompletionSerializer
+
+    def get_queryset(self):
+        """
+        GET /api/courses/{course_id}/completions/
+        """
+        content_id = self.request.query_params.get('content_id', None)
+        course_id = self.kwargs['course_id']
+        if not course_exists(course_id):
+            raise Http404
+        course_key = get_course_key(course_id)
+        queryset = BlockCompletion.objects.filter(course_key=course_key).select_related('user')
+        user_ids = get_ids_from_list_param(self.request, 'user_id')
+        if user_ids:
+            queryset = queryset.filter(user__in=user_ids)
+
+        if content_id:
+            content_descriptor, content_key, _existing_content = get_course_child(
+                self.request,
+                self.request.user,
+                course_key,
+                content_id
+            )
+            if not content_descriptor:
+                raise Http404
+            queryset = queryset.filter(block_key=content_key)
+
+        return queryset
+
+    def post(self, request, course_id):
+        """
+        POST /api/courses/{course_id}/completions/
+        """
+        warnings.warn(
+            "BlockCompletions should not be created this way.  Use the suggested APIs instead",
+            DeprecationWarning,
+        )
+        content_id = request.data.get('content_id', None)
+        user_id = request.data.get('user_id', None)
+        if not content_id:
+            return Response({'message': _('content_id is missing')}, status.HTTP_400_BAD_REQUEST)
+        if not user_id:
+            return Response({'message': _('user_id is missing')}, status.HTTP_400_BAD_REQUEST)
+        if not course_exists(course_id):
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+        course_key = get_course_key(course_id)
+        content_descriptor, content_key, _existing_content = get_course_child(request, request.user, course_key, content_id)  # pylint: disable=W0612,C0301
+        if not content_descriptor:
+            return Response({'message': _('content_id is invalid')}, status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'message': _('user_id is invalid')}, status.HTTP_400_BAD_REQUEST)
+        completion, created = BlockCompletion.objects.submit_completion(
+            user=user,
+            course_key=course_key,
+            block_key=content_key,
+            completion=1.0,
+        )
+        serializer = BlockCompletionSerializer(completion)
+        if created:
+            return Response(serializer.data, status=status.HTTP_201_CREATED)  # pylint: disable=E1101
+        else:
+            return Response({}, status=status.HTTP_204_NO_CONTENT)
 
 
 class CoursesMetricsCompletionsLeadersList(SecureAPIView):
