@@ -1413,38 +1413,28 @@ class UsersSocialMetrics(SecureListAPIView):
             cache_course_user_data('social', course_id, user.id, {'score': social_engagement_score})
         else:
             data = cached_social_data
+
         if include_stats:
-            data['stats'] = self._get_user_discussion_metrics(request, user, course_id)
+            cached_social_stats = get_cached_data('social_stats', course_id, user.id)
+            if not cached_social_stats:
+                data['stats'] = self._get_user_discussion_metrics(course_key, user)
+            else:
+                data['stats'] = cached_social_stats
 
         return Response(data, status.HTTP_200_OK)
 
     @staticmethod
-    def _get_user_discussion_metrics(request, user, course_id):
-        """ Fetches discussion metrics from the forums client."""
-        # load the course so that we can see when the course end date is
-        course_descriptor, course_key, course_content = get_course(request, request.user, course_id)  # pylint: disable=W0612,C0301
-        if not course_descriptor:
-            raise Http404
+    def _get_user_score(course_key, user):
+        score = StudentSocialEngagementScore.get_user_engagement_score(course_key, user.id)
+        if score is None:
+            return 0
+        return score
 
-        # be robust to the try of course_id we get from caller
-        try:
-            # assume new style
-            course_key = CourseKey.from_string(course_id)
-            slash_course_id = course_key.to_deprecated_string()
-        except:  # pylint: disable=W0702
-            # assume course_id passed in is legacy format
-            slash_course_id = course_id
-
-        try:
-            # get the course social stats, passing along a course end date to remove any activity after the course
-            # closure from the stats
-            user_id = str(user.id)
-            data = (get_user_social_stats(user_id, slash_course_id, end_date=course_descriptor.end))[user_id]
-        except (CommentClientRequestError, CommentClientMaintenanceError, ConnectionError), error:
-            logging.error("Forum service returned an error: %s", str(error))
-
-            data = {
-                'err_msg': str(error),
+    @staticmethod
+    def _get_user_discussion_metrics(course_key, user):
+        stats = StudentSocialEngagementScore.get_user_engagements_stats(course_key, user.id)
+        if stats is None:
+            return {
                 'num_threads': 0,
                 'num_thread_followers': 0,
                 'num_replies': 0,
@@ -1455,15 +1445,7 @@ class UsersSocialMetrics(SecureListAPIView):
                 'num_upvotes': 0,
                 'num_comments_generated': 0
             }
-
-        return data
-
-    @staticmethod
-    def _get_user_score(course_key, user):
-        score = StudentSocialEngagementScore.get_user_engagement_score(course_key, user.id)
-        if score is None:
-            return 0
-        return score
+        return stats
 
     @staticmethod
     def _get_course_average_score(course_key):
