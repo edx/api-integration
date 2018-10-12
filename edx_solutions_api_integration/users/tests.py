@@ -2805,7 +2805,7 @@ class UserAttributesApiTests(ModuleStoreTestCase, APIClientMixin):
 
         test_uri = '{}/{}/attributes/'.format(self.base_users_uri, self.user.id)
         data = {
-            'key': 'phone',
+            'key': 'phone_1',
 	        'value': '123456789',
 	        'organization_id': organization['id']
         }
@@ -2825,7 +2825,7 @@ class UserAttributesApiTests(ModuleStoreTestCase, APIClientMixin):
 
         test_uri = '{}/{}/attributes/'.format(self.base_users_uri, self.user.id)
         data = {
-            'key': 'phone',
+            'key': 'phone_1',
 	        'value': '123456789',
 	        'organization_id': organization['id']
         }
@@ -2833,13 +2833,13 @@ class UserAttributesApiTests(ModuleStoreTestCase, APIClientMixin):
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
 
-        test_uri = '{}/{}/attributes/?key_list=phone&organization_id={}'.format(
+        test_uri = '{}/{}/attributes/?key_list=phone_1&organization_id={}'.format(
             self.base_users_uri, self.user.id, organization['id'])
 
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
 
-        self.assertEqual(response.data[0]['key'], 'phone')
+        self.assertEqual(response.data[0]['key'], 'phone_1')
         self.assertEqual(response.data[0]['value'], '123456789')
 
     def test_users_attribute_values_update(self):
@@ -2854,7 +2854,7 @@ class UserAttributesApiTests(ModuleStoreTestCase, APIClientMixin):
 
         test_uri = '{}/{}/attributes/'.format(self.base_users_uri, self.user.id)
         data = {
-            'key': 'phone',
+            'key': 'phone_1',
 	        'value': '123456789',
 	        'organization_id': organization['id']
         }
@@ -2862,18 +2862,18 @@ class UserAttributesApiTests(ModuleStoreTestCase, APIClientMixin):
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
 
-        test_uri = '{}/{}/attributes/?key_list=phone&organization_id={}'.format(
+        test_uri = '{}/{}/attributes/?key_list=phone_1&organization_id={}'.format(
             self.base_users_uri, self.user.id, organization['id'])
 
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
 
-        self.assertEqual(response.data[0]['key'], 'phone')
+        self.assertEqual(response.data[0]['key'], 'phone_1')
         self.assertEqual(response.data[0]['value'], '123456789')
 
         test_uri = '{}/{}/attributes/'.format(self.base_users_uri, self.user.id)
         data = {
-            'key': 'phone',
+            'key': 'phone_1',
 	        'value': '123000000',
 	        'organization_id': organization['id']
         }
@@ -2881,13 +2881,13 @@ class UserAttributesApiTests(ModuleStoreTestCase, APIClientMixin):
         response = self.do_put(test_uri, data)
         self.assertEqual(response.status_code, 200)
 
-        test_uri = '{}/{}/attributes/?key_list=phone&organization_id={}'.format(
+        test_uri = '{}/{}/attributes/?key_list=phone_1&organization_id={}'.format(
             self.base_users_uri, self.user.id, organization['id'])
 
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
 
-        self.assertEqual(response.data[0]['key'], 'phone')
+        self.assertEqual(response.data[0]['key'], 'phone_1')
         self.assertEqual(response.data[0]['value'], '123000000')
 
     def test_create_user_with_attributes(self):
@@ -2897,11 +2897,12 @@ class UserAttributesApiTests(ModuleStoreTestCase, APIClientMixin):
         local_username = self.test_username + str(randint(11, 99))
         data = {'email': self.test_email, 'username': local_username, 'password':
                 self.test_password, 'first_name': self.test_first_name, 'last_name': self.test_last_name,
-                'attribute_keys': 'address,phone', 'attribute_values': 'ABC Town,123456789',
+                'attribute_keys': 'address_1,phone_1', 'attribute_values': 'ABC Town,123456789',
                 'organization_id': organization['id']}
         response = self.do_post(self.base_users_uri, data)
         self.assertEqual(response.status_code, 201)
         self.assertGreater(response.data['id'], 0)
+
         confirm_uri = self.base_users_uri + '/' + str(response.data['id'])
         self.assertIn(confirm_uri, response.data['uri'])
         self.assertEqual(response.data['email'], self.test_email)
@@ -2910,13 +2911,13 @@ class UserAttributesApiTests(ModuleStoreTestCase, APIClientMixin):
         self.assertEqual(response.data['last_name'], self.test_last_name)
         self.assertIsNotNone(response.data['created'])
 
-        test_uri = '{}/{}/attributes/?key_list=phone&organization_id={}'.format(
+        test_uri = '{}/{}/attributes/?key_list=phone_1&organization_id={}'.format(
             self.base_users_uri, response.data['id'], organization['id'])
 
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
 
-        self.assertEqual(response.data[0]['key'], 'phone')
+        self.assertEqual(response.data[0]['key'], 'phone_1')
         self.assertEqual(response.data[0]['value'], '123456789')
 
     def test_user_attributes_update(self):
@@ -2926,7 +2927,7 @@ class UserAttributesApiTests(ModuleStoreTestCase, APIClientMixin):
         local_username = self.test_username + str(randint(11, 99))
         data = {'email': self.test_email, 'username': local_username, 'password':
                 self.test_password, 'first_name': self.test_first_name, 'last_name': self.test_last_name,
-                'attribute_keys': 'address,phone', 'attribute_values': 'ABC Town,123456789',
+                'attribute_keys': 'address_1,phone_1', 'attribute_values': 'ABC Town,123456789',
                 'organization_id': organization['id']}
         response = self.do_post(self.base_users_uri, data)
         user_id = response.data['id']
@@ -2940,22 +2941,22 @@ class UserAttributesApiTests(ModuleStoreTestCase, APIClientMixin):
         self.assertEqual(response.data['last_name'], self.test_last_name)
         self.assertIsNotNone(response.data['created'])
 
-        test_uri = '{}/{}/attributes/?key_list=phone&organization_id={}'.format(
+        test_uri = '{}/{}/attributes/?key_list=phone_1&organization_id={}'.format(
             self.base_users_uri, user_id, organization['id'])
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data[0]['key'], 'phone')
+        self.assertEqual(response.data[0]['key'], 'phone_1')
         self.assertEqual(response.data[0]['value'], '123456789')
 
         test_uri = self.base_users_uri + '/' + str(user_id)
-        data = {'attribute_keys': 'phone', 'attribute_values': '1234567890',
+        data = {'attribute_keys': 'phone_1', 'attribute_values': '1234567890',
                 'organization_id': organization['id']}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 200)
 
-        test_uri = '{}/{}/attributes/?key_list=phone&organization_id={}'.format(
+        test_uri = '{}/{}/attributes/?key_list=phone_1&organization_id={}'.format(
             self.base_users_uri, user_id, organization['id'])
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data[0]['key'], 'phone')
+        self.assertEqual(response.data[0]['key'], 'phone_1')
         self.assertEqual(response.data[0]['value'], '1234567890')
