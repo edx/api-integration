@@ -2,7 +2,13 @@ from completion_aggregator.models import Aggregator
 from django.db.models import Q, Sum
 
 
-def _get_filtered_aggregation_queryset(course_key, exclude_users, org_ids=None, group_ids=None):
+def _get_filtered_aggregation_queryset(
+        course_key,
+        exclude_users,
+        org_ids=None,
+        group_ids=None,
+        cohort_user_ids=None,
+):
     queryset = Aggregator.objects.filter(
         course_key__exact=course_key,
         user__is_active=True,
@@ -14,10 +20,19 @@ def _get_filtered_aggregation_queryset(course_key, exclude_users, org_ids=None, 
         queryset = queryset.filter(user__organizations__in=org_ids)
     if group_ids:
         queryset = queryset.filter(user__groups__in=group_ids).distinct()
+    if cohort_user_ids:
+        queryset = queryset.filter(user_id__in=cohort_user_ids)
     return queryset
 
 
-def generate_leaderboard(course_key, count=None, exclude_users=None, org_ids=None, group_ids=None):
+def generate_leaderboard(
+        course_key,
+        count=None,
+        exclude_users=None,
+        org_ids=None,
+        group_ids=None,
+        cohort_user_ids=None,
+):
     """
     Assembles a data set representing the Top N users, by progress, for a given course.
 
@@ -53,7 +68,7 @@ def generate_leaderboard(course_key, count=None, exclude_users=None, org_ids=Non
     ]
 
     """
-    queryset = _get_filtered_aggregation_queryset(course_key, exclude_users, org_ids, group_ids)
+    queryset = _get_filtered_aggregation_queryset(course_key, exclude_users, org_ids, group_ids, cohort_user_ids)
     queryset = queryset.values(
         'user__id',
         'user__username',
@@ -66,8 +81,8 @@ def generate_leaderboard(course_key, count=None, exclude_users=None, org_ids=Non
     return queryset
 
 
-def get_total_completions(course_key, exclude_users, org_ids=None, group_ids=None):
-    queryset = _get_filtered_aggregation_queryset(course_key, exclude_users, org_ids, group_ids)
+def get_total_completions(course_key, exclude_users, org_ids=None, group_ids=None, cohort_user_ids=None):
+    queryset = _get_filtered_aggregation_queryset(course_key, exclude_users, org_ids, group_ids, cohort_user_ids)
     return queryset.aggregate(total_earned=Sum('earned')).get('total_earned')
 
 
