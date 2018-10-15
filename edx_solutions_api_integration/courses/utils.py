@@ -86,8 +86,8 @@ def get_total_completions(course_key, exclude_users, org_ids=None, group_ids=Non
     return queryset.aggregate(total_earned=Sum('earned')).get('total_earned')
 
 
-def get_num_users_started(course_key, exclude_users, org_ids=None, group_ids=None):
-    queryset = _get_filtered_aggregation_queryset(course_key, exclude_users, org_ids, group_ids)
+def get_num_users_started(course_key, exclude_users, org_ids=None, group_ids=None, cohort_user_ids=None):
+    queryset = _get_filtered_aggregation_queryset(course_key, exclude_users, org_ids, group_ids, cohort_user_ids)
     return queryset.distinct().count()
 
 
