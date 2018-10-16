@@ -1415,11 +1415,12 @@ class UsersSocialMetrics(SecureListAPIView):
             data = cached_social_data
 
         if include_stats:
-            cached_social_stats = get_cached_data('social_stats', course_id, user.id)
-            if not cached_social_stats:
-                data['stats'] = self._get_user_discussion_metrics(course_key, user)
-            else:
-                data['stats'] = cached_social_stats
+            if not data.get('stats'):
+                data['stats'] = StudentSocialEngagementScore.get_user_engagements_stats(course_key, user.id)
+                cache_course_user_data('social', course_id, user.id, {'score': data['score'], 'stats': data['stats']})
+        else:
+            # In case it was cached.
+            data.pop('stats', None)
 
         return Response(data, status.HTTP_200_OK)
 
@@ -1429,23 +1430,6 @@ class UsersSocialMetrics(SecureListAPIView):
         if score is None:
             return 0
         return score
-
-    @staticmethod
-    def _get_user_discussion_metrics(course_key, user):
-        stats = StudentSocialEngagementScore.get_user_engagements_stats(course_key, user.id)
-        if stats is None:
-            return {
-                'num_threads': 0,
-                'num_thread_followers': 0,
-                'num_replies': 0,
-                'num_flagged': 0,
-                'num_comments': 0,
-                'num_threads_read': 0,
-                'num_downvotes': 0,
-                'num_upvotes': 0,
-                'num_comments_generated': 0
-            }
-        return stats
 
     @staticmethod
     def _get_course_average_score(course_key):
