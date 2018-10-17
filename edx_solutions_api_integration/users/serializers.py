@@ -46,6 +46,21 @@ class UserSerializer(DynamicFieldsModelSerializer):
     roles = serializers.SerializerMethodField('get_user_roles')
     grades = serializers.SerializerMethodField('get_user_grades')
     attributes = serializers.SerializerMethodField('get_organization_attributes')
+    course_groups = serializers.SerializerMethodField('get_user_course_groups')
+
+
+    def get_user_course_groups(self, user):
+        """Return a list of course groups of the users, optionally filtered by course id."""
+
+        course_groups = user.course_groups.all()
+
+        if 'course_id' in self.context:
+            course_id = self.context['course_id']
+            course_groups = [group.name for group in course_groups if group.course_id == course_id]
+        else:
+            course_groups = [group.name for group in course_groups]
+
+        return course_groups
 
     def get_organization_attributes(self, user):
         """
@@ -137,6 +152,7 @@ class UserSerializer(DynamicFieldsModelSerializer):
             "roles",
             "grades",
             "attributes",
+            "course_groups",
         )
         read_only_fields = ("id", "email", "username")
 

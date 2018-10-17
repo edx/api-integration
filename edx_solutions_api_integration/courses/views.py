@@ -1246,6 +1246,11 @@ class CoursesUsersList(MobileListAPIView):
                 'user_attributes'
             )
 
+        if 'course_groups' in additional_fields:
+            users = users.prefetch_related(
+                'course_groups'
+            )
+
         self.user_organizations = Organization.objects.filter(users__in=users).distinct()
         if orgs:
             self.user_organizations.filter(id__in=orgs).distinct()

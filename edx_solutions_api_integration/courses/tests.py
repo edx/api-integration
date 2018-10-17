@@ -1299,6 +1299,19 @@ class CoursesApiTests(
         self.assertEqual(response.data['results'][0]['courses_enrolled'][0], unicode(course.id))
         self.assertEqual(response.data['results'][0]['courses_enrolled'][1], unicode(course2.id))
 
+    def test_courses_users_list_courses_course_groups_requested(self):
+        """Test the users list has the course groups information when explicitly requested."""
+        self.staff_login()
+        course = CourseFactory.create()
+        test_uri = self.base_courses_uri + '/{course_id}/users?additional_fields=course_groups'
+        user = UserFactory()
+
+        CourseEnrollmentFactory.create(user=user, course_id=course.id)
+        response = self.do_get(test_uri.format(course_id=unicode(course.id)))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertIn('course_groups', response.data['results'][0])
+
     def test_courses_users_list_courses_passed(self):
         """ Test courses_passed value returned by courses users list api """
         course = self.setup_course_with_grading()
