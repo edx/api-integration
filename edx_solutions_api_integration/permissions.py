@@ -327,6 +327,13 @@ class MobileDestroyAPIView(MobilePermissionMixin, generics.DestroyAPIView):
     pass
 
 
+class SecureViewSet(PermissionMixin, viewsets.ViewSet):
+    """
+    ViewSet used for protecting access to specific workflows
+    """
+    pass
+
+
 class SecureModelViewSet(PermissionMixin, viewsets.ModelViewSet):
     """
     ModelViewSet used for protecting access to specific workflows
