@@ -91,7 +91,7 @@ def get_num_users_started(course_key, exclude_users, org_ids=None, group_ids=Non
     return queryset.distinct().count()
 
 
-def get_user_position(course_key, user_id, exclude_users=None):
+def get_user_position(course_key, user_id, exclude_users=None, cohort_user_ids=None):
     """
     Returns user's progress position and completions for a given course.
     data = {"completions": 22, "position": 4}
@@ -116,12 +116,18 @@ def get_user_position(course_key, user_id, exclude_users=None):
             modified__lt=user_time_completed,
         )
 
-        users_above = Aggregator.objects.filter(
+        users_above_qs = Aggregator.objects.filter(
             more_completions_than_user | same_completions_but_faster_than_user,
             course_key=course_key,
             user__is_active=True,
             aggregation_name='course',
-        ).exclude(user__id__in=exclude_users).count()
+        ).exclude(user__id__in=exclude_users)
+
+        if cohort_user_ids:
+            users_above_qs = users_above_qs.filter(user__id__in=cohort_user_ids)
+
+        users_above = users_above_qs.count()
+
         data['position'] = users_above + 1
         data['completions'] = user_completions * 100
     return data

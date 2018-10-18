@@ -372,7 +372,9 @@ def _get_course_progress_metrics(
         cohort_user_ids=cohort_user_ids,
     )
     if user_id:
-        data.update(get_user_position(course_key, user_id, exclude_users=exclude_users))
+        data.update(
+            get_user_position(course_key, user_id, exclude_users=exclude_users, cohort_user_ids=cohort_user_ids)
+        )
 
     total_users_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users)
     if org_ids:
@@ -2127,7 +2129,7 @@ class CoursesMetricsSocialLeadersList(SecureListAPIView):
 
         if user_id:
             user_data = StudentSocialEngagementScore.get_user_leaderboard_position(
-                course_key, user_id, exclude_users
+                course_key, user_id, exclude_users, cohort_user_ids
             )
             data.update(user_data)
             leader_boards_cache_cohort_size = getattr(settings, 'LEADER_BOARDS_CACHE_COHORT_SIZE', 5000)
