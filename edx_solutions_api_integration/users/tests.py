@@ -1872,7 +1872,6 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
 
-    @mock.patch("edx_solutions_api_integration.users.views.get_user_social_stats", _fake_get_service_unavailability)
     def test_users_social_metrics_get_service_unavailability(self):
         test_uri = '{}/{}/courses/{}/metrics/social/'.format(self.users_base_uri, self.user.id, self.course.id)
         response = self.do_get(test_uri)
@@ -1883,7 +1882,6 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
 
-    @mock.patch("edx_solutions_api_integration.users.views.get_user_social_stats", _fake_get_user_social_stats)
     def test_users_social_metrics(self):
         test_uri = '{}/{}/courses/{}/metrics/social/?include_stats=true'.format(
             self.users_base_uri, self.user.id, self.course.id
@@ -1891,7 +1889,6 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
 
-    @mock.patch("edx_solutions_api_integration.users.views.get_user_social_stats", _fake_get_user_social_stats_with_end)
     def test_users_social_metrics_end_date(self):
         user_score = 30
         course = CourseFactory.create(org='TUCGLG', run='TUCGLG1', end=datetime(2012, 1, 1))

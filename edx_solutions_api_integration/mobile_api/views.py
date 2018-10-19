@@ -123,7 +123,7 @@ class MobileUsersCoursesGrades(MobileListAPIView):
         username = request.GET.get('username', None)
         course_id = request.GET.get('course_id', None)
 
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
 
         user = self.request.user

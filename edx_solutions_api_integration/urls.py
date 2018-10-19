@@ -14,7 +14,7 @@ from django.db import transaction
 
 from rest_framework.routers import DefaultRouter
 
-from edx_solutions_organizations.views import OrganizationsViewSet
+from edx_solutions_organizations import views as organization_views
 from edx_solutions_api_integration.system import views as system_views
 from edx_solutions_projects import views as project_views
 
@@ -45,9 +45,7 @@ urlpatterns = patterns(
 )
 
 server_api_router = DefaultRouter()
-server_api_router.register(r'organizations', OrganizationsViewSet)
-
-# Project-related ViewSets
+server_api_router.register(r'organizations', organization_views.OrganizationsViewSet)
 server_api_router.register(r'projects', project_views.ProjectsViewSet)
 server_api_router.register(r'workgroups', project_views.WorkgroupsViewSet)
 server_api_router.register(r'submissions', project_views.WorkgroupSubmissionsViewSet)
