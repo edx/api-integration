@@ -2,37 +2,28 @@ from completion_aggregator.models import Aggregator
 from django.db.models import Q, Sum
 
 
-def _get_filtered_aggregation_queryset(
-        course_key,
-        exclude_users,
-        org_ids=None,
-        group_ids=None,
-        cohort_user_ids=None,
-):
+def _get_filtered_aggregation_queryset(course_key, **kwargs):
     queryset = Aggregator.objects.filter(
         course_key__exact=course_key,
         user__is_active=True,
         user__courseenrollment__is_active=True,
         user__courseenrollment__course_id__exact=course_key,
         aggregation_name='course',
-    ).exclude(user_id__in=exclude_users)
-    if org_ids:
-        queryset = queryset.filter(user__organizations__in=org_ids)
-    if group_ids:
-        queryset = queryset.filter(user__groups__in=group_ids).distinct()
-    if cohort_user_ids:
-        queryset = queryset.filter(user_id__in=cohort_user_ids)
+    ).exclude(user_id__in=kwargs.get('exclude_users'))
+
+    if kwargs.get('org_ids'):
+        queryset = queryset.filter(user__organizations__in=kwargs.get('org_ids'))
+
+    if kwargs.get('group_ids'):
+        queryset = queryset.filter(user__groups__in=kwargs.get('group_ids')).distinct()
+
+    if kwargs.get('cohort_user_ids'):
+        queryset = queryset.filter(user_id__in=kwargs.get('cohort_user_ids'))
+
     return queryset
 
 
-def generate_leaderboard(
-        course_key,
-        count=None,
-        exclude_users=None,
-        org_ids=None,
-        group_ids=None,
-        cohort_user_ids=None,
-):
+def generate_leaderboard(course_key, **kwargs):
     """
     Assembles a data set representing the Top N users, by progress, for a given course.
 
@@ -68,7 +59,7 @@ def generate_leaderboard(
     ]
 
     """
-    queryset = _get_filtered_aggregation_queryset(course_key, exclude_users, org_ids, group_ids, cohort_user_ids)
+    queryset = _get_filtered_aggregation_queryset(course_key, **kwargs)
     queryset = queryset.values(
         'user__id',
         'user__username',
@@ -76,22 +67,22 @@ def generate_leaderboard(
         'user__profile__profile_image_uploaded_at',
         'earned',
         'percent',
-    ).order_by('-percent', 'modified')[:count]
+    ).order_by('-percent', 'modified')[:kwargs.get('count')]
 
     return queryset
 
 
-def get_total_completions(course_key, exclude_users, org_ids=None, group_ids=None, cohort_user_ids=None):
-    queryset = _get_filtered_aggregation_queryset(course_key, exclude_users, org_ids, group_ids, cohort_user_ids)
+def get_total_completions(course_key, **kwargs):
+    queryset = _get_filtered_aggregation_queryset(course_key, **kwargs)
     return queryset.aggregate(total_earned=Sum('earned')).get('total_earned')
 
 
-def get_num_users_started(course_key, exclude_users, org_ids=None, group_ids=None, cohort_user_ids=None):
-    queryset = _get_filtered_aggregation_queryset(course_key, exclude_users, org_ids, group_ids, cohort_user_ids)
+def get_num_users_started(course_key, **kwargs):
+    queryset = _get_filtered_aggregation_queryset(course_key, **kwargs)
     return queryset.distinct().count()
 
 
-def get_user_position(course_key, user_id, exclude_users=None, cohort_user_ids=None):
+def get_user_position(course_key, **kwargs):
     """
     Returns user's progress position and completions for a given course.
     data = {"completions": 22, "position": 4}
@@ -100,7 +91,7 @@ def get_user_position(course_key, user_id, exclude_users=None, cohort_user_ids=N
     try:
         queryset = Aggregator.objects.get(
             course_key=course_key,
-            user__id=user_id,
+            user__id=kwargs.get('user_id'),
             aggregation_name='course',
         )
     except Aggregator.DoesNotExist:
@@ -121,10 +112,10 @@ def get_user_position(course_key, user_id, exclude_users=None, cohort_user_ids=N
             course_key=course_key,
             user__is_active=True,
             aggregation_name='course',
-        ).exclude(user__id__in=exclude_users)
+        ).exclude(user__id__in=kwargs.get('exclude_users'))
 
-        if cohort_user_ids:
-            users_above_qs = users_above_qs.filter(user__id__in=cohort_user_ids)
+        if kwargs.get('cohort_user_ids'):
+            users_above_qs = users_above_qs.filter(user__id__in=kwargs.get('cohort_user_ids'))
 
         users_above = users_above_qs.count()
 
