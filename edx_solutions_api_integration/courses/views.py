@@ -2115,11 +2115,13 @@ class CoursesMetricsSocialLeadersList(SecureListAPIView):
         """
         course_key = get_course_key(course_id)
         exclude_roles = css_param_to_list(self.request, 'exclude_roles')
+        user_id = self.request.query_params.get('user_id', None)
         params = {
-            'user_id': self.request.query_params.get('user_id', None),
+            'user_id': user_id,
             'org_ids': get_ids_from_list_param(self.request, 'organizations'),
             'count': self.request.query_params.get('count', 3),
             'exclude_users': get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles),
+            'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
         }
 
         if not course_exists(request, request.user, course_id):
