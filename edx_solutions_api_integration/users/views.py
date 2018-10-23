@@ -751,11 +751,20 @@ class UsersDetail(SecureAPIView):
 
             for index, key in enumerate(attribute_keys):
                 if key in active_attribute_keys:
-                    OrganizationUsersAttributes.objects.filter(
+                    user_attributes = OrganizationUsersAttributes.objects.filter(
                         key=key,
                         user_id=existing_user.id,
                         organization_id=organization_id
-                    ).update(value=attribute_values[index])
+                    )
+                    if user_attributes:
+                        user_attributes.update(value=attribute_values[index])
+                    else:
+                        OrganizationUsersAttributes.objects.create(
+                            key=key,
+                            value=attribute_values[index],
+                            user_id=existing_user.id,
+                            organization_id=organization_id
+                        )
 
         return Response(response_data, status=status.HTTP_200_OK)
 
