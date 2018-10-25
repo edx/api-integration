@@ -9,7 +9,7 @@ def _get_filtered_aggregation_queryset(course_key, **kwargs):
         user__courseenrollment__is_active=True,
         user__courseenrollment__course_id__exact=course_key,
         aggregation_name='course',
-    ).exclude(user_id__in=kwargs.get('exclude_users'))
+    ).exclude(user_id__in=kwargs.get('exclude_users') or [])
 
     if kwargs.get('org_ids'):
         queryset = queryset.filter(user__organizations__in=kwargs.get('org_ids'))
@@ -112,7 +112,7 @@ def get_user_position(course_key, **kwargs):
             course_key=course_key,
             user__is_active=True,
             aggregation_name='course',
-        ).exclude(user__id__in=kwargs.get('exclude_users'))
+        ).exclude(user__id__in=kwargs.get('exclude_users') or [])
 
         if kwargs.get('cohort_user_ids'):
             users_above_qs = users_above_qs.filter(user__id__in=kwargs.get('cohort_user_ids'))
