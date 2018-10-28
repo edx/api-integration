@@ -49,42 +49,65 @@ class ImportParticipantsViewSet(SecureViewSet):
         # Check for empty fields.
         for key, value in user.items():
             if not isinstance(value, bool) and value.strip() == '':
-                if key == 'email':
-                    email = _("No email")
                 if key != 'username':
                     self._add_error(errors, _("Empty field: {}").format(key), _("Processing Participant"), email)
 
         # Ensure valid status.
         if status not in statuses:
-            self._add_error(errors, _("Status doesn't exist"), _('Enrolling Participant in Course'), email)
+            self._add_error(
+                errors,
+                _("Status '{}' doesn't exist").format(status),
+                _('Enrolling Participant in Course'),
+                email
+            )
 
         # Validate email.
         try:
             validate_email(email)
         except ValidationError:
-            self._add_error(errors, _('Valid e-mail is required'), _('Registering Participant'), email)
+            self._add_error(errors, _('"{}" is an invalid e-mail').format(email), _('Registering Participant'), email)
         else:
             # Ensure email/username integrity.
             if User.objects.filter(Q(email=email) | Q(username=username)).exists():
-                self._add_error(errors, _('Email or username already exists'), _('Registering Participant'), email)
+                self._add_error(
+                    errors,
+                    _('Email "{}" or username "{}" already exists').format(email, username),
+                    _('Registering Participant'),
+                    email
+                )
 
         # Check that the company exists.
         try:
             company = Organization.objects.get(id=company_id)
         except Organization.DoesNotExist:
-            self._add_error(errors, _("Company doesn't exist"), _('Enrolling Participant in Company'), email)
+            self._add_error(
+                errors,
+                _("Company {} doesn't exist").format(company_id),
+                _('Enrolling Participant in Company'),
+                email
+            )
 
         # Check that the course exists.
         course, course_key, __ = get_course(request, user, course_id)
         if not course:
-            self._add_error(errors, _("Course doesn't exist"), _('Enrolling Participant in Course'), email)
+            self._add_error(
+                errors,
+                _("Course {} doesn't exist").format(course_id),
+                _('Enrolling Participant in Course'),
+                email
+            )
 
         # Check if course is internal (if required).
         if internal and not CourseGroupRelationship.objects.filter(
                 course_id=course_id,
                 group__type="tag:internal"
         ).exists():
-            self._add_error(errors, _("Course is not Internal"), _('Enrolling Participant in Course'), email)
+            self._add_error(
+                errors,
+                _("Course {} is not Internal").format(course_id),
+                _('Enrolling Participant in Course'),
+                email
+            )
 
         if not errors:
             # Create the user and their profile.
@@ -151,7 +174,7 @@ class ImportParticipantsViewSet(SecureViewSet):
         pass
 
 
-    def _add_error(self, errors, reason, activity, participant):
-        error = _("Reason: {}, Activity: {}, Participant: {}").format(reason, activity, participant)
+    def _add_error(self, errors, reason, activity, email):
+        error = _("Reason: {}, Activity: {}, Participant: {}").format(reason, activity, email or _("No email"))
         errors.append(error)
         return error

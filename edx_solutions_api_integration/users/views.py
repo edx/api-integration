@@ -1543,7 +1543,7 @@ class UsersRolesList(SecureListAPIView):
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
 
         ignore_roles = request.data.get('ignore_roles', [])
-        current_roles = filter(lambda role: role.role not in ignore_roles, self.get_queryset())
+        current_roles = self.get_queryset().exclude(role__in=ignore_roles)
         for current_role in current_roles:
             course_descriptor, course_key, course_content = get_course(request, user, unicode(current_role.course_id))  # pylint: disable=W0612,C0301
             if course_descriptor:
