@@ -90,11 +90,11 @@ class ImportParticipantsViewSet(SecureViewSet):
             # Create the user and their profile.
             try:
                 # User
-                user = User.objects.update_or_create(**user)
+                user = User.objects.create(**user)
                 user.set_password(user.password)
                 user.save()
                 # Profile
-                UserProfile.objects.update_or_create(user=user, name=u'{} {}'.format(user.first_name, user.last_name))
+                UserProfile.objects.create(user=user, name=u'{} {}'.format(user.first_name, user.last_name))
                 # Notifications
                 if settings.FEATURES.get('ENABLE_DISCUSSION_EMAIL_DIGEST'):
                     enable_notifications(user)
@@ -124,7 +124,7 @@ class ImportParticipantsViewSet(SecureViewSet):
                 cohort = get_cohort_by_name(course_key, CourseUserGroup.default_cohort_name)
             except CourseUserGroup.DoesNotExist:
                 cohort = add_cohort(course_key, CourseUserGroup.default_cohort_name, CourseCohort.RANDOM)
-            CohortMembership.objects.update_or_create(course_user_group=cohort, user=user)
+            CohortMembership.objects.create(course_user_group=cohort, user=user)
 
             # Assign role and permission in course.
             try:
