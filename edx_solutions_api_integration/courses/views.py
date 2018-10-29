@@ -48,7 +48,7 @@ from lms.lib.comment_client.utils import CommentClientMaintenanceError, CommentC
 from lxml import etree
 from mobile_api.course_info.views import apply_wrappers_to_content
 from opaque_keys import InvalidKeyError
-from opaque_keys.edx.keys import CourseKey, UsageKey
+from opaque_keys.edx.keys import UsageKey
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
 from openedx.core.lib.courses import course_image_url
@@ -344,14 +344,7 @@ def _cache_static_tab_contents(cache_key, contents):
         cache.set(cache_key, contents, cache_expiration)
 
 
-def _get_course_progress_metrics(
-        course_key,
-        user_id=None,
-        exclude_users=None,
-        org_ids=None,
-        group_ids=None,
-        cohort_user_ids=None,
-):
+def _get_course_progress_metrics(course_key, **kwargs):
     """
     returns a dict containing these course progress metrics
     `course_avg`: average progress in course
@@ -364,25 +357,17 @@ def _get_course_progress_metrics(
     data = {'course_avg': course_avg}
     course_metadata = CourseAggregatedMetaData.get_from_id(course_key)
     total_possible_completions = float(course_metadata.total_assessments)
-    total_actual_completions = get_total_completions(
-        course_key,
-        exclude_users=exclude_users,
-        org_ids=org_ids,
-        group_ids=group_ids,
-        cohort_user_ids=cohort_user_ids,
-    )
-    if user_id:
-        data.update(
-            get_user_position(course_key, user_id, exclude_users=exclude_users, cohort_user_ids=cohort_user_ids)
-        )
+    total_actual_completions = get_total_completions(course_key, **kwargs)
+    if kwargs.get('user_id'):
+        data.update(get_user_position(course_key, **kwargs))
 
-    total_users_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users)
-    if org_ids:
-        total_users_qs = total_users_qs.filter(organizations__in=org_ids)
-    if group_ids:
-        total_users_qs = total_users_qs.filter(groups__in=group_ids).distinct()
-    if cohort_user_ids:
-        total_users_qs = total_users_qs.filter(id__in=cohort_user_ids)
+    total_users_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=kwargs.get('exclude_users'))
+    if kwargs.get('org_ids'):
+        total_users_qs = total_users_qs.filter(organizations__in=kwargs.get('org_ids'))
+    if kwargs.get('group_ids'):
+        total_users_qs = total_users_qs.filter(groups__in=kwargs.get('group_ids')).distinct()
+    if kwargs.get('cohort_user_ids'):
+        total_users_qs = total_users_qs.filter(id__in=kwargs.get('cohort_user_ids'))
     total_users = total_users_qs.count()
     if total_users and total_actual_completions and total_possible_completions:
         course_avg = total_actual_completions / float(total_users)
@@ -390,6 +375,120 @@ def _get_course_progress_metrics(
     data['course_avg'] = course_avg
     data['total_users'] = total_users
     data['total_possible_completions'] = total_possible_completions
+    return data
+
+
+def _get_courses_metrics_grades_leaders_list(course_key, **kwargs):
+    course_id = course_key.to_deprecated_string()
+    user_id = kwargs.get('user_id')
+    data = {}
+
+    if kwargs.get('skipleaders') and user_id:
+        cached_grade_data = get_cached_data('grade', course_id, user_id)
+        if not cached_grade_data:
+            data['course_avg'] = StudentGradebook.course_grade_avg(course_key, **kwargs)
+            data['user_grade'] = StudentGradebook.get_user_grade(course_key, user_id)
+            cache_course_data('grade', course_id, {'course_avg': data['course_avg']})
+            cache_course_user_data('grade', course_id, user_id, {'user_grade': data['user_grade']})
+        else:
+            data.update(cached_grade_data)
+    else:
+        cached_leader_board_data = get_cached_data('grade_leaderboard', course_id)
+        cached_grade_data = get_cached_data('grade', course_id, user_id)
+        if cached_leader_board_data and cached_grade_data and 'user_position' in cached_grade_data and not \
+                (kwargs.get('group_ids') or kwargs.get('exclude_roles')):
+            data.update(cached_grade_data)
+            data.update(cached_leader_board_data)
+        else:
+            data.update(StudentGradebook.generate_leaderboard(course_key, **kwargs))
+
+            serializer = CourseProficiencyLeadersSerializer(data.pop('queryset'), many=True)
+            data['leaders'] = serializer.data  # pylint: disable=E1101
+            leader_boards_cache_cohort_size = getattr(settings, 'LEADER_BOARDS_CACHE_COHORT_SIZE', 5000)
+            if kwargs.get('user_id'):
+                data.update(StudentGradebook.get_user_position(course_key, **kwargs))
+
+                if data.pop('enrollment_count') > leader_boards_cache_cohort_size:
+                    cache_course_data('grade', course_id, {'course_avg': data['course_avg']})
+                    cache_course_data('grade_leaderboard', course_id, {'leaders': data['leaders']})
+                    cache_course_user_data('grade', course_id, user_id, {
+                        'user_grade': data.get('user_grade', 0), 'user_position': data['user_position']
+                    })
+            else:
+                data.pop('enrollment_count')
+
+    return data
+
+
+def _get_courses_metrics_completions_leaders_list(course_key, **kwargs):
+    course_id = course_key.to_deprecated_string()
+    user_id = kwargs.get('user_id')
+    data = {}
+
+    if user_id:  # for single user's progress fetch from cache if available
+        cached_progress_data = get_cached_data('progress', course_id, user_id)
+        if cached_progress_data:
+            data.update(cached_progress_data)
+            if kwargs.get('skipleaders'):
+                return data
+
+            cached_leader_board_data = get_cached_data('progress_leaderboard', course_id)
+            if cached_leader_board_data and \
+                    not kwargs.get(('org_ids') or kwargs.get('group_ids') or kwargs.get('exclude_roles')):
+                data.update(cached_leader_board_data)
+                return data
+
+    data = _get_course_progress_metrics(course_key, **kwargs)
+    total_users = data['total_users']
+
+    if not kwargs.get('skipleaders') and 'leaders' not in data:
+        queryset = generate_leaderboard(course_key, **kwargs)
+        serializer = CourseCompletionsLeadersSerializer(queryset, many=True)
+        data['leaders'] = serializer.data  # pylint: disable=E1101
+        leader_boards_cache_cohort_size = getattr(settings, 'LEADER_BOARDS_CACHE_COHORT_SIZE', 5000)
+        if total_users > leader_boards_cache_cohort_size:
+            cache_course_data('progress_leaderboard', course_id, {'leaders': data['leaders']})
+    else:
+        cache_course_data('progress', course_id, {'course_avg': data['course_avg']})
+
+        # set user data in cache only if the user exists
+        if user_id:
+            cache_course_user_data('progress', course_id, user_id, {
+                'completions': data['completions'], 'position': data['position']
+            })
+
+    return data
+
+
+def _get_courses_metrics_social_leaders_list(course_key, **kwargs):
+    course_id = course_key.to_deprecated_string()
+    user_id = kwargs.get('user_id')
+    data = {}
+
+    cached_social_data = get_cached_data('social', course_id, user_id)
+    cached_leader_board_data = get_cached_data('social_leaderboard', course_id)
+    if cached_leader_board_data and cached_social_data and 'position' in cached_social_data and \
+            not (kwargs.get('org_ids') or kwargs.get('exclude_users')):
+        data.update(cached_social_data)
+        data.update(cached_leader_board_data)
+        return data
+
+    data.update(StudentSocialEngagementScore.generate_leaderboard(course_key, **kwargs))
+
+    serializer = CourseSocialLeadersSerializer(data.pop('queryset'), many=True)
+    data['leaders'] = serializer.data  # pylint: disable=E1101
+
+    if user_id:
+        user_data = StudentSocialEngagementScore.get_user_leaderboard_position(course_key, **kwargs)
+        data.update(user_data)
+        leader_boards_cache_cohort_size = getattr(settings, 'LEADER_BOARDS_CACHE_COHORT_SIZE', 5000)
+        if data.pop('total_user_count') > leader_boards_cache_cohort_size:
+            cache_course_user_data('social', course_id, user_id, {"score": data['score'], "position": data['position']})
+            cache_course_data('social', course_id, {'course_avg': data['course_avg']})
+            cache_course_data('social_leaderboard', course_id, {'leaders': data['leaders']})
+    else:
+        data.pop('total_user_count')
+
     return data
 
 
@@ -1923,64 +2022,23 @@ class CoursesMetricsGradesLeadersList(SecureListAPIView):
         """
         GET /api/courses/{course_id}/grades/leaders/
         """
-        user_id = self.request.query_params.get('user_id', None)
-        group_ids = get_ids_from_list_param(self.request, 'groups')
-        count = self.request.query_params.get('count', 3)
+        course_key = get_course_key(course_id)
         exclude_roles = css_param_to_list(self.request, 'exclude_roles')
-        skipleaders = str2bool(self.request.query_params.get('skipleaders', 'false'))
+        user_id = self.request.query_params.get('user_id', None)
+        params = {
+            'user_id': user_id,
+            'group_ids': get_ids_from_list_param(self.request, 'groups'),
+            'count': self.request.query_params.get('count', 3),
+            'skipleaders': str2bool(self.request.query_params.get('skipleaders', 'false')),
+            # Users having certain roles (such as an Observer) are excluded from aggregations
+            'exclude_users': get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles),
+            'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
+        }
 
-        data = {}
         if not course_exists(request, request.user, course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
-        course_key = get_course_key(course_id)
-        # Users having certain roles (such as an Observer) are excluded from aggregations
-        exclude_users = get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles)
-        cohort_user_ids = get_cohort_user_ids(user_id, course_key)
 
-        if skipleaders and user_id:
-            cached_grade_data = get_cached_data('grade', course_id, user_id)
-            if not cached_grade_data:
-                data['course_avg'] = StudentGradebook.course_grade_avg(
-                    course_key,
-                    exclude_users=exclude_users,
-                    cohort_user_ids=cohort_user_ids,
-                )
-                data['user_grade'] = StudentGradebook.get_user_grade(course_key, user_id)
-                cache_course_data('grade', course_id, {'course_avg': data['course_avg']})
-                cache_course_user_data('grade', course_id, user_id, {'user_grade': data['user_grade']})
-            else:
-                data.update(cached_grade_data)
-        else:
-            cached_leader_board_data = get_cached_data('grade_leaderboard', course_id)
-            cached_grade_data = get_cached_data('grade', course_id, user_id)
-            if cached_leader_board_data and cached_grade_data and 'user_position' in cached_grade_data and not \
-                    (group_ids or exclude_roles):
-                data.update(cached_grade_data)
-                data.update(cached_leader_board_data)
-            else:
-                leaderboard_data = StudentGradebook.generate_leaderboard(
-                    course_key,
-                    user_id=user_id,
-                    group_ids=group_ids,
-                    count=count,
-                    exclude_users=exclude_users,
-                    cohort_user_ids=cohort_user_ids,
-                )
-
-                serializer = CourseProficiencyLeadersSerializer(leaderboard_data['queryset'], many=True)
-                data['leaders'] = serializer.data  # pylint: disable=E1101
-                data['course_avg'] = leaderboard_data['course_avg']
-                if 'user_position' in leaderboard_data:
-                    data['user_position'] = leaderboard_data['user_position']
-                if 'user_grade' in leaderboard_data:
-                    data['user_grade'] = leaderboard_data['user_grade']
-                leader_boards_cache_cohort_size = getattr(settings, 'LEADER_BOARDS_CACHE_COHORT_SIZE', 5000)
-                if user_id and leaderboard_data['enrollment_count'] > leader_boards_cache_cohort_size:
-                    cache_course_data('grade', course_id, {'course_avg': leaderboard_data['course_avg']})
-                    cache_course_data('grade_leaderboard', course_id, {'leaders': data['leaders']})
-                    cache_course_user_data('grade', course_id, user_id, {
-                        'user_grade': data.get('user_grade', 0), 'user_position': data['user_position']
-                    })
+        data = _get_courses_metrics_grades_leaders_list(course_key, **params)
 
         return Response(data, status=status.HTTP_200_OK)
 
@@ -2013,63 +2071,24 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
         """
         GET /api/courses/{course_id}/metrics/completions/leaders/
         """
-        user_id = self.request.query_params.get('user_id', None)
-        count = self.request.query_params.get('count', None)
+        course_key = get_course_key(course_id)
         exclude_roles = css_param_to_list(self.request, 'exclude_roles')
-        org_ids = get_ids_from_list_param(self.request, 'organizations')
-        group_ids = get_ids_from_list_param(self.request, 'groups')
-        skipleaders = str2bool(self.request.query_params.get('skipleaders', 'false'))
-        data = {}
+        user_id = self.request.query_params.get('user_id', None)
+        params = {
+            'user_id': user_id,
+            'count': self.request.query_params.get('count', None),
+            'org_ids': get_ids_from_list_param(self.request, 'organizations'),
+            'group_ids': get_ids_from_list_param(self.request, 'groups'),
+            'skipleaders': str2bool(self.request.query_params.get('skipleaders', 'false')),
+            # Users having certain roles (such as an Observer) are excluded from aggregations
+            'exclude_users': get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles),
+            'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
+        }
+
         if not course_exists(request, request.user, course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
-        if user_id:  # for single user's progress fetch from cache if available
-            cached_progress_data = get_cached_data('progress', course_id, user_id)
-            if cached_progress_data:
-                data.update(cached_progress_data)
-                if skipleaders:
-                    return Response(data, status=status.HTTP_200_OK)
 
-                cached_leader_board_data = get_cached_data('progress_leaderboard', course_id)
-                if cached_leader_board_data and not (org_ids or group_ids or exclude_roles):
-                    data.update(cached_leader_board_data)
-                    return Response(data, status=status.HTTP_200_OK)
-
-        course_key = get_course_key(course_id)
-        exclude_users = get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles)
-        cohort_user_ids = get_cohort_user_ids(user_id, course_key)
-
-        data = _get_course_progress_metrics(
-            course_key,
-            user_id=user_id,
-            exclude_users=exclude_users,
-            org_ids=org_ids,
-            group_ids=group_ids,
-            cohort_user_ids=cohort_user_ids,
-        )
-        total_users = data['total_users']
-
-        if not skipleaders and 'leaders' not in data:
-            queryset = generate_leaderboard(
-                course_key,
-                count=count,
-                exclude_users=exclude_users,
-                org_ids=org_ids,
-                group_ids=group_ids,
-                cohort_user_ids=cohort_user_ids,
-            )
-            serializer = CourseCompletionsLeadersSerializer(queryset, many=True)
-            data['leaders'] = serializer.data  # pylint: disable=E1101
-            leader_boards_cache_cohort_size = getattr(settings, 'LEADER_BOARDS_CACHE_COHORT_SIZE', 5000)
-            if total_users > leader_boards_cache_cohort_size:
-                cache_course_data('progress_leaderboard', course_id, {'leaders': data['leaders']})
-        else:
-            cache_course_data('progress', course_id, {'course_avg': data['course_avg']})
-
-            #set user data in cache only if the user exists
-            if user_id:
-                cache_course_user_data('progress', course_id, user_id, {
-                    'completions': data['completions'], 'position': data['position']
-                })
+        data = _get_courses_metrics_completions_leaders_list(course_key, **params)
 
         return Response(data, status=status.HTTP_200_OK)
 
@@ -2094,50 +2113,66 @@ class CoursesMetricsSocialLeadersList(SecureListAPIView):
         """
         GET /api/courses/{course_id}/metrics/social/leaders/
         """
-        user_id = self.request.query_params.get('user_id', None)
-        org_ids = get_ids_from_list_param(self.request, 'organizations')
-        count = self.request.query_params.get('count', 3)
+        course_key = get_course_key(course_id)
         exclude_roles = css_param_to_list(self.request, 'exclude_roles')
-        data = {}
+        user_id = self.request.query_params.get('user_id', None)
+        params = {
+            'user_id': user_id,
+            'org_ids': get_ids_from_list_param(self.request, 'organizations'),
+            'count': self.request.query_params.get('count', 3),
+            'exclude_users': get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles),
+            'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
+        }
+
         if not course_exists(request, request.user, course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
 
-        cached_social_data = get_cached_data('social', course_id, user_id)
-        cached_leader_board_data = get_cached_data('social_leaderboard', course_id)
-        if cached_leader_board_data and cached_social_data and 'position' in cached_social_data and \
-                not (org_ids or exclude_roles):
-            data.update(cached_social_data)
-            data.update(cached_leader_board_data)
-            return Response(data, status=status.HTTP_200_OK)
+        data = _get_courses_metrics_social_leaders_list(course_key, **params)
 
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class CourseMetricsLeaders(SecureAPIView):
+    def get(self, request, course_id):
+        """
+        ### The `CourseMetricsLeaders` view contains combined functionality of:
+        - `CoursesMetricsGradesLeadersList`,
+        - `CoursesMetricsCompletionsLeadersList`,
+        - `CoursesMetricsCompletionsLeadersList`.
+
+        All params valid for the views above are applicable here as well.
+        Returned data is a dict with the following structure:
+        ```
+        {
+            'grades': data from `CoursesMetricsGradesLeadersList`
+            'completions': data from `CoursesMetricsCompletionsLeadersList`
+            'social': data from `CoursesMetricsCompletionsLeadersList`
+        }
+        ```
+        Usage: `GET /api/courses/{course_id}/metrics/leaders/`
+        """
         course_key = get_course_key(course_id)
-        # Users having certain roles (such as an Observer) are excluded from aggregations
-        exclude_users = get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles)
-        cohort_user_ids = get_cohort_user_ids(user_id, course_key)
+        exclude_roles = css_param_to_list(self.request, 'exclude_roles')
+        user_id = self.request.query_params.get('user_id', None)
+        params = {
+            'user_id': user_id,
+            'group_ids': get_ids_from_list_param(self.request, 'groups'),
+            'org_ids': get_ids_from_list_param(self.request, 'organizations'),
+            'count': self.request.query_params.get('count', 3),
+            'exclude_roles': css_param_to_list(self.request, 'exclude_roles'),
+            'exclude_users': get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles),
+            'skipleaders': str2bool(self.request.query_params.get('skipleaders', 'false')),
+            'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
+        }
 
-        course_avg, enrollment_count, queryset = StudentSocialEngagementScore.generate_leaderboard(
-            course_key,
-            org_ids=org_ids,
-            count=count,
-            exclude_users=exclude_users,
-            cohort_user_ids=cohort_user_ids,
-        )
+        if not course_exists(request, request.user, course_id):
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = CourseSocialLeadersSerializer(queryset, many=True)
-        data['leaders'] = serializer.data  # pylint: disable=E1101
-        data['course_avg'] = course_avg
-
-        if user_id:
-            user_data = StudentSocialEngagementScore.get_user_leaderboard_position(
-                course_key, user_id, exclude_users, cohort_user_ids
-            )
-            data.update(user_data)
-            leader_boards_cache_cohort_size = getattr(settings, 'LEADER_BOARDS_CACHE_COHORT_SIZE', 5000)
-            if enrollment_count > leader_boards_cache_cohort_size:
-                cache_course_user_data('social', course_id, user_id, user_data)
-                cache_course_data('social', course_id, {'course_avg': data['course_avg']})
-                cache_course_data('social_leaderboard', course_id, {'leaders': data['leaders']})
-
+        data = {
+            'grades': _get_courses_metrics_grades_leaders_list(course_key, **params),
+            'completions': _get_courses_metrics_completions_leaders_list(course_key, **params),
+            'social': _get_courses_metrics_social_leaders_list(course_key, **params),
+        }
         return Response(data, status=status.HTTP_200_OK)
 
 
