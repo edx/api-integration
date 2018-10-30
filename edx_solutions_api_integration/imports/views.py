@@ -6,8 +6,6 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth.models import Group, User
-from django.core.exceptions import ValidationError
-from django.core.validators import validate_email
 from django.db import IntegrityError
 from django.db.models import Q
 from django.utils.translation import ugettext as _
@@ -61,20 +59,14 @@ class ImportParticipantsViewSet(SecureViewSet):
                 email
             )
 
-        # Validate email.
-        try:
-            validate_email(email)
-        except ValidationError:
-            self._add_error(errors, _('"{}" is an invalid e-mail').format(email), _('Registering Participant'), email)
-        else:
-            # Ensure email/username integrity.
-            if User.objects.filter(Q(email=email) | Q(username=username)).exists():
-                self._add_error(
-                    errors,
-                    _('Email "{}" or username "{}" already exists').format(email, username),
-                    _('Registering Participant'),
-                    email
-                )
+        # Ensure email/username integrity.
+        if User.objects.filter(Q(email=email) | Q(username=username)).exists():
+            self._add_error(
+                errors,
+                _('Email "{}" or username "{}" already exists').format(email, username),
+                _('Registering Participant'),
+                email
+            )
 
         # Check that the company exists.
         try:
