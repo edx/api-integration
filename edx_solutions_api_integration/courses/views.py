@@ -2165,7 +2165,7 @@ class CourseMetricsLeaders(SecureAPIView):
             'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
         }
 
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
 
         data = {
