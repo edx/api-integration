@@ -12,11 +12,9 @@ from django.db.models import Count, Q
 from django.conf import settings
 from django.http import Http404
 from django.utils.translation import get_language, ugettext_lazy as _
-from requests.exceptions import ConnectionError
 from rest_framework import filters
 from rest_framework.response import Response
 from rest_framework import status
-import six
 
 from courseware import module_render
 from courseware.model_data import FieldDataCache
@@ -26,8 +24,6 @@ from gradebook.utils import generate_user_gradebook
 from social_engagement.models import StudentSocialEngagementScore
 from instructor.access import revoke_access, update_forum_role
 from openedx.core.djangoapps.lang_pref import LANGUAGE_KEY
-from lms.lib.comment_client.utils import CommentClientRequestError, CommentClientMaintenanceError
-from lms.lib.comment_client.user import get_user_social_stats
 from notification_prefs.views import enable_notifications
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import UsageKey, CourseKey
@@ -62,7 +58,7 @@ from util.password_policy_validators import (
 from xmodule.modulestore import InvalidLocationError
 
 from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
-from edx_solutions_organizations.models import Organization, OrganizationGroupUser, OrganizationUsersAttributes
+from edx_solutions_organizations.models import Organization, OrganizationUsersAttributes
 from edx_solutions_api_integration.permissions import (
     TokenBasedAPIView,
     SecureAPIView,
@@ -1040,7 +1036,7 @@ class UsersCoursesDetail(SecureAPIView):
 
         response_data = {}
         response_data['uri'] = base_uri
-        if not course_exists(request, user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         response_data['user_id'] = user.id
         response_data['course_id'] = course_id
@@ -1119,7 +1115,7 @@ class UsersCoursesDetail(SecureAPIView):
         user = get_user_from_request_params(self.request, self.kwargs)
         if not user:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
-        if not course_exists(request, user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_204_NO_CONTENT)
         course_key = get_course_key(course_id)
         try:
@@ -1409,7 +1405,7 @@ class UsersSocialMetrics(SecureListAPIView):
         if course_id is None:
             course_id = self.request.query_params.get('course_id', None)
 
-        if not course_exists(request, self.request.user, course_id):
+        if not course_exists(course_id):
             raise Http404
 
         course_key = get_course_key(course_id)
@@ -1501,7 +1497,7 @@ class UsersRolesList(SecureListAPIView):
 
         course_id = self.request.query_params.get('course_id', None)
         if course_id:
-            if not course_exists(self.request, user, course_id):
+            if not course_exists(course_id):
                 raise Http404
             course_key = get_course_key(course_id)
             queryset = queryset.filter(course_id=course_key)
@@ -1542,16 +1538,17 @@ class UsersRolesList(SecureListAPIView):
         except ObjectDoesNotExist:
             raise Http404
 
-        roles = request.data.get('roles', [])
+        roles = request.data.get('roles', {})
         if not roles:
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
+
         ignore_roles = request.data.get('ignore_roles', [])
-        current_roles = self.get_queryset()
+        current_roles = self.get_queryset().exclude(role__in=ignore_roles)
         for current_role in current_roles:
-            if current_role.role not in ignore_roles:
-                course_descriptor, course_key, course_content = get_course(request, user, unicode(current_role.course_id))  # pylint: disable=W0612,C0301
-                if course_descriptor:
-                    _manage_role(course_descriptor, user, current_role.role, 'revoke')
+            course_descriptor, course_key, course_content = get_course(request, user, unicode(current_role.course_id))  # pylint: disable=W0612,C0301
+            if course_descriptor:
+                _manage_role(course_descriptor, user, current_role.role, 'revoke')
+
         for role in roles:
             role_value = role.get('role')
             if not role_value:

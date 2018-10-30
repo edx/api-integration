@@ -873,7 +873,7 @@ class CoursesGroupsList(SecureAPIView):
             return Response({'message': _('group_id is missing')}, status.HTTP_400_BAD_REQUEST)
 
         base_uri = generate_base_uri(request)
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         course_key = get_course_key(course_id)
         try:
@@ -902,7 +902,7 @@ class CoursesGroupsList(SecureAPIView):
         """
         GET /api/courses/{course_id}/groups?type=workgroup
         """
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         group_type = css_param_to_list(request, 'type')
         course_key = get_course_key(course_id)
@@ -935,7 +935,7 @@ class CoursesGroupsDetail(SecureAPIView):
         """
         GET /api/courses/{course_id}/groups/{group_id}
         """
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         try:
             existing_group = Group.objects.get(id=group_id)
@@ -957,7 +957,7 @@ class CoursesGroupsDetail(SecureAPIView):
         """
         DELETE /api/courses/{course_id}/groups/{group_id}
         """
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_204_NO_CONTENT)
         try:
             existing_group = Group.objects.get(id=group_id)
@@ -1224,7 +1224,7 @@ class CoursesUsersList(MobileListAPIView):
         """
         POST /api/courses/{course_id}/users
         """
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         course_key = get_course_key(course_id)
         if 'user_id' in request.data:
@@ -1263,7 +1263,7 @@ class CoursesUsersList(MobileListAPIView):
         if not request.user.is_staff:
             return Response({}, status=status.HTTP_401_UNAUTHORIZED)
 
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         self.course_key = get_course_key(course_id)
         try:
@@ -1403,7 +1403,7 @@ class CoursesUsersPassedList(SecureListAPIView):
         GET /api/courses/{course_id}/users/passed
         """
         course_id = self.kwargs['course_id']
-        if not course_exists(self.request, self.request.user, course_id):
+        if not course_exists(course_id):
             raise Http404
 
         org_ids = get_ids_from_list_param(self.request, 'organization')
@@ -1474,7 +1474,7 @@ class CoursesUsersDetail(SecureAPIView):
             user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
             return Response({}, status=status.HTTP_204_NO_CONTENT)
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         course_key = get_course_key(course_id)
         CourseEnrollment.unenroll(user, course_key)
@@ -1507,7 +1507,7 @@ class CourseContentGroupsList(SecureAPIView):
         """
         POST /api/courses/{course_id}/content/{content_id}/groups
         """
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         course_key = get_course_key(course_id)
         content_descriptor, content_key, existing_content = get_course_child(request, request.user, course_key, content_id)  # pylint: disable=W0612,C0301
@@ -1548,7 +1548,7 @@ class CourseContentGroupsList(SecureAPIView):
         """
         response_data = []
         group_type = request.query_params.get('type')
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         course_key = get_course_key(course_id)
         content_descriptor, content_key, existing_content = get_course_child(request, request.user, course_key, content_id)  # pylint: disable=W0612,C0301
@@ -1580,7 +1580,7 @@ class CourseContentGroupsDetail(SecureAPIView):
         """
         GET /api/courses/{course_id}/content/{content_id}/groups/{group_id}
         """
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         course_key = get_course_key(course_id)
         content_descriptor, content_key, existing_content = get_course_child(request, request.user, course_key, content_id)  # pylint: disable=W0612,C0301
@@ -1623,7 +1623,7 @@ class CourseContentUsersList(SecureAPIView):
         """
         GET /api/courses/{course_id}/content/{content_id}/users
         """
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         course_key = get_course_key(course_id)
         content_descriptor, content_key, existing_content = get_course_child(request, request.user, course_key, content_id)  # pylint: disable=W0612,C0301
@@ -1667,7 +1667,7 @@ class CoursesMetricsGradesList(SecureListAPIView):
         """
         GET /api/courses/{course_id}/metrics/grades?user_ids=1,2
         """
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         course_key = get_course_key(course_id)
         exclude_users = get_aggregate_exclusion_user_ids(course_key)
@@ -1748,7 +1748,7 @@ class CoursesMetrics(SecureAPIView):
         """
         GET /api/courses/{course_id}/metrics/
         """
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         course_descriptor, course_key, course_content = get_course(request, request.user, course_id)  # pylint: disable=W0612
         slash_course_id = get_course_key(course_id, slashseparated=True)
@@ -1881,7 +1881,7 @@ class CoursesTimeSeriesMetrics(SecureAPIView):
         """
         GET /api/courses/{course_id}/time-series-metrics/
         """
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
 
         start = request.query_params.get('start_date', None)
@@ -2035,7 +2035,7 @@ class CoursesMetricsGradesLeadersList(SecureListAPIView):
             'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
         }
 
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
 
         data = _get_courses_metrics_grades_leaders_list(course_key, **params)
@@ -2085,7 +2085,7 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
             'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
         }
 
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
 
         data = _get_courses_metrics_completions_leaders_list(course_key, **params)
@@ -2124,7 +2124,7 @@ class CoursesMetricsSocialLeadersList(SecureListAPIView):
             'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
         }
 
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
 
         data = _get_courses_metrics_social_leaders_list(course_key, **params)
@@ -2165,7 +2165,7 @@ class CourseMetricsLeaders(SecureAPIView):
             'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
         }
 
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
 
         data = {
@@ -2188,7 +2188,7 @@ class CoursesWorkgroupsList(SecureListAPIView):
 
     def get_queryset(self):
         course_id = self.kwargs['course_id']
-        if not course_exists(self.request, self.request.user, course_id):
+        if not course_exists(course_id):
             raise Http404
 
         queryset = Workgroup.objects.filter(project__course_id=course_id)
@@ -2287,7 +2287,7 @@ class CoursesMetricsCities(SecureListAPIView):
         course_id = self.kwargs['course_id']
         user_id = self.request.query_params.get('user_id', None)
         city = css_param_to_list(self.request, 'city')
-        if not course_exists(self.request, self.request.user, course_id):
+        if not course_exists(course_id):
             raise Http404
         course_key = get_course_key(course_id)
         exclude_users = get_aggregate_exclusion_user_ids(course_key)
@@ -2329,7 +2329,7 @@ class CoursesRolesList(SecureAPIView):
         GET /api/courses/{course_id}/roles/
         """
         course_id = self.kwargs['course_id']
-        if not course_exists(request, request.user, course_id):
+        if not course_exists(course_id):
             raise Http404
 
         response_data = []

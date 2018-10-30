@@ -112,16 +112,10 @@ def get_course_content(request, user, course_key, course_descriptor):  # pylint:
     return course_content
 
 
-def course_exists(request, user, course_id):  # pylint: disable=W0613
-    """
-    Checks if course exists
-    """
+def course_exists(course_id):
+    """Checks if course exists."""
     course_key = get_course_key(course_id)
-    if not course_key:
-        return False
-    if not get_modulestore().has_course(course_key):
-        return False
-    return True
+    return course_key and get_modulestore().has_course(course_key)
 
 
 def get_course_child_key(content_id):
