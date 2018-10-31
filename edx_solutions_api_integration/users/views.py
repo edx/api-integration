@@ -1409,23 +1409,12 @@ class UsersSocialMetrics(SecureListAPIView):
             raise Http404
 
         course_key = get_course_key(course_id)
-        cached_social_data = get_cached_data('social', course_id, user.id)
-        if not cached_social_data:
-            social_engagement_score = self._get_user_score(course_key, user)
-            course_avg = self._get_course_average_score(course_key)
-            data = {'course_avg': course_avg, 'score': social_engagement_score}
-            cache_course_data('social', course_id, {'course_avg': course_avg})
-            cache_course_user_data('social', course_id, user.id, {'score': social_engagement_score})
-        else:
-            data = cached_social_data
+        social_engagement_score = self._get_user_score(course_key, user)
+        course_avg = self._get_course_average_score(course_key)
+        data = {'course_avg': course_avg, 'score': social_engagement_score}
 
         if include_stats:
-            if not data.get('stats'):
-                data['stats'] = StudentSocialEngagementScore.get_user_engagements_stats(course_key, user.id)
-                cache_course_user_data('social', course_id, user.id, {'score': data['score'], 'stats': data['stats']})
-        else:
-            # In case it was cached.
-            data.pop('stats', None)
+            data['stats'] = StudentSocialEngagementScore.get_user_engagements_stats(course_key, user.id)
 
         return Response(data, status.HTTP_200_OK)
 
