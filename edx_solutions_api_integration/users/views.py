@@ -1420,12 +1420,7 @@ class UsersSocialMetrics(SecureListAPIView):
             data = cached_social_data
 
         if include_stats:
-            if not data.get('stats'):
-                data['stats'] = StudentSocialEngagementScore.get_user_engagements_stats(course_key, user.id)
-                cache_course_user_data('social', course_id, user.id, {'score': data['score'], 'stats': data['stats']})
-        else:
-            # In case it was cached.
-            data.pop('stats', None)
+            data['stats'] = StudentSocialEngagementScore.get_user_engagements_stats(course_key, user.id)
 
         return Response(data, status.HTTP_200_OK)
 
