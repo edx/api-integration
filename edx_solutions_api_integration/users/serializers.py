@@ -11,26 +11,27 @@ from edx_solutions_api_integration.utils import get_profile_image_urls_by_userna
 
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
     """
-    A ModelSerializer that takes an additional `fields` argument that
-    controls which fields should be displayed.
+    A ModelSerializer that takes optional `fields`, `exclude_fields`, and `additional_fields` query parameters that
+    helps filter what fields need to be serialized.
     """
 
     def __init__(self, *args, **kwargs):
-        # Instantiate the superclass normally
         super(DynamicFieldsModelSerializer, self).__init__(*args, **kwargs)
+        request = self.context.get('request')
+        if request:
+            default_fields = set(self.context.get('default_fields', []))
+            fields = set(self._get_delimited_queryparam_safe(request, 'fields'))
+            additional_fields = set(self._get_delimited_queryparam_safe(request, 'additional_fields'))
+            exclude_fields = set(self._get_delimited_queryparam_safe(request, 'exclude_fields'))
+            all_fields = set(self.fields.keys())
+            wanted_fields = (fields or default_fields or all_fields) | additional_fields
+            unneeded_fields = (all_fields - wanted_fields) | exclude_fields
+            for field_name in unneeded_fields:
+                self.fields.pop(field_name)
 
-        if 'request' in self.context:
-            fields = self.context['request'].query_params.get('fields', None)
-            if not fields and 'default_fields' in self.context:
-                additional_fields = self.context['request'].query_params.get('additional_fields', "")
-                fields = ','.join([self.context['default_fields'], additional_fields])
-            if fields:
-                fields = fields.split(',')
-                # Drop any fields that are not specified in the `fields` argument.
-                allowed = set(fields)
-                existing = set(self.fields.keys())
-                for field_name in existing - allowed:
-                    self.fields.pop(field_name)
+    def _get_delimited_queryparam_safe(self, request, param, delimiter=',', default=None):
+        value = request.query_params.get(param, '')
+        return value.split(delimiter) if value else default or []
 
 
 class UserSerializer(DynamicFieldsModelSerializer):
@@ -48,18 +49,14 @@ class UserSerializer(DynamicFieldsModelSerializer):
     attributes = serializers.SerializerMethodField('get_organization_attributes')
     course_groups = serializers.SerializerMethodField('get_user_course_groups')
 
-
     def get_user_course_groups(self, user):
         """Return a list of course groups of the users, optionally filtered by course id."""
-
         course_groups = user.course_groups.all()
-
         if 'course_id' in self.context:
             course_id = self.context['course_id']
             course_groups = [group.name for group in course_groups if group.course_id == course_id]
         else:
             course_groups = [group.name for group in course_groups]
-
         return course_groups
 
     def get_organization_attributes(self, user):
@@ -70,12 +67,12 @@ class UserSerializer(DynamicFieldsModelSerializer):
         if 'active_attributes' in self.context:
             active_keys = [item['key'] for item in self.context['active_attributes']]
             attributes = [
-                        {
-                            'key': item.key,
-                            'value': item.value,
-                            'organization_id': item.organization_id,
-                        } for item in user.user_attributes.all() if item.key in active_keys
-                    ]
+                {
+                    'key': item.key,
+                    'value': item.value,
+                    'organization_id': item.organization_id,
+                } for item in user.user_attributes.all() if item.key in active_keys
+            ]
         return attributes
 
     def get_profile_image(self, user):
