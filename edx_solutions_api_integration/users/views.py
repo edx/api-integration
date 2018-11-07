@@ -315,7 +315,17 @@ class UsersList(SecureListAPIView):
             org_ids = map(int, org_ids.split(','))
             queryset = queryset.filter(organizations__id__in=org_ids).distinct()
 
-        if match == 'partial':
+        if match == 'extendedpartial':
+            if name:
+                queryset = queryset.filter(
+                    Q(profile__name__icontains=name) | Q(first_name__icontains=name) | Q(last_name__icontains=name) |
+                    Q(email__icontains=name) | Q(organizations__display_name__icontains=name)
+                )
+            if courses:
+                courses_filter_list = [Q(courseenrollment__course_id__icontains=course) for course in courses]
+                courses_filter_list = reduce(lambda a, b: a | b, courses_filter_list)
+                queryset = queryset.filter(courses_filter_list)
+        elif match == 'partial':
             if name:
                 queryset = queryset.filter(
                     Q(profile__name__icontains=name) | Q(first_name__icontains=name) | Q(last_name__icontains=name)
