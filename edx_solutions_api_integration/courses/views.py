@@ -2199,7 +2199,7 @@ class CoursesMetricsSocial(MobileListAPIView):
     """
     ### The CoursesMetricsSocial view allows clients to query about the activity of all users in the
     forums
-    - URI: ```/api/users/{course_id}/metrics/social/?organization={org_id}```
+    - URI: ```/api/courses/{course_id}/metrics/social/?organization={org_id}```
     - GET: Returns a list of social metrics for users in the specified course. Results can be filtered by organization
     """
 
@@ -2207,67 +2207,34 @@ class CoursesMetricsSocial(MobileListAPIView):
         if not request.user.is_staff:
             return Response({}, status=status.HTTP_401_UNAUTHORIZED)
 
-        total_enrollments = 0
-        data = {}
+        if not course_exists(course_id):
+            raise Http404
 
-        try:
-            slash_course_id = get_course_key(course_id, slashseparated=True)
-            # the forum service expects the legacy slash separated string format
+        organization = request.query_params.get('organization', None)
+        stats = request.query_params.get('stats', False)
+        course_key = get_course_key(course_id)
+        # remove any excluded users from the aggregate
+        exclude_users = get_aggregate_exclusion_user_ids(course_key)
 
-            organization = request.query_params.get('organization', None)
-            attribute_keys = css_param_to_list(self.request, 'attribute_keys')
-            attribute_values = css_param_to_list(self.request, 'attribute_values')
+        if stats:
+            data = StudentSocialEngagementScore.get_course_engagement_stats(course_key, organization, exclude_users)
 
-            # load the course so that we can see when the course end date is
-            course_descriptor, course_key, course_content = get_course(self.request, self.request.user, course_id)  # pylint: disable=W0612,C0301
-            if not course_descriptor:
-                raise Http404
-
-            # get the course social stats, passing along a course end date to remove any activity after the course
-            # closure from the stats
-            data = get_course_social_stats(slash_course_id, end_date=course_descriptor.end)
-
-            course_key = get_course_key(course_id)
-
-            # remove any excluded users from the aggregate
-            exclude_users = get_aggregate_exclusion_user_ids(course_key)
-
-            for user_id in exclude_users:
-                if str(user_id) in data:
-                    del data[str(user_id)]
-            enrollment_qs = CourseEnrollment.objects.users_enrolled_in(course_key).filter(is_active=True)\
+            enrollment_qs = CourseEnrollment.objects.users_enrolled_in(course_key) \
+                .filter(is_active=True) \
                 .exclude(id__in=exclude_users)
 
             if organization:
                 enrollment_qs = enrollment_qs.filter(organizations=organization)
 
-            user_organizations = Organization.objects.filter(users__id__in=enrollment_qs).distinct()
-            enrollment_qs = Organization.get_all_users_by_organization_attribute_filter(
-                enrollment_qs, user_organizations, attribute_keys, attribute_values
-            )
-
-            actual_data = {}
-            actual_users = enrollment_qs.values_list('id', flat=True)
-            for user_id in actual_users:
-                if str(user_id) in data:
-                    actual_data.update({str(user_id): data[str(user_id)]})
-
-            data = actual_data
-            total_enrollments = len(actual_users)
-
-            data = {'total_enrollments': total_enrollments, 'users': data}
-            http_status = status.HTTP_200_OK
-        except (CommentClientMaintenanceError, CommentClientRequestError, ConnectionError), e:  # pylint: disable=C0103
-            logging.error("Forum service returned an error: %s", str(e))
-
             data = {
-                "err_msg": str(e),
-                'total_enrollments': total_enrollments,
-                'users': data
+                'total_enrollments': enrollment_qs.count(),
+                'users': data,
             }
-            http_status = status.HTTP_200_OK
 
-        return Response(data, http_status)
+        else:
+            data = StudentSocialEngagementScore.get_course_engagement_scores(course_key, organization, exclude_users)
+
+        return Response(data, status.HTTP_200_OK)
 
 
 class CoursesMetricsCities(SecureListAPIView):
