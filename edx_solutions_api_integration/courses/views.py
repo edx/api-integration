@@ -757,28 +757,28 @@ class CoursesDetail(MobileAPIView):
         """
         GET /api/courses/{course_id}
         """
-        if 'username' in request.GET:
+        user = request.user
+        query_username = request.query_params.get('username')
+        # Staff users can make requests on behalf of other users.
+        if user.is_staff and query_username is not None:
             try:
-                user = User.objects.get(username=request.GET['username'])
+                user = User.objects.get(username=query_username)
             except User.DoesNotExist:
                 raise Http404()
-        else:
-            user = request.user  # Usually this is AnonymousUser since this is a server-to-server API
 
-        depth = request.query_params.get('depth', 0)
-        depth_int = int(depth)
         course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612
         if not course_descriptor:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
 
         usage_key = modulestore().make_course_usage_key(course_key)
         usage_key = usage_key.replace(course_key=modulestore().fill_in_run(usage_key.course_key))
+        depth = int(request.query_params.get('depth', 0))
         try:
             data_blocks = get_blocks(
                 request,
                 usage_key,
                 user=user,
-                depth=depth_int,
+                depth=depth,
                 requested_fields=BLOCK_DATA_FIELDS
             )
             root_block = data_blocks.get('blocks', {}).get(
@@ -795,7 +795,7 @@ class CoursesDetail(MobileAPIView):
                 course_key,
                 course_descriptor,
                 root_block,
-                depth_int,
+                depth,
                 content_block=course_descriptor
             )
             base_uri_without_qs = generate_base_uri(request, True)
