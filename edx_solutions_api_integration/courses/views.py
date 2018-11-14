@@ -9,13 +9,6 @@ from datetime import timedelta
 
 from completion.models import BlockCompletion
 from completion_aggregator.models import Aggregator
-from courseware.courses import (
-    get_course_about_section,
-    get_course_info_section,
-    get_course_info_section_module,
-)
-from courseware.models import StudentModule
-from courseware.views.views import get_static_tab_fragment
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.cache import cache
@@ -23,27 +16,15 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Count, F, Max, Min, Q
 from django.http import Http404
 from django.utils.translation import ugettext_lazy as _
-from opaque_keys.edx.keys import UsageKey
-
-from requests.exceptions import ConnectionError
-
-from rest_framework import status
-from rest_framework.response import Response
 
 from courseware.courses import get_course_about_section, get_course_info_section, get_course_info_section_module
 from courseware.models import StudentModule
 from courseware.views.views import get_static_tab_fragment
-from mobile_api.course_info.views import apply_wrappers_to_content
-from openedx.core.lib.xblock_utils import get_course_update_items
-from openedx.core.lib.courses import course_image_url
-from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
 from openedx.core.djangoapps.course_groups.cohorts import get_cohort_user_ids
 from django_comment_common.models import FORUM_ROLE_MODERATOR
 from instructor.access import revoke_access, update_forum_role
 from lms.djangoapps.course_api.blocks.api import get_blocks
 from lms.lib.comment_client.thread import get_course_thread_stats
-from lms.lib.comment_client.user import get_course_social_stats
 from lms.lib.comment_client.utils import CommentClientMaintenanceError, CommentClientRequestError
 from lxml import etree
 from mobile_api.course_info.views import apply_wrappers_to_content
@@ -96,23 +77,14 @@ from edx_solutions_api_integration.models import (
     CourseGroupRelationship,
     GroupProfile,
 )
-from edx_solutions_api_integration.users.serializers import (
-    UserCountByCitySerializer,
-    UserSerializer,
-)
-from progress.models import CourseModuleCompletion
-from social_engagement.models import StudentSocialEngagementScore
 from edx_solutions_api_integration.permissions import (
     SecureAPIView,
     SecureListAPIView,
     MobileAPIView,
     MobileListAPIView,
-    IsStaffView,
-    TokenBasedAPIView,
 )
 from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer
 from edx_solutions_organizations.models import Organization
-from edx_solutions_api_integration.users.views import UsersPreferences
 from edx_solutions_api_integration.utils import (
     cache_course_data,
     cache_course_user_data,
@@ -2199,8 +2171,10 @@ class CoursesMetricsSocial(MobileListAPIView):
     """
     ### The CoursesMetricsSocial view allows clients to query about the activity of all users in the
     forums
-    - URI: ```/api/courses/{course_id}/metrics/social/?organization={org_id}```
-    - GET: Returns a list of social metrics for users in the specified course. Results can be filtered by organization
+    - URI: ```/api/courses/{course_id}/metrics/social/?organization={org_id}&score={bool}```
+    - GET: Returns a list of social metrics for users in the specified course.
+        * use `organization` query param to filter users by organization
+        * use `score` query param to get only scores of the users
     """
 
     def get(self, request, course_id):  # pylint: disable=arguments-differ
@@ -2211,12 +2185,15 @@ class CoursesMetricsSocial(MobileListAPIView):
             raise Http404
 
         organization = request.query_params.get('organization', None)
-        stats = request.query_params.get('stats', False)
+        scores = request.query_params.get('scores', False)
         course_key = get_course_key(course_id)
         # remove any excluded users from the aggregate
         exclude_users = get_aggregate_exclusion_user_ids(course_key)
 
-        if stats:
+        if scores:
+            data = StudentSocialEngagementScore.get_course_engagement_scores(course_key, organization, exclude_users)
+
+        else:
             data = StudentSocialEngagementScore.get_course_engagement_stats(course_key, organization, exclude_users)
 
             enrollment_qs = CourseEnrollment.objects.users_enrolled_in(course_key) \
@@ -2230,9 +2207,6 @@ class CoursesMetricsSocial(MobileListAPIView):
                 'total_enrollments': enrollment_qs.count(),
                 'users': data,
             }
-
-        else:
-            data = StudentSocialEngagementScore.get_course_engagement_scores(course_key, organization, exclude_users)
 
         return Response(data, status.HTTP_200_OK)
 
