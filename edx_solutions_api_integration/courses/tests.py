@@ -107,10 +107,6 @@ def _fake_get_course(request, user, course_id, depth=0, load_content=False):
     return course_descriptor, course_key, course_content
 
 
-def _fake_get_service_unavailability(course_id, end_date=None):
-    raise ConnectionError
-
-
 @override_switch(
     '{}.{}'.format(WAFFLE_COMPLETION_NAMESPACE, ENABLE_COMPLETION_TRACKING),
     active=True,
@@ -2016,13 +2012,6 @@ class CoursesApiTests(
         self.assertEqual(response.status_code, 404)
 
     def test_courses_metrics_social_check_service_availability(self):
-        self.staff_login()
-        test_uri = '{}/{}/metrics/social/'.format(self.base_courses_uri, self.test_course_id)
-        response = self.do_get(test_uri)
-        self.assertEqual(response.status_code, 200)
-
-    @mock.patch("edx_solutions_api_integration.courses.views.get_course_social_stats", _fake_get_service_unavailability)
-    def test_courses_social_metrics_get_service_unavailability(self):
         self.staff_login()
         test_uri = '{}/{}/metrics/social/'.format(self.base_courses_uri, self.test_course_id)
         response = self.do_get(test_uri)
