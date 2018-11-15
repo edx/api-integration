@@ -2174,7 +2174,7 @@ class CoursesMetricsSocial(MobileListAPIView):
     - URI: ```/api/courses/{course_id}/metrics/social/?organization={org_id}&score={bool}```
     - GET: Returns a list of social metrics for users in the specified course.
         * use `organization` query param to filter users by organization
-        * use `score` query param to get only scores of the users
+        * use `scores` query param to get only scores of the users
     """
 
     def get(self, request, course_id):  # pylint: disable=arguments-differ
