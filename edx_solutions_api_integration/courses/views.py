@@ -9,13 +9,6 @@ from datetime import timedelta
 
 from completion.models import BlockCompletion
 from completion_aggregator.models import Aggregator
-from courseware.courses import (
-    get_course_about_section,
-    get_course_info_section,
-    get_course_info_section_module,
-)
-from courseware.models import StudentModule
-from courseware.views.views import get_static_tab_fragment
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.cache import cache
@@ -23,27 +16,15 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Count, F, Max, Min, Q
 from django.http import Http404
 from django.utils.translation import ugettext_lazy as _
-from opaque_keys.edx.keys import UsageKey
-
-from requests.exceptions import ConnectionError
-
-from rest_framework import status
-from rest_framework.response import Response
 
 from courseware.courses import get_course_about_section, get_course_info_section, get_course_info_section_module
 from courseware.models import StudentModule
 from courseware.views.views import get_static_tab_fragment
-from mobile_api.course_info.views import apply_wrappers_to_content
-from openedx.core.lib.xblock_utils import get_course_update_items
-from openedx.core.lib.courses import course_image_url
-from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
 from openedx.core.djangoapps.course_groups.cohorts import get_cohort_user_ids
 from django_comment_common.models import FORUM_ROLE_MODERATOR
 from instructor.access import revoke_access, update_forum_role
 from lms.djangoapps.course_api.blocks.api import get_blocks
 from lms.lib.comment_client.thread import get_course_thread_stats
-from lms.lib.comment_client.user import get_course_social_stats
 from lms.lib.comment_client.utils import CommentClientMaintenanceError, CommentClientRequestError
 from lxml import etree
 from mobile_api.course_info.views import apply_wrappers_to_content
@@ -96,23 +77,14 @@ from edx_solutions_api_integration.models import (
     CourseGroupRelationship,
     GroupProfile,
 )
-from edx_solutions_api_integration.users.serializers import (
-    UserCountByCitySerializer,
-    UserSerializer,
-)
-from progress.models import CourseModuleCompletion
-from social_engagement.models import StudentSocialEngagementScore
 from edx_solutions_api_integration.permissions import (
     SecureAPIView,
     SecureListAPIView,
     MobileAPIView,
     MobileListAPIView,
-    IsStaffView,
-    TokenBasedAPIView,
 )
 from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer
 from edx_solutions_organizations.models import Organization
-from edx_solutions_api_integration.users.views import UsersPreferences
 from edx_solutions_api_integration.utils import (
     cache_course_data,
     cache_course_user_data,
@@ -2199,75 +2171,44 @@ class CoursesMetricsSocial(MobileListAPIView):
     """
     ### The CoursesMetricsSocial view allows clients to query about the activity of all users in the
     forums
-    - URI: ```/api/users/{course_id}/metrics/social/?organization={org_id}```
-    - GET: Returns a list of social metrics for users in the specified course. Results can be filtered by organization
+    - URI: ```/api/courses/{course_id}/metrics/social/?organization={org_id}&score={bool}```
+    - GET: Returns a list of social metrics for users in the specified course.
+        * use `organization` query param to filter users by organization
+        * use `scores` query param to get only scores of the users
     """
 
     def get(self, request, course_id):  # pylint: disable=arguments-differ
         if not request.user.is_staff:
             return Response({}, status=status.HTTP_401_UNAUTHORIZED)
 
-        total_enrollments = 0
-        data = {}
+        if not course_exists(course_id):
+            raise Http404
 
-        try:
-            slash_course_id = get_course_key(course_id, slashseparated=True)
-            # the forum service expects the legacy slash separated string format
+        organization = request.query_params.get('organization', None)
+        scores = request.query_params.get('scores', False)
+        course_key = get_course_key(course_id)
+        # remove any excluded users from the aggregate
+        exclude_users = get_aggregate_exclusion_user_ids(course_key)
 
-            organization = request.query_params.get('organization', None)
-            attribute_keys = css_param_to_list(self.request, 'attribute_keys')
-            attribute_values = css_param_to_list(self.request, 'attribute_values')
+        if scores:
+            data = StudentSocialEngagementScore.get_course_engagement_scores(course_key, organization, exclude_users)
 
-            # load the course so that we can see when the course end date is
-            course_descriptor, course_key, course_content = get_course(self.request, self.request.user, course_id)  # pylint: disable=W0612,C0301
-            if not course_descriptor:
-                raise Http404
+        else:
+            data = StudentSocialEngagementScore.get_course_engagement_stats(course_key, organization, exclude_users)
 
-            # get the course social stats, passing along a course end date to remove any activity after the course
-            # closure from the stats
-            data = get_course_social_stats(slash_course_id, end_date=course_descriptor.end)
-
-            course_key = get_course_key(course_id)
-
-            # remove any excluded users from the aggregate
-            exclude_users = get_aggregate_exclusion_user_ids(course_key)
-
-            for user_id in exclude_users:
-                if str(user_id) in data:
-                    del data[str(user_id)]
-            enrollment_qs = CourseEnrollment.objects.users_enrolled_in(course_key).filter(is_active=True)\
+            enrollment_qs = CourseEnrollment.objects.users_enrolled_in(course_key) \
+                .filter(is_active=True) \
                 .exclude(id__in=exclude_users)
 
             if organization:
                 enrollment_qs = enrollment_qs.filter(organizations=organization)
 
-            user_organizations = Organization.objects.filter(users__id__in=enrollment_qs).distinct()
-            enrollment_qs = Organization.get_all_users_by_organization_attribute_filter(
-                enrollment_qs, user_organizations, attribute_keys, attribute_values
-            )
-
-            actual_data = {}
-            actual_users = enrollment_qs.values_list('id', flat=True)
-            for user_id in actual_users:
-                if str(user_id) in data:
-                    actual_data.update({str(user_id): data[str(user_id)]})
-
-            data = actual_data
-            total_enrollments = len(actual_users)
-
-            data = {'total_enrollments': total_enrollments, 'users': data}
-            http_status = status.HTTP_200_OK
-        except (CommentClientMaintenanceError, CommentClientRequestError, ConnectionError), e:  # pylint: disable=C0103
-            logging.error("Forum service returned an error: %s", str(e))
-
             data = {
-                "err_msg": str(e),
-                'total_enrollments': total_enrollments,
-                'users': data
+                'total_enrollments': enrollment_qs.count(),
+                'users': data,
             }
-            http_status = status.HTTP_200_OK
 
-        return Response(data, http_status)
+        return Response(data, status.HTTP_200_OK)
 
 
 class CoursesMetricsCities(SecureListAPIView):
