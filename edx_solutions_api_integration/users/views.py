@@ -295,6 +295,7 @@ class UsersList(SecureListAPIView):
     """
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    course_key = None
     filter_backends = (filters.DjangoFilterBackend, IdsInFilterBackend, HasOrgsFilterBackend)
     filter_fields = ('username', )
 
@@ -363,6 +364,9 @@ class UsersList(SecureListAPIView):
         """
         GET /api/users?ids=11,12,13.....&page=2
         """
+        course_id = self.request.query_params.get('include', None)
+        if course_id:
+            self.course_key = get_course_key(course_id)
         return self.list(request, *args, **kwargs)
 
     def post(self, request):  # pylint: disable=R0915
@@ -494,6 +498,17 @@ class UsersList(SecureListAPIView):
         response_data['uri'] = '{}/{}'.format(base_uri, str(user.id))
         return Response(response_data, status=status.HTTP_201_CREATED)
 
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        serializer_context = super(UsersList, self).get_serializer_context()
+        if self.course_key:
+            serializer_context.update({
+                'course_id': self.course_key
+            })
+
+        return serializer_context
 
 class TokenBasedUserDetails(TokenBasedAPIView):
     """
