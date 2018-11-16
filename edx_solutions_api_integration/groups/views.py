@@ -225,12 +225,12 @@ class GroupsUsersList(SecureAPIView):
     ### The GroupsUserList view allows clients to interact with the set of User entities related to the specified Group
     - URI: ```/api/groups/{group_id}/users/```
     - GET: Returns a JSON representation (array) of the set of related User entities
-    - POST: Append a User entity to the set of related User entities for the specified group
-        * user_id: __required__, The identifier for the User being added
+    - POST: Append a User or a set of User entities to the specified group
+        * user_id: __required__, The identifier for the User/Users being added
     - POST Example:
 
             {
-                "user_id" : 123
+                "user_id" : 1,2,3
             }
     ### Use Cases/Notes:
     * Use the GroupsUsersList view to manage User membership for a specific Group
@@ -243,36 +243,24 @@ class GroupsUsersList(SecureAPIView):
         """
         POST /api/groups/{group_id}/users/
         """
-        base_uri = generate_base_uri(request)
         try:
             existing_group = Group.objects.get(id=group_id)
         except ObjectDoesNotExist:
             return Response({}, status.HTTP_404_NOT_FOUND)
 
         user_id = request.data.get('user_id', None)
-        if not user_id:
+        if user_id:
+            user_id = map(int, str(user_id).split(','))
+        else:
             return Response({'message': _('user_id is missing')}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            existing_user = User.objects.get(id=user_id)
-        except ObjectDoesNotExist:
-            return Response({}, status.HTTP_404_NOT_FOUND)
-        try:
-            existing_relationship = Group.objects.filter(id=existing_group.id).get(user=existing_user)
-        except ObjectDoesNotExist:
-            existing_relationship = None
-        response_data = {}
-        if existing_relationship is None:
-            existing_group.user_set.add(existing_user.id)
-            response_data['uri'] = '{}/{}'.format(base_uri, existing_user.id)
-            response_data['group_id'] = str(existing_group.id)
-            response_data['user_id'] = str(existing_user.id)
-            response_status = status.HTTP_201_CREATED
+        existing_users = User.objects.filter(id__in=user_id).distinct()
+        if existing_users:
+            existing_group.user_set.add(*existing_users)
         else:
-            response_data['uri'] = '{}/{}'.format(base_uri, existing_user.id)
-            response_data['message'] = "Relationship already exists."
-            response_status = status.HTTP_409_CONFLICT
-        return Response(response_data, status=response_status)
+            return Response({}, status.HTTP_404_NOT_FOUND)
+
+        return Response({}, status=status.HTTP_201_CREATED)
 
     def get(self, request, group_id):
         """

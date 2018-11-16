@@ -315,26 +315,24 @@ class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
         data = {'user_id': user_id}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
-        confirm_uri = test_uri + '/' + str(response.data['user_id'])
-        self.assertIn(confirm_uri, response.data['uri'])
-        self.assertEqual(response.data['group_id'], str(group_id))
-        self.assertEqual(response.data['user_id'], str(user_id))
 
-    def test_group_users_list_post_duplicate(self):
-        local_username = self.test_username + str(randint(11, 99))
-        data = {'email': self.test_email, 'username': local_username, 'password': self.test_password}
-        response = self.do_post(self.base_users_uri, data)
-        user_id = response.data['id']
+    def test_group_users_list_post_multiple(self):
+        user_id = []
+        for i in xrange(2):
+            local_username = self.test_username + str(i)
+            data = {'email': self.test_email, 'username': local_username, 'password': self.test_password}
+            response = self.do_post(self.base_users_uri, data)
+            user_id.append(response.data['id'])
         data = {'name': 'Alpha Group', 'type': 'test'}
         response = self.do_post(self.base_groups_uri, data)
         test_uri = self.base_groups_uri + '/' + str(response.data['id'])
         response = self.do_get(test_uri)
         test_uri = test_uri + '/users'
-        data = {'user_id': user_id}
+        data = {'user_id': ','.join(map(str, user_id))}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
-        response = self.do_post(test_uri, data)
-        self.assertEqual(response.status_code, 409)
+        response = self.do_get(test_uri)
+        self.assertEqual(len(user_id), len(response.data['users']))
 
     def test_group_users_list_post_invalid_group(self):
         test_uri = self.base_groups_uri + '/1239878976'
