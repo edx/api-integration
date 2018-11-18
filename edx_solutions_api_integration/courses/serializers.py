@@ -1,9 +1,11 @@
 """ Django REST Framework Serializers """
 from django.conf import settings
-from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from openedx.core.lib.courses import course_image_url
 from rest_framework import serializers
 from rest_framework.reverse import reverse
+
+from completion.models import BlockCompletion
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from openedx.core.lib.courses import course_image_url
 
 from edx_solutions_api_integration.utils import get_profile_image_urls_by_username
 
@@ -122,3 +124,25 @@ class UserGradebookSerializer(serializers.Serializer):
         if gradebook.grade and (gradebook.proforma_grade <= gradebook.grade + grade_complete_match_range):
             complete_status = True
         return complete_status
+
+
+class BlockCompletionSerializer(serializers.ModelSerializer):
+    """
+    Serialize Block Completions.
+
+    Include extra fields for backwards compatibility with CourseModuleCompletions.
+    """
+
+    class Meta(object):  # pylint: disable=missing-docstring,too-few-public-methods
+        model = BlockCompletion
+
+    user_id = serializers.IntegerField(source='user.id')
+    content_id = serializers.CharField(source='block_key')
+    course_id = serializers.CharField(source='course_key')
+    stage = serializers.SerializerMethodField()
+
+    def get_stage(self, _obj):  # pylint: disable=no-self-use
+        """
+        BlockCompletions do not support stages.  Always return None.
+        """
+        return None
