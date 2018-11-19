@@ -301,7 +301,7 @@ class UsersList(SecureListAPIView):
 
     def get_queryset(self):
         """
-        Optionally filter users by organizations and course enrollments
+        :return: queryset for users list. Optionally filter users by organizations and course enrollments
         """
         queryset = self.queryset
 
@@ -316,7 +316,8 @@ class UsersList(SecureListAPIView):
             org_ids = map(int, org_ids.split(','))
             queryset = queryset.filter(organizations__id__in=org_ids).distinct()
 
-        if match == 'extendedpartial':
+        # filter users by name, email or organizations
+        if match == 'extended_partial':
             if name:
                 queryset = queryset.filter(
                     Q(profile__name__icontains=name) | Q(first_name__icontains=name) | Q(last_name__icontains=name) |
@@ -364,7 +365,7 @@ class UsersList(SecureListAPIView):
         """
         GET /api/users?ids=11,12,13.....&page=2
         """
-        course_id = self.request.query_params.get('include', None)
+        course_id = self.request.query_params.get('course_id', None)
         if course_id:
             self.course_key = get_course_key(course_id)
         return self.list(request, *args, **kwargs)
