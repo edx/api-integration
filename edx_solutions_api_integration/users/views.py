@@ -1420,9 +1420,49 @@ class UsersSocialMetrics(SecureListAPIView):
             data = cached_social_data
 
         if include_stats:
-            data['stats'] = StudentSocialEngagementScore.get_user_engagements_stats(course_key, user.id)
+            data['stats'] = self._get_user_discussion_metrics(request, user, course_id)
 
         return Response(data, status.HTTP_200_OK)
+
+    @staticmethod
+    def _get_user_discussion_metrics(request, user, course_id):
+        """ Fetches discussion metrics from the forums client."""
+        # load the course so that we can see when the course end date is
+        course_descriptor, course_key, course_content = get_course(request, request.user, course_id)  # pylint: disable=W0612,C0301
+        if not course_descriptor:
+            raise Http404
+
+        # be robust to the try of course_id we get from caller
+        try:
+            # assume new style
+            course_key = CourseKey.from_string(course_id)
+            slash_course_id = course_key.to_deprecated_string()
+        except:  # pylint: disable=W0702
+            # assume course_id passed in is legacy format
+            slash_course_id = course_id
+
+        try:
+            # get the course social stats, passing along a course end date to remove any activity after the course
+            # closure from the stats
+            user_id = str(user.id)
+            data = (get_user_social_stats(user_id, slash_course_id, end_date=course_descriptor.end))[user_id]
+        except (CommentClientRequestError, CommentClientMaintenanceError, ConnectionError), error:
+            logging.error("Forum service returned an error: %s", str(error))
+
+            data = {
+                'err_msg': str(error),
+                'num_threads': 0,
+                'num_thread_followers': 0,
+                'num_replies': 0,
+                'num_flagged': 0,
+                'num_comments': 0,
+                'num_threads_read': 0,
+                'num_downvotes': 0,
+                'num_upvotes': 0,
+                'num_comments_generated': 0
+            }
+
+        return data
 
     @staticmethod
     def _get_user_score(course_key, user):
