@@ -12,6 +12,7 @@ from django.db.models import Count, Q
 from django.conf import settings
 from django.http import Http404
 from django.utils.translation import get_language, ugettext_lazy as _
+from requests.exceptions import ConnectionError
 from rest_framework import filters
 from rest_framework.response import Response
 from rest_framework import status
@@ -24,6 +25,8 @@ from gradebook.utils import generate_user_gradebook
 from social_engagement.models import StudentSocialEngagementScore
 from instructor.access import revoke_access, update_forum_role
 from openedx.core.djangoapps.lang_pref import LANGUAGE_KEY
+from lms.lib.comment_client.utils import CommentClientRequestError, CommentClientMaintenanceError
+from lms.lib.comment_client.user import get_user_social_stats
 from notification_prefs.views import enable_notifications
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import UsageKey, CourseKey

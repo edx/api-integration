@@ -40,6 +40,7 @@ from lms.lib.comment_client.user import get_course_social_stats
 from lms.lib.comment_client.utils import CommentClientMaintenanceError, CommentClientRequestError
 from mobile_api.course_info.views import apply_wrappers_to_content
 from opaque_keys.edx.keys import UsageKey
+from opaque_keys import InvalidKeyError
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
 from openedx.core.djangoapps.course_groups.cohorts import get_cohort_user_ids
