@@ -12,7 +12,7 @@ from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Count, F, Max, Min, Q
+from django.db.models import Count, F, Max, Min, Prefetch, Q
 from django.http import Http404
 from django.utils.translation import ugettext_lazy as _
 
@@ -31,7 +31,6 @@ from courseware.courses import (
 )
 from courseware.models import StudentModule
 from courseware.views.views import get_static_tab_fragment
-from openedx.core.djangoapps.course_groups.cohorts import get_cohort_user_ids
 from django_comment_common.models import FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
 from instructor.access import revoke_access, update_forum_role
@@ -42,6 +41,8 @@ from mobile_api.course_info.views import apply_wrappers_to_content
 from opaque_keys.edx.keys import UsageKey
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
+from openedx.core.djangoapps.course_groups.cohorts import get_cohort_user_ids
+from openedx.core.djangoapps.course_groups.models import CourseUserGroup
 from openedx.core.lib.courses import course_image_url
 from openedx.core.lib.xblock_utils import get_course_update_items
 from social_engagement.models import StudentSocialEngagementScore
@@ -1260,7 +1261,7 @@ class CoursesUsersList(MobileListAPIView):
         Extra context provided to the serializer class.
         """
         serializer_context = super(CoursesUsersList, self).get_serializer_context()
-        default_fields = ",".join([
+        default_fields = [
             "id",
             "email",
             "username",
@@ -1276,7 +1277,7 @@ class CoursesUsersList(MobileListAPIView):
             "is_staff",
             "last_login",
             "attributes",
-        ])
+        ]
 
         active_attributes = []
         for organization in self.user_organizations:
@@ -1288,61 +1289,39 @@ class CoursesUsersList(MobileListAPIView):
             'course_meta_data': self.course_meta_data,
             'active_attributes': active_attributes,
         })
-
         return serializer_context
 
     def get_queryset(self):
         """
         :return: queryset for course users list.
         """
-        # Get a list of all enrolled students
         users = CourseEnrollment.objects.users_enrolled_in(self.course_key)
-
         attribute_keys = css_param_to_list(self.request, 'attribute_keys')
         attribute_values = css_param_to_list(self.request, 'attribute_values')
-
         orgs = get_ids_from_list_param(self.request, 'organizations')
+        groups = get_ids_from_list_param(self.request, 'groups')
+        workgroups = get_ids_from_list_param(self.request, 'workgroups')
+        exclude_groups = get_ids_from_list_param(self.request, 'exclude_groups')
+        additional_fields = self.request.query_params.get('additional_fields', [])
         if orgs:
             users = users.filter(organizations__in=orgs)
-
-        groups = get_ids_from_list_param(self.request, 'groups')
         if groups:
             users = users.filter(groups__in=groups).distinct()
-
-        workgroups = get_ids_from_list_param(self.request, 'workgroups')
         if workgroups:
             users = users.filter(workgroups__in=workgroups).distinct()
-
-        exclude_groups = get_ids_from_list_param(self.request, 'exclude_groups')
         if exclude_groups:
             users = users.exclude(groups__in=exclude_groups)
-
-        additional_fields = self.request.query_params.get('additional_fields', [])
         if 'organizations' in additional_fields:
-            users = users.prefetch_related(
-                'organizations'
-            )
+            users = users.prefetch_related('organizations')
         if 'roles' in additional_fields:
-            users = users.prefetch_related(
-                'courseaccessrole_set'
-            )
+            users = users.prefetch_related('courseaccessrole_set')
         if 'grades' in additional_fields:
-            users = users.prefetch_related(
-                'studentgradebook_set'
-            )
+            users = users.prefetch_related('studentgradebook_set')
         if 'courses_enrolled' in additional_fields:
-            users = users.prefetch_related(
-                'courseenrollment_set'
-            )
-
-        if 'attributes' in additional_fields:
-            users = users.prefetch_related(
-                'user_attributes'
-            )
-
+            users = users.prefetch_related('courseenrollment_set')
         if 'course_groups' in additional_fields:
             users = users.prefetch_related(
-                'course_groups'
+                Prefetch('course_groups', queryset=CourseUserGroup.objects.filter(course_id=self.course_key))
             )
 
         self.user_organizations = Organization.objects.filter(users__in=users).distinct()
@@ -1352,8 +1331,8 @@ class CoursesUsersList(MobileListAPIView):
         users = Organization.get_all_users_by_organization_attribute_filter(
             users, self.user_organizations, attribute_keys, attribute_values
         )
-
         users = users.select_related('profile')
+        users = users.prefetch_related('user_attributes')
         return users
 
 

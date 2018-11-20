@@ -212,11 +212,12 @@ class CustomPagination(pagination.PageNumberPagination):
         We should not paginate results in that case.
         """
         default_page_size = getattr(settings, 'API_PAGE_SIZE', 20)
+        max_page_size = getattr(settings, 'API_MAX_PAGE_SIZE', 1000)
         page_size = int(request.query_params.get('page_size', default_page_size))
         if page_size == 0:
             return None
-        elif page_size > 100:
-            return default_page_size
+        elif page_size > max_page_size:
+            return max_page_size
         else:
             return page_size
 

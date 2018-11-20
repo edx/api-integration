@@ -413,7 +413,6 @@ def get_profile_image_urls_by_username(username, profile_image_uploaded_at):
         dictionary of {size_display_name: url} for each image.
 
     """
-
     if profile_image_uploaded_at:
         urls = _get_profile_image_urls(
             _make_profile_image_name(username),
