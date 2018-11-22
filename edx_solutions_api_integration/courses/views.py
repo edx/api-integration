@@ -1692,6 +1692,15 @@ class CoursesProjectList(SecureListAPIView):
         return Project.objects.filter(course_id=course_key)
 
 
+def _get_users_in_cohort(user_id, course_key, ignore_groupwork):
+    """
+    Get users in the same cohort, possibly ignoring if Group Work is enabled
+    """
+    if ignore_groupwork and Project.objects.filter(course_id=course_key):
+        return None
+    return get_cohort_user_ids(user_id, course_key)
+
+
 class CoursesMetrics(SecureAPIView):
     """
     ### The CoursesMetrics view allows clients to retrieve a list of Metrics for the specified Course
@@ -1720,7 +1729,7 @@ class CoursesMetrics(SecureAPIView):
         metrics_required = css_param_to_list(request, 'metrics_required')
         exclude_users = get_aggregate_exclusion_user_ids(course_key)
         user_id = request.query_params.get('user_id', None)
-        cohort_user_ids = get_cohort_user_ids(user_id, course_key)
+        cohort_user_ids = _get_users_in_cohort(user_id, course_key, ignore_groupwork=True)
         cached_enrollments_data = get_cached_data('course_enrollments', course_id)
         if cached_enrollments_data and not len(request.query_params):
             enrollment_count = cached_enrollments_data.get('enrollment_count')
@@ -1994,7 +2003,7 @@ class CoursesMetricsGradesLeadersList(SecureListAPIView):
             'skipleaders': str2bool(self.request.query_params.get('skipleaders', 'false')),
             # Users having certain roles (such as an Observer) are excluded from aggregations
             'exclude_users': get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles),
-            'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
+            'cohort_user_ids': _get_users_in_cohort(user_id, course_key, ignore_groupwork=True),
         }
 
         if not course_exists(course_id):
@@ -2158,7 +2167,7 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
             'skipleaders': str2bool(self.request.query_params.get('skipleaders', 'false')),
             # Users having certain roles (such as an Observer) are excluded from aggregations
             'exclude_users': get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles),
-            'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
+            'cohort_user_ids': _get_users_in_cohort(user_id, course_key, ignore_groupwork=True),
         }
 
         if not course_exists(course_id):
@@ -2197,7 +2206,7 @@ class CoursesMetricsSocialLeadersList(SecureListAPIView):
             'org_ids': get_ids_from_list_param(self.request, 'organizations'),
             'count': self.request.query_params.get('count', 3),
             'exclude_users': get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles),
-            'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
+            'cohort_user_ids': _get_users_in_cohort(user_id, course_key, ignore_groupwork=True),
         }
 
         if not course_exists(course_id):
@@ -2238,7 +2247,7 @@ class CourseMetricsLeaders(SecureAPIView):
             'exclude_roles': css_param_to_list(self.request, 'exclude_roles'),
             'exclude_users': get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles),
             'skipleaders': str2bool(self.request.query_params.get('skipleaders', 'false')),
-            'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
+            'cohort_user_ids': _get_users_in_cohort(user_id, course_key, ignore_groupwork=True),
         }
 
         if not course_exists(course_id):
@@ -2367,7 +2376,7 @@ class CoursesMetricsCities(SecureListAPIView):
             raise Http404
         course_key = get_course_key(course_id)
         exclude_users = get_aggregate_exclusion_user_ids(course_key)
-        cohort_user_ids = get_cohort_user_ids(user_id, course_key)
+        cohort_user_ids = _get_users_in_cohort(user_id, course_key, ignore_groupwork=True)
         cached_cities_data = get_cached_data('cities_count', course_id)
         if cached_cities_data and not len(self.request.query_params):
             queryset = cached_cities_data
