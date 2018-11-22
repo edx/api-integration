@@ -242,7 +242,7 @@ class UsersList(SecureListAPIView):
         GET /api/users?email={john@example}&match=partial
         GET /api/users?name={john doe}
         GET /api/users?name={joh}&match=partial
-        GET /api/users?search_query_string={joh}&match=extended_partial
+        GET /api/users?search_query_string={joh}&match=partial
         GET /api/users?organization_display_name={xyz}&match=partial
         GET /api/users?username={john}
             * email: string, filters user set by email address
@@ -318,29 +318,25 @@ class UsersList(SecureListAPIView):
             org_ids = map(int, org_ids.split(','))
             queryset = queryset.filter(organizations__id__in=org_ids).distinct()
 
-        # filter users by name, email or organizations
-        if match == 'extended_partial':
+        if match == 'partial':
+            # filter users by name, email or organizations
             if search_query_string:
                 queryset = queryset.filter(
-                    Q(profile__name__icontains=search_query_string) | Q(first_name__icontains=search_query_string) |
-                    Q(last_name__icontains=search_query_string) | Q(email__icontains=search_query_string) |
-                    Q(organizations__display_name__icontains=search_query_string)
-                )
-            if courses:
-                courses_filter_list = [Q(courseenrollment__course_id__icontains=course) for course in courses]
-                courses_filter_list = reduce(lambda a, b: a | b, courses_filter_list)
-                queryset = queryset.filter(courses_filter_list)
-        elif match == 'partial':
-            if name:
-                queryset = queryset.filter(
-                    Q(profile__name__icontains=name) | Q(first_name__icontains=name) | Q(last_name__icontains=name)
-                )
+                            Q(profile__name__icontains=search_query_string) | Q(first_name__icontains=search_query_string) |
+                            Q(last_name__icontains=search_query_string) | Q(email__icontains=search_query_string) |
+                            Q(organizations__display_name__icontains=search_query_string)
+                        )
+            else:
+                if name:
+                    queryset = queryset.filter(
+                        Q(profile__name__icontains=name) | Q(first_name__icontains=name) | Q(last_name__icontains=name)
+                    )
 
-            if email:
-                queryset = queryset.filter(email__icontains=email)
+                if email:
+                    queryset = queryset.filter(email__icontains=email)
 
-            if organization_display_name is not None:
-                queryset = queryset.filter(organizations__display_name__icontains=organization_display_name)
+                if organization_display_name is not None:
+                    queryset = queryset.filter(organizations__display_name__icontains=organization_display_name)
 
             if courses:
                 courses_filter_list = [Q(courseenrollment__course_id__icontains=course) for course in courses]

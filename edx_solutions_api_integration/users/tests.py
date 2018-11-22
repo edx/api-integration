@@ -448,7 +448,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         CourseEnrollmentFactory.create(user=users[3], course_id=course2.id)
 
         # fetch user data by partial name, email or organization display_name match
-        response = self.do_get('{}?search_query_string={}&match=extended_partial'.format(test_uri, 'Mcd'))
+        response = self.do_get('{}?search_query_string={}&match=partial'.format(test_uri, 'Mcd'))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(response.data['results'][0]['full_name'], 'Micheal Mcdonald')
@@ -457,7 +457,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         # fetch user data by partial name, email or organization display_name and course id match
         response = self.do_get(
-            '{}?search_query_string={}&courses={}&match=extended_partial'.format(
+            '{}?search_query_string={}&courses={}&match=partial'.format(
                 test_uri, 'mic.mcdonald@example.com', 'edX'
             )
         )
