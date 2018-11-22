@@ -110,6 +110,93 @@ def _fake_get_service_unavailability(course_id, end_date=None):
     raise ConnectionError
 
 
+class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
+    """
+    Test get and post behavior on Completion endpoint.
+    """
+
+    MODULESTORE = TEST_DATA_SPLIT_MODULESTORE
+
+    @classmethod
+    def setUpClass(cls):
+        super(CohortAverageTestCase, cls).setUpClass()
+
+        cls.course = CourseFactory.create()
+        cls.chapter = ItemFactory.create(
+            category="chapter",
+            parent_location=cls.course.location,
+        )
+        cls.html1 = ItemFactory.create(
+            category="html",
+            parent_location=cls.chapter.location,
+        )
+        cls.html2 = ItemFactory.create(
+            category="html",
+            parent_location=cls.chapter.location,
+        )
+        cls.html3 = ItemFactory.create(
+            category="html",
+            parent_location=cls.chapter.location,
+        )
+
+        cls.social_leaders_api = reverse(
+            'course-metrics-social-leaders', kwargs={'course_id': unicode(cls.course.id)}
+        )
+        cls.scores = [10, 20, 30, 40, 50, 60, 70]
+        cls.course_avg = sum(cls.scores) / len(cls.scores)
+        cls.users = []
+        for score in cls.scores:
+            user = UserFactory.create()
+            cls.users.append(user)
+            CourseEnrollmentFactory(user=user, course_id=cls.course.id)
+            StudentSocialEngagementScore.objects.get_or_create(
+                user=user, course_id=cls.course.id, defaults={'score': score}
+            )
+
+        cls.completion_uri = "/api/server/courses/{}/completions".format(cls.course.id)
+        with override_switch('completion.enable_completion_tracking', active=True):
+            for loc in (cls.html1.location, cls.html2.location):
+                BlockCompletion.objects.submit_completion(
+                    user=cls.users[0],
+                    course_key=cls.course.id,
+                    block_key=loc,
+                    completion=1.0,
+                )
+
+    def test_social_averages(self):
+        # Test social average is global without cohorts
+        response = self.do_get("{}?user_id={}".format(self.social_leaders_api, self.users[-1].id))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['course_avg'], self.course_avg)
+
+        # Test social average when cohorts are enabled
+        def get_cohort_user_ids(user_id, course_key, **kwargs):
+            return [user_id]
+
+        with mock.patch('edx_solutions_api_integration.courses.views.get_cohort_user_ids', get_cohort_user_ids):
+            for i in range(len(self.scores)):
+                response = self.do_get(
+                    "{}?user_id={}".format(self.social_leaders_api, self.users[i].id)
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data['course_avg'], self.scores[i])
+
+            # Test social average when groupworks is present
+
+            project_mock = mock.MagicMock()
+            objects_mock = mock.MagicMock()
+            objects_mock.filter = lambda course_id: [True]
+            project_mock.objects = objects_mock
+
+            with mock.patch('edx_solutions_api_integration.courses.views.Project', project_mock):
+                for i in range(len(self.scores)):
+                    response = self.do_get(
+                        "{}?user_id={}".format(self.social_leaders_api, self.users[i].id)
+                    )
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response.data['course_avg'], self.course_avg)
+
+
 @override_switch(
     '{}.{}'.format(WAFFLE_COMPLETION_NAMESPACE, ENABLE_COMPLETION_TRACKING),
     active=True,
