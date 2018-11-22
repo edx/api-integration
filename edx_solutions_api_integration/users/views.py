@@ -242,6 +242,7 @@ class UsersList(SecureListAPIView):
         GET /api/users?email={john@example}&match=partial
         GET /api/users?name={john doe}
         GET /api/users?name={joh}&match=partial
+        GET /api/users?search_query_string={joh}&match=extended_partial
         GET /api/users?organization_display_name={xyz}&match=partial
         GET /api/users?username={john}
             * email: string, filters user set by email address
@@ -306,6 +307,7 @@ class UsersList(SecureListAPIView):
         queryset = self.queryset
 
         name = self.request.query_params.get('name', None)
+        search_query_string = self.request.query_params.get('search_query_string', None)
         match = self.request.query_params.get('match', None)
         email = self.request.query_params.get('email', None)
         org_ids = self.request.query_params.get('organizations', None)
@@ -318,10 +320,11 @@ class UsersList(SecureListAPIView):
 
         # filter users by name, email or organizations
         if match == 'extended_partial':
-            if name:
+            if search_query_string:
                 queryset = queryset.filter(
-                    Q(profile__name__icontains=name) | Q(first_name__icontains=name) | Q(last_name__icontains=name) |
-                    Q(email__icontains=name) | Q(organizations__display_name__icontains=name)
+                    Q(profile__name__icontains=search_query_string) | Q(first_name__icontains=search_query_string) |
+                    Q(last_name__icontains=search_query_string) | Q(email__icontains=search_query_string) |
+                    Q(organizations__display_name__icontains=search_query_string)
                 )
             if courses:
                 courses_filter_list = [Q(courseenrollment__course_id__icontains=course) for course in courses]
