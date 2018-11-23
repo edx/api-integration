@@ -142,10 +142,10 @@ class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
         cls.social_leaders_api = reverse(
             'course-metrics-social-leaders', kwargs={'course_id': unicode(cls.course.id)}
         )
-        cls.scores = [10, 20, 30, 40, 50, 60, 70]
-        cls.course_avg = sum(cls.scores) / len(cls.scores)
+        cls.social_scores = [10, 20, 30, 40, 50, 60, 70]
+        cls.social_avg = sum(cls.social_scores) / len(cls.social_scores)
         cls.users = []
-        for score in cls.scores:
+        for score in cls.social_scores:
             user = UserFactory.create()
             cls.users.append(user)
             CourseEnrollmentFactory(user=user, course_id=cls.course.id)
@@ -153,7 +153,9 @@ class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
                 user=user, course_id=cls.course.id, defaults={'score': score}
             )
 
-        cls.completion_uri = "/api/server/courses/{}/completions".format(cls.course.id)
+        cls.completion_leaders_api = reverse(
+            'course-metrics-completions-leaders', kwargs={'course_id': unicode(cls.course.id)}
+        )
         with override_switch('completion.enable_completion_tracking', active=True):
             for loc in (cls.html1.location, cls.html2.location):
                 BlockCompletion.objects.submit_completion(
@@ -162,24 +164,59 @@ class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
                     block_key=loc,
                     completion=1.0,
                 )
+        cls.progress_scores = [2/3, 0.]
+        cls.progress_avg = sum(cls.progress_scores) / len(cls.progress_scores)
+
+    @classmethod
+    def _get_cohort_user_ids(cls, user_id, course_key, **kwargs):
+        return [user_id]
+
+    def test_progress_averages(self):
+        # TODO CLEAR Q
+        import q
+        # Test progress average is global without cohorts
+        uri = "{}?user_id={}".format(self.completion_leaders_api, self.users[-1].id)
+        response = self.do_get(uri)
+        q(response.content)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['course_avg'], self.progress_avg)
+
+        # Test social average when cohorts are enabled
+        with mock.patch('edx_solutions_api_integration.courses.views.get_cohort_user_ids', self._get_cohort_user_ids):
+            for i, progress in enumerate(self.progress_scores):
+                response = self.do_get(
+                    "{}?user_id={}".format(self.completion_leaders_api, self.users[i].id)
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data['course_avg'], progress)
+
+            # Test social average when groupworks is present
+            project_mock = mock.MagicMock()
+            objects_mock = mock.MagicMock()
+            objects_mock.filter = lambda course_id: [True]
+            project_mock.objects = objects_mock
+
+            with mock.patch('edx_solutions_api_integration.courses.views.Project', project_mock):
+                for i, progress in enumerate(self.progress_scores):
+                    response = self.do_get(
+                        "{}?user_id={}".format(self.completion_leaders_api, self.users[i].id)
+                    )
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response.data['course_avg'], self.progress_avg)
 
     def test_social_averages(self):
         # Test social average is global without cohorts
         response = self.do_get("{}?user_id={}".format(self.social_leaders_api, self.users[-1].id))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['course_avg'], self.course_avg)
+        self.assertEqual(response.data['course_avg'], self.social_avg)
 
-        # Test social average when cohorts are enabled
-        def get_cohort_user_ids(user_id, course_key, **kwargs):
-            return [user_id]
-
-        with mock.patch('edx_solutions_api_integration.courses.views.get_cohort_user_ids', get_cohort_user_ids):
-            for i in range(len(self.scores)):
+        with mock.patch('edx_solutions_api_integration.courses.views.get_cohort_user_ids', self._get_cohort_user_ids):
+            for i, score in enumerate(self.social_scores):
                 response = self.do_get(
                     "{}?user_id={}".format(self.social_leaders_api, self.users[i].id)
                 )
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.data['course_avg'], self.scores[i])
+                self.assertEqual(response.data['course_avg'], score)
 
             # Test social average when groupworks is present
 
@@ -189,12 +226,12 @@ class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
             project_mock.objects = objects_mock
 
             with mock.patch('edx_solutions_api_integration.courses.views.Project', project_mock):
-                for i in range(len(self.scores)):
+                for i in range(len(self.social_scores)):
                     response = self.do_get(
                         "{}?user_id={}".format(self.social_leaders_api, self.users[i].id)
                     )
                     self.assertEqual(response.status_code, 200)
-                    self.assertEqual(response.data['course_avg'], self.course_avg)
+                    self.assertEqual(response.data['course_avg'], self.social_avg)
 
 
 @override_switch(
