@@ -194,7 +194,12 @@ class ImportParticipantsViewSet(SecureViewSet):
             cohort = get_cohort_by_name(course_key, CourseUserGroup.default_cohort_name)
         except CourseUserGroup.DoesNotExist:
             cohort = add_cohort(course_key, CourseUserGroup.default_cohort_name, CourseCohort.RANDOM)
-        CohortMembership.objects.create(course_user_group=cohort, user=user)
+        try:
+            CohortMembership.objects.create(course_user_group=cohort, user=user)
+        except IntegrityError:
+            # This situation can occur if user is already present in the course or if his enrollment was removed
+            # manually from Django Admin. We can ignore this error.
+            pass
 
         # Assign role and permission in course.
         try:
