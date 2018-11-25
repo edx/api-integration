@@ -17,6 +17,7 @@ from django.http import Http404
 from django.utils.translation import ugettext_lazy as _
 
 from lxml import etree
+from multiprocessing.pool import ThreadPool
 from requests.exceptions import ConnectionError
 from rest_framework import status
 from rest_framework.response import Response
@@ -2243,11 +2244,15 @@ class CourseMetricsLeaders(SecureAPIView):
         if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
 
+        pool = ThreadPool(3)
         data = {
-            'grades': _get_courses_metrics_grades_leaders_list(course_key, **params),
-            'completions': _get_courses_metrics_completions_leaders_list(course_key, **params),
-            'social': _get_courses_metrics_social_leaders_list(course_key, **params),
+            'grades': pool.apply_async(_get_courses_metrics_grades_leaders_list, (course_key,), params),
+            'completions': pool.apply_async(_get_courses_metrics_completions_leaders_list, (course_key,), params),
+            'social': pool.apply_async(_get_courses_metrics_social_leaders_list, (course_key,), params),
         }
+        for key in data.keys():
+            data[key] = data[key].get()
+
         return Response(data, status=status.HTTP_200_OK)
 
 
