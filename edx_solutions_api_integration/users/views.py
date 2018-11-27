@@ -242,6 +242,7 @@ class UsersList(SecureListAPIView):
         GET /api/users?email={john@example}&match=partial
         GET /api/users?name={john doe}
         GET /api/users?name={joh}&match=partial
+        GET /api/users?search_query_string={joh}&match=partial
         GET /api/users?organization_display_name={xyz}&match=partial
         GET /api/users?username={john}
             * email: string, filters user set by email address
@@ -295,16 +296,18 @@ class UsersList(SecureListAPIView):
     """
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    course_key = None
     filter_backends = (filters.DjangoFilterBackend, IdsInFilterBackend, HasOrgsFilterBackend)
     filter_fields = ('username', )
 
     def get_queryset(self):
         """
-        Optionally filter users by organizations and course enrollments
+        :return: queryset for users list. Optionally filter users by organizations and course enrollments
         """
         queryset = self.queryset
 
         name = self.request.query_params.get('name', None)
+        search_query_string = self.request.query_params.get('search_query_string', None)
         match = self.request.query_params.get('match', None)
         email = self.request.query_params.get('email', None)
         org_ids = self.request.query_params.get('organizations', None)
@@ -316,16 +319,24 @@ class UsersList(SecureListAPIView):
             queryset = queryset.filter(organizations__id__in=org_ids).distinct()
 
         if match == 'partial':
-            if name:
+            # filter users by name, email or organizations
+            if search_query_string:
                 queryset = queryset.filter(
-                    Q(profile__name__icontains=name) | Q(first_name__icontains=name) | Q(last_name__icontains=name)
-                )
+                            Q(profile__name__icontains=search_query_string) | Q(first_name__icontains=search_query_string) |
+                            Q(last_name__icontains=search_query_string) | Q(email__icontains=search_query_string) |
+                            Q(organizations__display_name__icontains=search_query_string)
+                        )
+            else:
+                if name:
+                    queryset = queryset.filter(
+                        Q(profile__name__icontains=name) | Q(first_name__icontains=name) | Q(last_name__icontains=name)
+                    )
 
-            if email:
-                queryset = queryset.filter(email__icontains=email)
+                if email:
+                    queryset = queryset.filter(email__icontains=email)
 
-            if organization_display_name is not None:
-                queryset = queryset.filter(organizations__display_name__icontains=organization_display_name)
+                if organization_display_name is not None:
+                    queryset = queryset.filter(organizations__display_name__icontains=organization_display_name)
 
             if courses:
                 courses_filter_list = [Q(courseenrollment__course_id__icontains=course) for course in courses]
@@ -353,6 +364,9 @@ class UsersList(SecureListAPIView):
         """
         GET /api/users?ids=11,12,13.....&page=2
         """
+        course_id = self.request.query_params.get('course_id', None)
+        if course_id:
+            self.course_key = get_course_key(course_id)
         return self.list(request, *args, **kwargs)
 
     def post(self, request):  # pylint: disable=R0915
@@ -484,6 +498,17 @@ class UsersList(SecureListAPIView):
         response_data['uri'] = '{}/{}'.format(base_uri, str(user.id))
         return Response(response_data, status=status.HTTP_201_CREATED)
 
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        serializer_context = super(UsersList, self).get_serializer_context()
+        if self.course_key:
+            serializer_context.update({
+                'course_id': self.course_key
+            })
+
+        return serializer_context
 
 class TokenBasedUserDetails(TokenBasedAPIView):
     """
