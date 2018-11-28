@@ -2381,33 +2381,22 @@ class CoursesRolesList(SecureAPIView):
         if not course_exists(course_id):
             raise Http404
 
-        response_data = []
+        user_id = self.request.query_params.get('user_id', None)
+        role = self.request.query_params.get('role', None)
         course_key = get_course_key(course_id)
         instructors = CourseInstructorRole(course_key).users_with_role()
-        for instructor in instructors:
-            response_data.append({'id': instructor.id, 'role': 'instructor'})
-
         staff = CourseStaffRole(course_key).users_with_role()
-        for admin in staff:
-            response_data.append({'id': admin.id, 'role': 'staff'})
-
         observers = CourseObserverRole(course_key).users_with_role()
-        for observer in observers:
-            response_data.append({'id': observer.id, 'role': 'observer'})
-
         assistants = CourseAssistantRole(course_key).users_with_role()
-        for assistant in assistants:
-            response_data.append({'id': assistant.id, 'role': 'assistant'})
-
-        user_id = self.request.query_params.get('user_id', None)
+        all_users = (instructors | staff | observers | assistants).annotate(role=F("courseaccessrole__role"))
         if user_id:
-            response_data = list([item for item in response_data if int(item['id']) == int(user_id)])
-
-        role = self.request.query_params.get('role', None)
+            all_users &= User.objects.filter(id=int(user_id))
         if role:
-            response_data = list([item for item in response_data if item['role'] == role])
-
-        return Response(response_data, status=status.HTTP_200_OK)
+            all_users &= User.objects.filter(courseaccessrole__role=role)
+        return Response(
+            all_users.values("id", "role"),
+            status=status.HTTP_200_OK
+        )
 
     def post(self, request, course_id):
         """
