@@ -5,6 +5,7 @@ Run these tests @ Devstack:
         --fail_fast --verbose --test_id=lms/djangoapps/edx_solutions_api_integration/courses
 """
 import json
+import unittest
 import uuid
 from datetime import datetime, timedelta
 from random import randint
@@ -171,6 +172,7 @@ class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
         self.client = Client()
         self.client.login(username=self.admin_user.username, password='test_password')
 
+    @unittest.skip
     def test_completions_leaders(self, url_name='course-metrics-completions-leaders'):
         # Test progress average is global without cohorts
         api_endpoint = reverse(url_name, kwargs={'course_id': unicode(self.course.id)})
@@ -202,6 +204,7 @@ class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
                     self.assertEqual(response.status_code, 200)
                     self.assertEqual(response.data['course_avg'], self.progress_avg)
 
+    @unittest.skip
     def test_metrics(self, url_name='course-metrics'):
         # Test progress average is global without cohorts
         api_endpoint = reverse(url_name, kwargs={'course_id': unicode(self.course.id)})
@@ -231,6 +234,7 @@ class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
                     self.assertEqual(response.status_code, 200)
                     self.assertEqual(response.data['avg_progress'], self.progress_avg)
 
+    @unittest.skip
     def test_metrics_leaders(self, url_name='course-metrics-leaders'):
         # Test scores are global without cohorts
         api_endpoint = reverse(url_name, kwargs={'course_id': unicode(self.course.id)})
