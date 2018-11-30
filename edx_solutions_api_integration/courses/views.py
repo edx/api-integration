@@ -338,12 +338,9 @@ def _get_course_progress_metrics(course_key, **kwargs):
     """
     course_avg = 0
     data = {'course_avg': course_avg}
-    course_metadata = CourseAggregatedMetaData.get_from_id(course_key)
-    total_possible_completions = float(course_metadata.total_assessments)
-    total_actual_completions = get_total_completions(course_key, **kwargs)
+    total_actual_completions, total_possible_completions = get_total_completions(course_key, **kwargs)
     if kwargs.get('user_id'):
         data.update(get_user_position(course_key, **kwargs))
-
     total_users_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=kwargs.get('exclude_users'))
     if kwargs.get('org_ids'):
         total_users_qs = total_users_qs.filter(organizations__in=kwargs.get('org_ids'))
@@ -1749,7 +1746,7 @@ class CoursesMetrics(SecureAPIView):
             data['users_not_started'] = data['users_enrolled'] - users_started
 
         if 'modules_completed' in metrics_required:
-            modules_completed = get_total_completions(
+            modules_completed, _ = get_total_completions(
                 course_key,
                 exclude_users=exclude_users,
                 org_ids=org_ids,
