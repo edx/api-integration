@@ -1299,6 +1299,7 @@ class CoursesUsersList(MobileListAPIView):
         workgroups = get_ids_from_list_param(self.request, 'workgroups')
         exclude_groups = get_ids_from_list_param(self.request, 'exclude_groups')
         additional_fields = self.request.query_params.get('additional_fields', [])
+        ordering = self.request.query_params.get('order_by', 'id')
         if orgs:
             users = users.filter(organizations__in=orgs)
         if groups:
@@ -1329,7 +1330,7 @@ class CoursesUsersList(MobileListAPIView):
         )
         users = users.select_related('profile')
         users = users.prefetch_related('user_attributes')
-        return users
+        return users.order_by(ordering)
 
 
 class CoursesUsersPassedList(SecureListAPIView):
