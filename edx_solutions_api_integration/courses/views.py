@@ -2390,11 +2390,11 @@ class CoursesRolesList(SecureAPIView):
         assistants = CourseAssistantRole(course_key).users_with_role()
         all_users = (instructors | staff | observers | assistants).annotate(role=F("courseaccessrole__role"))
         if user_id:
-            all_users &= User.objects.filter(id=int(user_id))
+            all_users = all_users.filter(id=int(user_id))
         if role:
-            all_users &= User.objects.filter(courseaccessrole__role=role)
+            all_users = all_users.filter(role=role)
         return Response(
-            all_users.values("id", "role"),
+            all_users.distinct().values("id", "role"),
             status=status.HTTP_200_OK
         )
 
