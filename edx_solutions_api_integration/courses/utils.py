@@ -1,5 +1,5 @@
 from completion_aggregator.models import Aggregator
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Avg
 
 
 def _get_filtered_aggregation_queryset(course_key, **kwargs):
@@ -74,7 +74,8 @@ def generate_leaderboard(course_key, **kwargs):
 
 def get_total_completions(course_key, **kwargs):
     queryset = _get_filtered_aggregation_queryset(course_key, **kwargs)
-    return queryset.aggregate(total_earned=Sum('earned')).get('total_earned')
+    aggregate = queryset.aggregate(earned=Sum('earned'), possible=Avg('possible'))
+    return aggregate.get('earned'), aggregate.get('possible')
 
 
 def get_num_users_started(course_key, **kwargs):
