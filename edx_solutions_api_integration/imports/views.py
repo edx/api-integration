@@ -192,7 +192,7 @@ class ImportParticipantsViewSet(SecureViewSet):
             pass
         try:
             cohort = add_cohort(course_key, CourseUserGroup.default_cohort_name, CourseCohort.RANDOM)
-        except IntegrityError:
+        except (IntegrityError, ValueError):
             cohort = get_cohort_by_name(course_key, CourseUserGroup.default_cohort_name)
         try:
             CohortMembership.objects.create(course_user_group=cohort, user=user)
