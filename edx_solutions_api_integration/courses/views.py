@@ -44,6 +44,7 @@ from opaque_keys.edx.keys import UsageKey
 from opaque_keys import InvalidKeyError
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
+from openedx.core.djangoapps.course_groups.cohorts import get_cohort_user_ids
 from openedx.core.djangoapps.course_groups.models import CourseUserGroup
 from openedx.core.lib.courses import course_image_url
 from openedx.core.lib.xblock_utils import get_course_update_items
@@ -347,6 +348,8 @@ def _get_course_progress_metrics(course_key, **kwargs):
         total_users_qs = total_users_qs.filter(organizations__in=kwargs.get('org_ids'))
     if kwargs.get('group_ids'):
         total_users_qs = total_users_qs.filter(groups__in=kwargs.get('group_ids')).distinct()
+    if kwargs.get('cohort_user_ids'):
+        total_users_qs = total_users_qs.filter(id__in=kwargs.get('cohort_user_ids'))
     total_users = total_users_qs.count()
     if total_users and total_actual_completions and total_possible_completions:
         course_avg = total_actual_completions / float(total_users)
@@ -1723,6 +1726,7 @@ class CoursesMetrics(SecureAPIView):
         metrics_required = css_param_to_list(request, 'metrics_required')
         exclude_users = get_aggregate_exclusion_user_ids(course_key)
         user_id = request.query_params.get('user_id', None)
+        cohort_user_ids = get_cohort_user_ids(user_id, course_key)
         cached_enrollments_data = get_cached_data('course_enrollments', course_id)
         if cached_enrollments_data and not len(request.query_params):
             enrollment_count = cached_enrollments_data.get('enrollment_count')
@@ -1734,6 +1738,9 @@ class CoursesMetrics(SecureAPIView):
 
             if group_ids:
                 users_enrolled_qs = users_enrolled_qs.filter(groups__in=group_ids).distinct()
+
+            if cohort_user_ids:
+                users_enrolled_qs = users_enrolled_qs.filter(id__in=cohort_user_ids)
 
             enrollment_count = users_enrolled_qs.count()
             if not len(request.query_params):
@@ -1750,6 +1757,7 @@ class CoursesMetrics(SecureAPIView):
                 exclude_users=exclude_users,
                 org_ids=org_ids,
                 group_ids=group_ids,
+                cohort_user_ids=cohort_user_ids,
             )
             data['users_started'] = users_started
             data['users_not_started'] = data['users_enrolled'] - users_started
@@ -1760,6 +1768,7 @@ class CoursesMetrics(SecureAPIView):
                 exclude_users=exclude_users,
                 org_ids=org_ids,
                 group_ids=group_ids,
+                cohort_user_ids=cohort_user_ids,
             )
             data['modules_completed'] = modules_completed
 
@@ -1769,6 +1778,7 @@ class CoursesMetrics(SecureAPIView):
                 exclude_users=exclude_users,
                 org_ids=org_ids,
                 group_ids=group_ids,
+                cohort_user_ids=cohort_user_ids,
             )
             data['users_completed'] = users_completed
 
@@ -1778,6 +1788,7 @@ class CoursesMetrics(SecureAPIView):
                 exclude_users=exclude_users,
                 org_ids=org_ids,
                 group_ids=group_ids,
+                cohort_user_ids=cohort_user_ids,
             ).count()
             data['users_passed'] = users_passed
 
@@ -1787,6 +1798,7 @@ class CoursesMetrics(SecureAPIView):
                 exclude_users=exclude_users,
                 org_ids=org_ids,
                 group_ids=group_ids,
+                cohort_user_ids=cohort_user_ids,
             )
             data['avg_progress'] = progress_metrics['course_avg']
 
@@ -1796,6 +1808,7 @@ class CoursesMetrics(SecureAPIView):
                 exclude_users=exclude_users,
                 org_ids=org_ids,
                 group_ids=group_ids,
+                cohort_user_ids=cohort_user_ids,
             )
 
         if 'thread_stats' in metrics_required:
@@ -1987,6 +2000,7 @@ class CoursesMetricsGradesLeadersList(SecureListAPIView):
             'skipleaders': str2bool(self.request.query_params.get('skipleaders', 'false')),
             # Users having certain roles (such as an Observer) are excluded from aggregations
             'exclude_users': get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles),
+            'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
         }
 
         if not course_exists(course_id):
@@ -2150,6 +2164,7 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
             'skipleaders': str2bool(self.request.query_params.get('skipleaders', 'false')),
             # Users having certain roles (such as an Observer) are excluded from aggregations
             'exclude_users': get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles),
+            'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
         }
 
         if not course_exists(course_id):
@@ -2188,6 +2203,7 @@ class CoursesMetricsSocialLeadersList(SecureListAPIView):
             'org_ids': get_ids_from_list_param(self.request, 'organizations'),
             'count': self.request.query_params.get('count', 3),
             'exclude_users': get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles),
+            'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
         }
 
         if not course_exists(course_id):
@@ -2228,6 +2244,7 @@ class CourseMetricsLeaders(SecureAPIView):
             'exclude_roles': css_param_to_list(self.request, 'exclude_roles'),
             'exclude_users': get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles),
             'skipleaders': str2bool(self.request.query_params.get('skipleaders', 'false')),
+            'cohort_user_ids': get_cohort_user_ids(user_id, course_key),
         }
 
         if not course_exists(course_id):
@@ -2360,12 +2377,16 @@ class CoursesMetricsCities(SecureListAPIView):
             raise Http404
         course_key = get_course_key(course_id)
         exclude_users = get_aggregate_exclusion_user_ids(course_key)
+        cohort_user_ids = get_cohort_user_ids(user_id, course_key)
         cached_cities_data = get_cached_data('cities_count', course_id)
         if cached_cities_data and not len(self.request.query_params):
             queryset = cached_cities_data
         else:
             queryset = CourseEnrollment.objects.users_enrolled_in(course_key)\
                 .exclude(id__in=exclude_users).exclude(profile__city__isnull=True).exclude(profile__city__iexact='')
+
+            if cohort_user_ids:
+                queryset = queryset.filter(id__in=cohort_user_ids)
 
             if city:
                 q_list = [Q(profile__city__iexact=item.strip()) for item in city]
