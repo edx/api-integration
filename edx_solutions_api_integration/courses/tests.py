@@ -35,6 +35,7 @@ from django.utils import timezone
 from django_comment_common.models import FORUM_ROLE_MODERATOR, Role
 from freezegun import freeze_time
 from instructor.access import allow_access
+from openedx.core.djangoapps.waffle_utils.testutils import override_waffle_flag
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
 from requests.exceptions import ConnectionError
 from rest_framework import status
@@ -51,6 +52,8 @@ from xmodule.modulestore.tests.django_utils import (
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
 from course_metadata.models import CourseAggregatedMetaData
+
+from edx_solutions_api_integration.courses.views import COHORT_FLAG
 from edx_solutions_api_integration.courseware_access import get_course_descriptor, get_course_key
 from edx_solutions_api_integration.test_utils import (
     APIClientMixin, CourseGradingMixin, SignalDisconnectTestMixin,
@@ -172,6 +175,7 @@ class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
         self.client = Client()
         self.client.login(username=self.admin_user.username, password='test_password')
 
+    @override_waffle_flag(COHORT_FLAG, active=True)
     @unittest.skip
     def test_completions_leaders(self, url_name='course-metrics-completions-leaders'):
         # Test progress average is global without cohorts
@@ -204,6 +208,7 @@ class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
                     self.assertEqual(response.status_code, 200)
                     self.assertEqual(response.data['course_avg'], self.progress_avg)
 
+    @override_waffle_flag(COHORT_FLAG, active=True)
     @unittest.skip
     def test_metrics(self, url_name='course-metrics'):
         # Test progress average is global without cohorts
@@ -234,6 +239,7 @@ class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
                     self.assertEqual(response.status_code, 200)
                     self.assertEqual(response.data['avg_progress'], self.progress_avg)
 
+    @override_waffle_flag(COHORT_FLAG, active=True)
     @unittest.skip
     def test_metrics_leaders(self, url_name='course-metrics-leaders'):
         # Test scores are global without cohorts
@@ -268,6 +274,7 @@ class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
                     self.assertEqual(response.data['social']['course_avg'], self.social_avg)
                     self.assertEqual(response.data['completions']['course_avg'], self.progress_avg)
 
+    @override_waffle_flag(COHORT_FLAG, active=True)
     def test_social_leaders(self, url_name='course-metrics-social-leaders'):
         # Test social average is global without cohorts
         api_endpoint = reverse(url_name, kwargs={'course_id': unicode(self.course.id)})

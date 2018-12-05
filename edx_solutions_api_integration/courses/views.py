@@ -46,6 +46,7 @@ from openedx.core.djangoapps.content.course_overviews.models import CourseOvervi
 from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
 from openedx.core.djangoapps.course_groups.cohorts import get_cohort_user_ids
 from openedx.core.djangoapps.course_groups.models import CourseUserGroup
+from openedx.core.djangoapps.waffle_utils import CourseWaffleFlag, WaffleFlagNamespace
 from openedx.core.lib.courses import course_image_url
 from openedx.core.lib.xblock_utils import get_course_update_items
 from student.models import CourseEnrollment, CourseEnrollmentAllowed
@@ -116,6 +117,9 @@ from edx_solutions_projects.serializers import (
     BasicWorkgroupSerializer,
     ProjectSerializer,
 )
+
+WAFFLE_FLAG_NAMESPACE = WaffleFlagNamespace(name='course_groups')
+COHORT_FLAG = CourseWaffleFlag(WAFFLE_FLAG_NAMESPACE, 'course_outline_page', flag_undefined_default=False)
 
 BLOCK_DATA_FIELDS = ['children', 'display_name', 'type', 'due', 'start']
 log = logging.getLogger(__name__)
@@ -1701,8 +1705,10 @@ class CoursesProjectList(SecureListAPIView):
 def _get_users_in_cohort(user_id, course_key, ignore_groupwork):
     """
     Get users in the same cohort, possibly ignoring if Group Work is enabled
+    or Waffle flag disabled
     """
-    if ignore_groupwork and Project.objects.filter(course_id=course_key):
+    if not COHORT_FLAG.is_enabled(course_key) or (ignore_groupwork and
+                                                  Project.objects.filter(course_id=course_key)):
         return None
     return get_cohort_user_ids(user_id, course_key)
 
