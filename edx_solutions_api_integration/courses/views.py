@@ -11,7 +11,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.cache import cache
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
 from django.db.models import Count, F, Max, Min, Prefetch, Q
 from django.http import Http404
 from django.utils.translation import ugettext_lazy as _
@@ -1187,6 +1187,9 @@ class CoursesUsersList(MobileListAPIView):
         * GET supports additional fields to extract organizations,grades,roles,progress of the user
          * To get users with organizations,grades,roles and progress
          ```/api/courses/{course_id}/users?additional_fields=organizations,grades,roles,progress```
+        * GET supports ordering the returned users by a specific field, passed into `order_by`.
+         * To get users ordered by email
+         ```/api/courses/{course_id}/users?order_by=email```
 
 
     **Post Values**
@@ -1299,6 +1302,7 @@ class CoursesUsersList(MobileListAPIView):
         workgroups = get_ids_from_list_param(self.request, 'workgroups')
         exclude_groups = get_ids_from_list_param(self.request, 'exclude_groups')
         additional_fields = self.request.query_params.get('additional_fields', [])
+        order_by_field = self.request.query_params.get('order_by', 'id')
         if orgs:
             users = users.filter(organizations__in=orgs)
         if groups:
@@ -1329,7 +1333,11 @@ class CoursesUsersList(MobileListAPIView):
         )
         users = users.select_related('profile')
         users = users.prefetch_related('user_attributes')
-        return users
+        try:
+            User._meta.get_field(order_by_field)
+            return users.order_by(order_by_field)
+        except FieldDoesNotExist:
+            return users
 
 
 class CoursesUsersPassedList(SecureListAPIView):
