@@ -46,7 +46,7 @@ from openedx.core.djangoapps.content.course_overviews.models import CourseOvervi
 from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
 from openedx.core.djangoapps.course_groups.cohorts import get_cohort_user_ids
 from openedx.core.djangoapps.course_groups.models import CourseUserGroup
-from openedx.core.djangoapps.waffle_utils import CourseWaffleFlag, WaffleFlagNamespace
+from openedx.core.djangoapps.waffle_utils import WaffleSwitchNamespace
 from openedx.core.lib.courses import course_image_url
 from openedx.core.lib.xblock_utils import get_course_update_items
 from student.models import CourseEnrollment, CourseEnrollmentAllowed
@@ -118,11 +118,24 @@ from edx_solutions_projects.serializers import (
     ProjectSerializer,
 )
 
-WAFFLE_FLAG_NAMESPACE = WaffleFlagNamespace(name='course_groups')
-COHORT_FLAG = CourseWaffleFlag(WAFFLE_FLAG_NAMESPACE, 'course_outline_page', flag_undefined_default=False)
+
+WAFFLE_NAMESPACE = 'course_groups'
+WAFFLE_COHORT_SWITCH = 'cohort_available'
+WAFFLE_SWITCHES = WaffleSwitchNamespace(name=WAFFLE_NAMESPACE)
 
 BLOCK_DATA_FIELDS = ['children', 'display_name', 'type', 'due', 'start']
 log = logging.getLogger(__name__)
+
+
+def _is_cohort_available():
+    """
+    Shortcut for checking the status of cohorting Waffle Switch
+
+    Cohort features were disabled because of conflicts with Group Works
+    while calculating average engagement and progress scores.
+    :return: bool
+    """
+    return WAFFLE_SWITCHES.is_enabled(WAFFLE_COHORT_SWITCH)
 
 
 def _inner_content(tag):
@@ -792,6 +805,7 @@ class CoursesDetail(MobileAPIView):
                 image_url = course_image_url(course_descriptor)
             response_data['language'] = course_descriptor.language
             response_data['course_image_url'] = image_url
+            response_data['cohort_flag'] = _is_cohort_available()
             response_data['resources'] = []
             resource_uri = '{}/content/'.format(base_uri_without_qs)
             response_data['resources'].append({'uri': resource_uri})
@@ -1707,8 +1721,7 @@ def _get_users_in_cohort(user_id, course_key, ignore_groupwork):
     Get users in the same cohort, possibly ignoring if Group Work is enabled
     or Waffle flag disabled
     """
-    if not COHORT_FLAG.is_enabled(course_key) or (ignore_groupwork and
-                                                  Project.objects.filter(course_id=course_key)):
+    if not _is_cohort_available() or (ignore_groupwork and Project.objects.filter(course_id=course_key)):
         return None
     return get_cohort_user_ids(user_id, course_key)
 
