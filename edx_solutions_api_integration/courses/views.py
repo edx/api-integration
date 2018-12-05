@@ -119,9 +119,9 @@ from edx_solutions_projects.serializers import (
 )
 
 
-WAFFLE_NAMESPACE = 'course_groups'
-WAFFLE_COHORT_SWITCH = 'cohort_available'
-WAFFLE_SWITCHES = WaffleSwitchNamespace(name=WAFFLE_NAMESPACE)
+COHORT_NAMESPACE = 'course_groups'
+COHORT_SWITCH = 'cohort_available'
+WAFFLE_COHORT_SWITCHES = WaffleSwitchNamespace(name=COHORT_NAMESPACE)
 
 BLOCK_DATA_FIELDS = ['children', 'display_name', 'type', 'due', 'start']
 log = logging.getLogger(__name__)
@@ -135,7 +135,7 @@ def _is_cohort_available():
     while calculating average engagement and progress scores.
     :return: bool
     """
-    return WAFFLE_SWITCHES.is_enabled(WAFFLE_COHORT_SWITCH)
+    return WAFFLE_COHORT_SWITCHES.is_enabled(COHORT_SWITCH)
 
 
 def _inner_content(tag):
