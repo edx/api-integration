@@ -3,6 +3,7 @@ Views for importing data into the LMS that requires a lot of LMS functionality t
 """
 
 import logging
+import time
 
 from django.conf import settings
 from django.contrib.auth.models import Group, User
@@ -193,12 +194,14 @@ class ImportParticipantsViewSet(SecureViewSet):
         try:
             cohort = add_cohort(course_key, CourseUserGroup.default_cohort_name, CourseCohort.RANDOM)
         except (IntegrityError, ValueError):
+            # TODO: Revisit this approach, possibly using an atomic transaction for adding a cohort?
             # Sometimes we can get a situation where although the Cohort exists, read replicas
             # haven't synced up yet and our read for new Cohorts or related models fails when it hits those replicas.
             # So we retry a couple times until it works.
             tried, cohort = 0, None
             while cohort is None:
                 try:
+                    time.sleep(1)
                     cohort = get_cohort_by_name(course_key, CourseUserGroup.default_cohort_name)
                 except Exception:
                     tried += 1
