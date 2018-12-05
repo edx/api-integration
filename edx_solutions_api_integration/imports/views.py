@@ -201,12 +201,12 @@ class ImportParticipantsViewSet(SecureViewSet):
             tried, cohort = 0, None
             while cohort is None:
                 try:
-                    time.sleep(1)
                     cohort = get_cohort_by_name(course_key, CourseUserGroup.default_cohort_name)
                 except Exception:
                     tried += 1
                     if tried == 5:
                         raise
+                    time.sleep(1)
         try:
             CohortMembership.objects.create(course_user_group=cohort, user=user)
         except IntegrityError:
