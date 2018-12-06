@@ -87,8 +87,8 @@ class UserSerializer(DynamicFieldsModelSerializer):
 
     def get_courses_enrolled(self, user):
         """ Serialize user enrolled courses """
-        enrollments = user.courseenrollment_set.filter(is_active=1).values_list('course_id', flat=True)
-        return [unicode(enrollment) for enrollment in enrollments]
+        courses = user.courseenrollment_set.filter(is_active=True).values_list('course_id', flat=True)
+        return [unicode(course_id) for course_id in courses]
 
     def get_user_roles(self, user):
         """ returns list of user roles """
