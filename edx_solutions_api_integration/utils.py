@@ -23,10 +23,15 @@ from openedx.core.djangoapps.user_api.accounts.image_helpers import (
     _get_default_profile_image_urls,
 )
 from openedx.core.djangoapps.user_api.accounts.serializers import PROFILE_IMAGE_KEY_PREFIX
+from openedx.core.djangoapps.waffle_utils import WaffleSwitchNamespace
 from student.roles import CourseRole, CourseObserverRole
 
 USER_METRICS_CACHE_TTL = 60 * 60
 COURSE_METRICS_CACHE_TTL = 30 * 60
+
+COHORT_NAMESPACE = 'course_groups'
+COHORT_SWITCH = 'cohort_available'
+WAFFLE_COHORT_SWITCHES = WaffleSwitchNamespace(name=COHORT_NAMESPACE)
 
 
 def address_exists_in_network(ip_address, net_n_bits):
@@ -433,3 +438,14 @@ def get_profile_image_urls_by_username(username, profile_image_uploaded_at):
 
 class StringCipher(UsernameCipher):
     pass
+
+
+def is_cohort_available():
+    """
+    Shortcut for checking the status of cohorting Waffle Switch
+
+    Cohort features were disabled because of conflicts with Group Works
+    while calculating average engagement and progress scores.
+    :return: bool
+    """
+    return WAFFLE_COHORT_SWITCHES.is_enabled(COHORT_SWITCH)

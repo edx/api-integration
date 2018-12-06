@@ -85,7 +85,7 @@ from edx_solutions_api_integration.utils import (
     cache_course_data,
     cache_course_user_data,
     get_cached_data,
-)
+    is_cohort_available)
 from edx_solutions_projects.serializers import BasicWorkgroupSerializer
 from edx_solutions_api_integration.users.serializers import (
     UserSerializer,
@@ -594,6 +594,7 @@ class UsersDetail(SecureAPIView):
 
         _serialize_user(response_data, existing_user)
         response_data['uri'] = base_uri
+        response_data['cohort_flag'] = is_cohort_available()
         response_data['resources'] = []
         resource_uri = '{}/groups'.format(base_uri)
         response_data['resources'].append({'uri': resource_uri})

@@ -52,13 +52,12 @@ from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
 from course_metadata.models import CourseAggregatedMetaData
 
-from edx_solutions_api_integration.courses.views import COHORT_NAMESPACE, COHORT_SWITCH
 from edx_solutions_api_integration.courseware_access import get_course_descriptor, get_course_key
 from edx_solutions_api_integration.test_utils import (
     APIClientMixin, CourseGradingMixin, SignalDisconnectTestMixin,
     make_non_atomic,
 )
-from edx_solutions_api_integration.utils import strip_whitespaces_and_newlines
+from edx_solutions_api_integration.utils import strip_whitespaces_and_newlines, COHORT_NAMESPACE, COHORT_SWITCH
 from edx_solutions_organizations.models import Organization
 from edx_solutions_projects.models import Project, Workgroup
 from gradebook.models import StudentGradebook
