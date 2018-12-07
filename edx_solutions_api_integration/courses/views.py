@@ -789,7 +789,6 @@ class CoursesDetail(MobileAPIView):
                 image_url = course_image_url(course_descriptor)
             response_data['language'] = course_descriptor.language
             response_data['course_image_url'] = image_url
-            response_data['cohort_flag'] = is_cohort_available()
             response_data['resources'] = []
             resource_uri = '{}/content/'.format(base_uri_without_qs)
             response_data['resources'].append({'uri': resource_uri})

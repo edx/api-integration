@@ -30,7 +30,7 @@ USER_METRICS_CACHE_TTL = 60 * 60
 COURSE_METRICS_CACHE_TTL = 30 * 60
 
 COHORT_NAMESPACE = 'course_groups'
-COHORT_SWITCH = 'cohort_available'
+COHORT_SWITCH = 'enable_apros_integration'
 WAFFLE_COHORT_SWITCHES = WaffleSwitchNamespace(name=COHORT_NAMESPACE)
 
 
