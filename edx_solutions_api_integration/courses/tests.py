@@ -8,6 +8,8 @@ import json
 import unittest
 import uuid
 from datetime import datetime, timedelta
+
+from collections import Iterable
 from random import randint
 from urllib import urlencode
 
@@ -71,24 +73,24 @@ MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 USER_COUNT = 6
 
 
-def _fake_get_course_social_stats(course_id, end_date=None):
+def _fake_get_course_social_stats(_cls, *args, **_kwargs):
     """ Fake get_course_social_stats method """
-    if end_date:
-        raise Exception("Expected None for end_date parameter")
-
-    course_key = get_course_key(course_id)
-    users = CourseEnrollment.objects.users_enrolled_in(course_key)
+    users = CourseEnrollment.objects.users_enrolled_in(args[0])
     return {str(user.id): {user.first_name: user.last_name} for user in users}
 
 
-def _fake_get_course_social_stats_date_expected(course_id, end_date=None):  # pylint: disable=C0103,W0613
+def _fake_get_course_social_stats_date_expected(_cls, *args, **_kwargs):  # pylint: disable=C0103,W0613
     """ Fake get_course_social_stats_date_expected method """
-    if not end_date:
-        raise Exception("Expected non-None end_date parameter")
-    return {
+    data = {
         '2': {'two': 'two-two'},
         '3': {'three': 'three-three-three'}
     }
+    exclude_users = args[-1]
+    if exclude_users and isinstance(exclude_users, Iterable):
+        for user_id in exclude_users:
+            data.pop(str(user_id), None)
+
+    return data
 
 
 def _fake_get_course_thread_stats(course_id):  # pylint: disable=W0613
@@ -106,10 +108,6 @@ def _fake_get_course(request, user, course_id, depth=0, load_content=False):
     if course_key:
         course_descriptor = get_course_descriptor(course_key, depth)
     return course_descriptor, course_key, course_content
-
-
-def _fake_get_service_unavailability(course_id, end_date=None):
-    raise ConnectionError
 
 
 @override_switch(
@@ -2216,16 +2214,10 @@ class CoursesApiTests(
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
 
-    @mock.patch("edx_solutions_api_integration.courses.views.get_course_social_stats", _fake_get_service_unavailability)
-    def test_courses_social_metrics_get_service_unavailability(self):
-        self.staff_login()
-        test_uri = '{}/{}/metrics/social/'.format(self.base_courses_uri, self.test_course_id)
-        response = self.do_get(test_uri)
-        self.assertEqual(response.status_code, 200)
-
-    @mock.patch(
-        "edx_solutions_api_integration.courses.views.get_course_social_stats",
-        _fake_get_course_social_stats_date_expected
+    @mock.patch.object(
+        StudentSocialEngagementScore,
+        'get_course_engagement_stats',
+        classmethod(_fake_get_course_social_stats_date_expected),
     )
     def test_courses_metrics_social_get(self):
         self.staff_login()
@@ -2251,9 +2243,13 @@ class CoursesApiTests(
         self.assertNotIn('2', users)
         self.assertIn('3', users)
 
-    @mock.patch("edx_solutions_api_integration.courses.views.get_course_social_stats", _fake_get_course_social_stats)
+    @mock.patch.object(
+        StudentSocialEngagementScore,
+        'get_course_engagement_stats',
+        classmethod(_fake_get_course_social_stats)
+    )
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
-    def test_courses_metrics_social_get_no_date(self,store):
+    def test_courses_metrics_social_get_no_date(self, store):
         self.staff_login()
         course = CourseFactory.create(
             start=datetime(2014, 6, 16, 14, 30),
