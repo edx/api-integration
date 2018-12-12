@@ -372,7 +372,7 @@ def css_data_to_list(request, param_name):
     values = request.data.get(param_name, [])
     if isinstance(values, basestring):
         upper_bound = getattr(settings, 'API_LOOKUP_UPPER_BOUND', 100)
-        values = [value.strip() for value in filter(None, values.split(',')[:upper_bound])]
+        values = [value.strip() for value in values.split(',')[:upper_bound]]
     return values
 
 
