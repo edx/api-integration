@@ -23,6 +23,8 @@ from openedx.core.djangoapps.course_groups.cohorts import add_cohort, get_cohort
 from openedx.core.djangoapps.course_groups.models import CohortMembership, CourseCohort, CourseUserGroup
 from student.models import CourseEnrollment, PasswordHistory, UserProfile
 
+from opaque_keys.edx.keys import CourseKey
+
 from edx_solutions_api_integration.permissions import SecureViewSet
 
 AUDIT_LOG = logging.getLogger("audit")
@@ -113,6 +115,16 @@ class ImportParticipantsViewSet(SecureViewSet):
                     errors,
                     _('User with email "{}" does not exist').format(email),
                     _('Retrieving existing Participant'),
+                    email
+                )
+
+            # Check if course is already enrolled.
+            if validated_data.get('user_object', None) and CourseEnrollment.is_enrolled(validated_data.get('user_object'),
+                                                                              CourseKey.from_string(course_id)):
+                self._add_error(
+                    errors,
+                    _('User with email "{}" is already enrolled').format(email),
+                    _("Enrolling Participant in Course"),
                     email
                 )
 
