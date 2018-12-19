@@ -23,6 +23,8 @@ from openedx.core.djangoapps.course_groups.cohorts import add_cohort, get_cohort
 from openedx.core.djangoapps.course_groups.models import CohortMembership, CourseCohort, CourseUserGroup
 from student.models import CourseEnrollment, PasswordHistory, UserProfile
 
+from opaque_keys.edx.keys import CourseKey
+
 from edx_solutions_api_integration.permissions import SecureViewSet
 
 AUDIT_LOG = logging.getLogger("audit")
@@ -116,6 +118,16 @@ class ImportParticipantsViewSet(SecureViewSet):
                     email
                 )
 
+            # Check if course is already enrolled.
+            if validated_data.get('user_object', None) and CourseEnrollment.is_enrolled(validated_data.get('user_object'),
+                                                                              CourseKey.from_string(course_id)):
+                self._add_error(
+                    errors,
+                    _('User with email "{}" is already enrolled').format(email),
+                    _("Enrolling Participant in Course"),
+                    email
+                )
+
         # Check that the course exists.
         validated_data['course'], validated_data['course_key'], __ = get_course(request, user, course_id)
         if not validated_data['course']:
@@ -191,22 +203,9 @@ class ImportParticipantsViewSet(SecureViewSet):
             # If the enrollment already exists, it's possible we weren't able to add to the cohort yet,
             # so ignore the error and continue.
             pass
-        try:
-            cohort = add_cohort(course_key, CourseUserGroup.default_cohort_name, CourseCohort.RANDOM)
-        except (IntegrityError, ValueError):
-            # TODO: Revisit this approach, possibly using an atomic transaction for adding a cohort?
-            # Sometimes we can get a situation where although the Cohort exists, read replicas
-            # haven't synced up yet and our read for new Cohorts or related models fails when it hits those replicas.
-            # So we retry a couple times until it works.
-            tried, cohort = 0, None
-            while cohort is None:
-                try:
-                    cohort = get_cohort_by_name(course_key, CourseUserGroup.default_cohort_name)
-                except Exception:
-                    tried += 1
-                    if tried == 5:
-                        raise
-                    time.sleep(1)
+
+        cohort = get_cohort_by_name(course_key, CourseUserGroup.default_cohort_name)
+
         try:
             CohortMembership.objects.create(course_user_group=cohort, user=user)
         except IntegrityError:
