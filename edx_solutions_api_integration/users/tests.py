@@ -60,6 +60,7 @@ from xmodule.modulestore.tests.django_utils import (
     TEST_DATA_SPLIT_MODULESTORE
 )
 from django.contrib.auth.models import User
+from edx_solutions_api_integration.courseware_access import get_course_key
 from edx_solutions_api_integration.test_utils import (
     get_non_atomic_database_settings,
     CourseGradingMixin,
@@ -415,6 +416,15 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['results'][0]['full_name'], 'John Doe')
         self.assertEqual(response.data['results'][1]['full_name'], 'Micheal Mcdonald')
         self.assertEqual(response.data['results'][2]['full_name'], 'Steve Jobs')
+        enrollment = CourseEnrollment.objects.get(user=users[0],
+                                                  course_id=get_course_key(response.data['results'][0]['courses_enrolled'][0]))
+        self.assertTrue(enrollment.is_active)
+        enrollment = CourseEnrollment.objects.get(user=users[1],
+                                                  course_id=get_course_key(response.data['results'][1]['courses_enrolled'][0]))
+        self.assertTrue(enrollment.is_active)
+        enrollment = CourseEnrollment.objects.get(user=users[2],
+                                                  course_id=get_course_key(response.data['results'][2]['courses_enrolled'][0]))
+        self.assertTrue(enrollment.is_active)
 
         # fetch user data by partial course ids and name match
         response = self.do_get('{}?courses={}&match=partial&name={}'.format(test_uri, 'edx,mit', 'job'))
@@ -468,6 +478,9 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(len(response.data['results'][0]['organizations']), 1)
         self.assertEqual(response.data['results'][0]['organizations'][0]['display_name'], 'ABC Organization')
         self.assertEqual(response.data['results'][0]['courses_enrolled'][0], unicode(course1.id))
+        enrollment = CourseEnrollment.objects.get(user=users[1],
+                                                  course_id=get_course_key(response.data['results'][0]['courses_enrolled'][0]))
+        self.assertTrue(enrollment.is_active)
 
         # fetch user data by partial name and email match
         response = self.do_get('{}?name={}&email={}&match=partial'.format(test_uri, 'Mcd', 'example.com'))
