@@ -339,11 +339,16 @@ class UsersList(SecureListAPIView):
                     queryset = queryset.filter(organizations__display_name__icontains=organization_display_name)
 
             if courses:
-                courses_filter_list = [
-                    Q(courseenrollment__course_id__icontains=course) & Q(courseenrollment__is_active=True) for
-                    course in courses]
-                courses_filter_list = reduce(lambda a, b: a | b, courses_filter_list)
-                queryset = queryset.filter(courses_filter_list)
+                if search_query_string is not None:
+                    # filter courses by exact course_id
+                    courses = map(CourseKey.from_string, courses)
+                    queryset = queryset.filter(courseenrollment__course_id__in=courses, courseenrollment__is_active=True).distinct()
+                else:
+                    courses_filter_list = [
+                        Q(courseenrollment__course_id__icontains=course) & Q(courseenrollment__is_active=True) for
+                        course in courses]
+                    courses_filter_list = reduce(lambda a, b: a | b, courses_filter_list)
+                    queryset = queryset.filter(courses_filter_list)
         else:
             if name:
                 queryset = queryset.filter(Q(profile__name=name) | Q(first_name=name) | Q(last_name=name))

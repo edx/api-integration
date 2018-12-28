@@ -465,10 +465,11 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['results'][0]['email'], 'mic.mcdonald@example.com')
         self.assertEqual(response.data['results'][0]['organizations'][0]['display_name'], 'ABC Organization')
 
-        # fetch user data by partial name, email or organization display_name and course id match
+        # fetch user data by partial name, email or organization display_name and exact course id match
+        course1_id = {'courses': '{}'.format(unicode(course1.id))}
         response = self.do_get(
-            '{}?search_query_string={}&courses={}&match=partial'.format(
-                test_uri, 'mic.mcdonald@example.com', 'edX'
+            '{}?search_query_string={}&{}&match=partial'.format(
+                test_uri, 'mic.mcdonald@example.com', urlencode(course1_id)
             )
         )
         self.assertEqual(response.status_code, 200)
