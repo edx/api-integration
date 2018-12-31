@@ -2407,6 +2407,74 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['last_name'], test_last_name)
         self.assertEqual(response.data['full_name'], u'{} {}'.format(test_first_name, test_last_name))
 
+    @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
+    def test_user_delete(self, store):
+        test_uri = self.users_base_uri
+
+        organizations = []
+        organizations.append(Organization.objects.create(display_name='ABC Organization'))
+        organizations.append(Organization.objects.create(display_name='XYZ Organization'))
+
+        course1 = CourseFactory.create(org='edX', number='CS101', run='2016_Q1', default_store=store)
+        course2 = CourseFactory.create(org='mit', number='CS101', run='2016_Q2', default_store=store)
+
+        user_ids = []
+        # create 30 new users
+        for i in xrange(1, 31):
+            data = {
+                'email': 'test{}@example.com'.format(i),
+                'username': 'test_user{}'.format(i),
+                'password': self.test_password,
+                'first_name': 'John{}'.format(i),
+                'last_name': 'Doe{}'.format(i),
+                'city': 'Boston',
+                'title': "The King",
+            }
+
+            response = self.do_post(test_uri, data)
+            self.assertEqual(response.status_code, 201)
+            user_ids.append(response.data['id'])
+
+        # add first half to ABC Organization
+        for user in User.objects.filter(id__in=user_ids[:15]):
+            user.organizations.add(organizations[0])
+            CourseEnrollmentFactory.create(user=user, course_id=course1.id)
+        # add second half to XYZ Organization
+        for user in User.objects.filter(id__in=user_ids[15:]):
+            user.organizations.add(organizations[0])
+            CourseEnrollmentFactory.create(user=user, course_id=course2.id)
+
+        # delete 1 user by id
+        response = self.do_delete('{}?ids={}'.format(test_uri, user_ids[0]))
+        self.assertEqual(response.status_code, 204)
+        self.assertIsNone(User.objects.filter(id=user_ids[0]).first())
+
+        # delete multiple users by id
+        response = self.do_delete('{}?ids={}'.format(test_uri, ','.join([str(i) for i in user_ids[1:10]])))
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(User.objects.filter(id__in=user_ids[1:10]).count(), 0)
+
+        # delete 1 user by username
+        response = self.do_delete('{}?username={}'.format(test_uri, 'test_user12'))
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(User.objects.filter(username='test_user12').count(), 0)
+
+        # require either username or ids
+        response = self.do_delete('{}?name=John&match=partial'.format(test_uri))
+        self.assertEqual(response.status_code, 400)
+
+        # other parameters are ignored
+        response = self.do_delete('{}?ids={}&page=10&page_size=2&name=John&match=partial'.format(
+            test_uri, ','.join([str(i) for i in user_ids[10:15]])
+        ))
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(User.objects.filter(id__in=user_ids[10:15]).count(), 0)
+
+        # assert that only the last 15 users exist
+        self.assertEqual(User.objects.filter(id__in=user_ids[:15]).count(), 0)
+        self.assertEqual(User.objects.filter(id__in=user_ids[15:]).count(), 15)
+
+
 
 @ddt.ddt
 class TokenBasedUsersApiTests(CacheIsolationTestCase, APIClientMixin, OAuth2TokenMixin):

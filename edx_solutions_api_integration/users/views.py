@@ -288,6 +288,13 @@ class UsersList(SecureListAPIView):
                 "year_of_birth" : "1996",
                 "gender" : "F"
             }
+
+    - DELETE: Deletes users by their ids or username
+        Possible use cases
+        DELETE /api/users?ids=23
+        DELETE /api/users?ids=23,24,25
+        DELETE /api/users?username=edx
+
     ### Use Cases/Notes:
     * Password formatting policies can be enabled through the "ENFORCE_PASSWORD_POLICY" feature flag
     * The first_name and last_name fields are additionally concatenated and stored in the 'name' field of UserProfile
@@ -375,6 +382,19 @@ class UsersList(SecureListAPIView):
         if course_id:
             self.course_key = get_course_key(course_id)
         return self.list(request, *args, **kwargs)
+
+    def delete(self, request):
+        """
+        DELETE /api/users?ids=11,12,13
+        DELETE /api/users?username=user
+        """
+        # require at least either ids or username filters
+        if set(self.request.query_params.keys()) & set(['username', 'ids']):
+            qs = self.filter_queryset(self.queryset)
+            qs.delete()
+            return Response({}, status.HTTP_204_NO_CONTENT)
+        else:
+            return Response({'message': _('username or ids are missing')}, status.HTTP_400_BAD_REQUEST)
 
     def post(self, request):  # pylint: disable=R0915
         """
