@@ -41,7 +41,7 @@ from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from edx_notifications.lib.consumer import mark_notification_read
 from course_metadata.models import CourseAggregatedMetaData, CourseSetting
 from completion_aggregator.models import Aggregator
-from student.models import CourseEnrollment, CourseEnrollmentException, PasswordHistory, UserProfile
+from student.models import CourseEnrollment, CourseEnrollmentException, PasswordHistory, UserProfile, LoginFailures
 from student.roles import (
     CourseAccessRole,
     CourseInstructorRole,
@@ -747,6 +747,10 @@ class UsersDetail(SecureAPIView):
             existing_user.set_password(password)
             existing_user.save()
             update_user_password_hash = existing_user.password
+
+            # clear failed login attempts counters, if applicable
+            if LoginFailures.is_feature_enabled():
+                LoginFailures.clear_lockout_counter(existing_user)
 
             if update_user_password_hash != old_password_hash:
                 # add this account creation to password history

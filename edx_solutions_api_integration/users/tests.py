@@ -15,6 +15,7 @@ import six
 import json
 
 from datetime import datetime
+from mock import patch
 
 from completion.models import BlockCompletion
 from completion.waffle import WAFFLE_NAMESPACE, ENABLE_COMPLETION_TRACKING
@@ -823,6 +824,37 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['full_name'], '{} {}'.format(self.test_first_name, self.test_last_name))
         self.assertEqual(response.data['is_active'], False)
         self.assertIsNotNone(response.data['created'])
+
+    @patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': True,
+                                                  'ENABLE_MAX_FAILED_LOGIN_ATTEMPTS': True,
+                                                  'PREVENT_CONCURRENT_LOGINS': False})
+    @override_settings(MAX_FAILED_LOGIN_ATTEMPTS_ALLOWED=3)
+    def test_user_detail_post_locked_out(self):
+        test_uri = self.users_base_uri
+        local_username = self.test_username + str(randint(11, 99))
+        data = {'email': self.test_email,
+                'username': local_username, 'password': self.test_password,
+                'first_name': self.test_first_name, 'last_name': self.test_last_name}
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 201)
+        test_uri = test_uri + '/' + str(response.data['id'])
+        auth_data = {'username': local_username, 'password': 'x'}
+        for i in xrange(3):
+            response = self.do_post(self.sessions_base_uri, auth_data)
+            self.assertEqual(response.status_code, 401)
+
+        # check to see if this response indicates blockout
+        response = self.do_post(self.sessions_base_uri, auth_data)
+        self.assertEqual(response.status_code, 403)
+
+        # reset user password to reset lockout counter to zero
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 200)
+
+        # check to see if counter is reset and user can login
+        auth_data['password'] = self.test_password
+        self.do_post(self.sessions_base_uri, auth_data)
+        self.assertEqual(response.status_code, 200)
 
     def test_user_detail_invalid_email(self):
         test_uri = '{}/{}'.format(self.users_base_uri, self.user.id)
