@@ -995,7 +995,8 @@ class UsersCoursesList(SecureAPIView):
             }
             return Response(response_data, status=status.HTTP_409_CONFLICT)
 
-        log.debug('User "{}" has been automatically added in cohort "{}" for course "{}"'.format(  # pylint: disable=W1202
+        log.debug(u'User "{}" has been automatically added in cohort "{}" for course "{}"'.format(
+            # pylint: disable=W1202
             user.username, default_cohort.name, course_descriptor.display_name)
         )  # pylint: disable=C0330
         response_data['uri'] = '{}/{}'.format(base_uri, course_key)
