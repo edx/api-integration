@@ -1177,7 +1177,9 @@ class CoursesUsersList(MobileListAPIView):
         * GET supports dynamic fields which means we can pass list of fields we want.
         for example if we want to get only user's first_name and last_name
         ```/api/courses/{course_id}/users?fields=first_name,last_name```
-        * GET supports filtering of user by organization(s), groups
+        * GET supports direct filtering of users by user_id
+        ```/api/courses/{course_id}/users?users={user_id1},{user_id2}
+        * GET supports filtering of users by organizations, groups
          * To get users enrolled in a course and are also member of organization
          ```/api/courses/{course_id}/users?organizations={organization_id}```
          * organizations filter can be a single id or multiple ids separated by comma
@@ -1297,50 +1299,53 @@ class CoursesUsersList(MobileListAPIView):
         """
         :return: queryset for course users list.
         """
-        users = CourseEnrollment.objects.users_enrolled_in(self.course_key)
+        user_qs = CourseEnrollment.objects.users_enrolled_in(self.course_key)
         attribute_keys = css_param_to_list(self.request, 'attribute_keys')
         attribute_values = css_param_to_list(self.request, 'attribute_values')
         orgs = get_ids_from_list_param(self.request, 'organizations')
         groups = get_ids_from_list_param(self.request, 'groups')
+        users = get_ids_from_list_param(self.request, 'users')
         workgroups = get_ids_from_list_param(self.request, 'workgroups')
         exclude_groups = get_ids_from_list_param(self.request, 'exclude_groups')
         additional_fields = self.request.query_params.get('additional_fields', [])
         order_by_field = self.request.query_params.get('order_by', 'id')
         if orgs:
-            users = users.filter(organizations__in=orgs)
+            user_qs = user_qs.filter(organizations__in=orgs)
         if groups:
-            users = users.filter(groups__in=groups).distinct()
+            user_qs = user_qs.filter(groups__in=groups).distinct()
+        if users:
+            user_qs = user_qs.filter(id__in=users).distinct()
         if workgroups:
-            users = users.filter(workgroups__in=workgroups).distinct()
+            user_qs = user_qs.filter(workgroups__in=workgroups).distinct()
         if exclude_groups:
-            users = users.exclude(groups__in=exclude_groups)
+            user_qs = user_qs.exclude(groups__in=exclude_groups)
         if 'organizations' in additional_fields:
-            users = users.prefetch_related('organizations')
+            user_qs = user_qs.prefetch_related('organizations')
         if 'roles' in additional_fields:
-            users = users.prefetch_related('courseaccessrole_set')
+            user_qs = user_qs.prefetch_related('courseaccessrole_set')
         if 'grades' in additional_fields:
-            users = users.prefetch_related('studentgradebook_set')
+            user_qs = user_qs.prefetch_related('studentgradebook_set')
         if 'courses_enrolled' in additional_fields:
-            users = users.prefetch_related('courseenrollment_set')
+            user_qs = user_qs.prefetch_related('courseenrollment_set')
         if 'course_groups' in additional_fields:
-            users = users.prefetch_related(
+            user_qs = user_qs.prefetch_related(
                 Prefetch('course_groups', queryset=CourseUserGroup.objects.filter(course_id=self.course_key))
             )
 
-        self.user_organizations = Organization.objects.filter(users__in=users).distinct()
+        self.user_organizations = Organization.objects.filter(users__in=user_qs).distinct()
         if orgs:
             self.user_organizations.filter(id__in=orgs).distinct()
 
-        users = Organization.get_all_users_by_organization_attribute_filter(
-            users, self.user_organizations, attribute_keys, attribute_values
+        user_qs = Organization.get_all_users_by_organization_attribute_filter(
+            user_qs, self.user_organizations, attribute_keys, attribute_values
         )
-        users = users.select_related('profile')
-        users = users.prefetch_related('user_attributes')
+        user_qs = user_qs.select_related('profile')
+        user_qs = user_qs.prefetch_related('user_attributes')
         try:
             User._meta.get_field(order_by_field)
-            return users.order_by(order_by_field)
+            return user_qs.order_by(order_by_field)
         except FieldDoesNotExist:
-            return users
+            return user_qs
 
 
 class CoursesUsersPassedList(SecureListAPIView):
