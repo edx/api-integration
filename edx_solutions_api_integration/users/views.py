@@ -385,16 +385,25 @@ class UsersList(SecureListAPIView):
 
     def delete(self, request):
         """
-        DELETE /api/users?ids=11,12,13
-        DELETE /api/users?username=user
+        DELETE /api/users
+
+        The body of the request must include on of the following parameters:
+
+            "ids": [1, 2, 3]
+            "username: "username"
+
         """
-        # require at least either ids or username filters
-        if set(self.request.query_params.keys()) & set(['username', 'ids']):
-            qs = self.filter_queryset(self.queryset)
-            qs.delete()
-            return Response({}, status.HTTP_204_NO_CONTENT)
+        data = request.data
+        qs = self.queryset
+        if 'ids' in data.keys():
+            qs = qs.filter(id__in=data['ids'])
+        elif 'username' in data.keys():
+            qs = qs.filter(username=data['username'])
         else:
             return Response({'message': _('username or ids are missing')}, status.HTTP_400_BAD_REQUEST)
+
+        qs.delete()
+        return Response({}, status.HTTP_204_NO_CONTENT)
 
     def post(self, request):  # pylint: disable=R0915
         """
