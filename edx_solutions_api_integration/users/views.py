@@ -57,7 +57,10 @@ from util.password_policy_validators import (
 )
 from xmodule.modulestore import InvalidLocationError
 
-from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
+from edx_solutions_api_integration.courseware_access import (
+    get_course, get_course_child, get_course_key,
+    course_exists, get_course_descriptor
+)
 from edx_solutions_organizations.models import Organization, OrganizationUsersAttributes
 from edx_solutions_api_integration.permissions import (
     TokenBasedAPIView,
@@ -1014,20 +1017,23 @@ class UsersCoursesList(SecureAPIView):
             user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
-        enrollments = CourseEnrollment.enrollments_for_user(user=user)
+        enrollments = CourseEnrollment.enrollments_for_user(user=user).order_by('-created')
         response_data = []
         for enrollment in enrollments:
             if enrollment.course_overview:
+                course_id = enrollment.course_overview.id
+                course_descriptor = get_course_descriptor(course_id, 0)
                 course_data = {
                     "id": unicode(enrollment.course_overview.id),
                     "uri": '{}/{}'.format(base_uri, unicode(enrollment.course_overview.id)),
                     "is_active": enrollment.is_active,
                     "name": enrollment.course_overview.display_name,
                     "start": enrollment.course_overview.start,
-                    "end": enrollment.course_overview.end
+                    "end": enrollment.course_overview.end,
+                    "course_image_url": enrollment.course_overview.course_image_url,
+                    "total_chapters": len(course_descriptor.children)
                 }
                 response_data.append(course_data)
-
         return Response(response_data, status=status.HTTP_200_OK)
 
 
