@@ -30,6 +30,7 @@ from opaque_keys.edx.keys import UsageKey, CourseKey
 from opaque_keys.edx.locations import Location, SlashSeparatedCourseKey
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.course_groups.models import CourseUserGroup, CourseCohort
+from openedx.core.djangoapps.content.course_structures.models import CourseStructure
 from openedx.core.djangoapps.course_groups.cohorts import (
     get_cohort_by_name,
     add_cohort,
@@ -945,6 +946,17 @@ class UsersGroupsDetail(SecureAPIView):
         return Response({}, status=status.HTTP_204_NO_CONTENT)
 
 
+def _update_blocks(_block, _blocks):
+    children = []
+    for block_id in _block['children']:
+        _blocks[block_id]['id'] = block_id
+        children.append(_blocks[block_id])
+
+    _block['children'] = children
+    for b in _block['children']:
+        _update_blocks(b, _blocks)
+
+
 class UsersCoursesList(SecureAPIView):
     """
     ### The UsersCoursesList view allows clients to interact with the set of Course entities related to the
@@ -1022,7 +1034,15 @@ class UsersCoursesList(SecureAPIView):
         for enrollment in enrollments:
             if enrollment.course_overview:
                 course_id = enrollment.course_overview.id
-                course_descriptor = get_course_descriptor(course_id, 0)
+                course_structure = CourseStructure.objects.get(course_id=course_id)
+                blocks = course_structure.structure['blocks'].copy()
+                for b in blocks.values():
+                    b['name'] = b.pop('display_name')
+                    b['category'] = b.pop('block_type')
+
+                course = [block for block_id, block in blocks.items() if block['category'] == 'course'][0]
+                _update_blocks(course, blocks)
+
                 course_data = {
                     "id": unicode(enrollment.course_overview.id),
                     "uri": '{}/{}'.format(base_uri, unicode(enrollment.course_overview.id)),
@@ -1031,7 +1051,7 @@ class UsersCoursesList(SecureAPIView):
                     "start": enrollment.course_overview.start,
                     "end": enrollment.course_overview.end,
                     "course_image_url": enrollment.course_overview.course_image_url,
-                    "total_chapters": len(course_descriptor.children)
+                    "content": course['children']
                 }
                 response_data.append(course_data)
         return Response(response_data, status=status.HTTP_200_OK)
