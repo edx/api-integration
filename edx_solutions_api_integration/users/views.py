@@ -58,10 +58,7 @@ from util.password_policy_validators import (
 )
 from xmodule.modulestore import InvalidLocationError
 
-from edx_solutions_api_integration.courseware_access import (
-    get_course, get_course_child, get_course_key,
-    course_exists, get_course_descriptor
-)
+from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
 from edx_solutions_organizations.models import Organization, OrganizationUsersAttributes
 from edx_solutions_api_integration.permissions import (
     TokenBasedAPIView,
