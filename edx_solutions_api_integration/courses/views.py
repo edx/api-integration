@@ -1351,6 +1351,32 @@ class CoursesUsersList(MobileListAPIView):
 
 
 class CoursesEngagementSummary(MobileListAPIView):
+    """
+    ### The CoursesEngagementSummary view allows clients to fetch course engagement summary
+
+    **Example Request**
+
+        * GET /api/courses/{course_id}/engagement-summary
+        * GET supports filtering of course engagement summary by organizations, groups
+        * To get course engagement summary for an organization
+        ```/api/courses/{course_id}/engagement-summary?organizations={organization_id}```
+
+    **GET Response Values**
+
+        * {
+            "engaged_users": 8,
+            "total_users": 21,
+            "active_users": 12,
+            "last_week_login_users": 1,
+            "total_course_progress": 0.5024027959807782,
+            "active_users_progress": 0.8792048929663618,
+            "active_users_percentage": 57.14285714285714,
+            "engaged_users_progress": 1.3188073394495428,
+            "engaged_users_percentage": 38.095238095238095,
+            "last_week_login_users_progress": 0.9174311926605511,
+            "last_week_login_users_percentage": 4.761904761904762,
+        }
+    """
     def get(self, request, course_id):  # pylint: disable=W0221
         """
         GET /api/courses/{course_id}/engagement-summary
@@ -1365,7 +1391,6 @@ class CoursesEngagementSummary(MobileListAPIView):
         user_id = self.request.query_params.get('user_id', None)
         params = {
             'user_id': user_id,
-            'count': self.request.query_params.get('count', None),
             'org_ids': get_ids_from_list_param(self.request, 'organizations'),
             'group_ids': get_ids_from_list_param(self.request, 'groups'),
             'exclude_users': get_aggregate_exclusion_user_ids(self.course_key),
@@ -1384,35 +1409,35 @@ class CoursesEngagementSummary(MobileListAPIView):
         users_logged_in_last_week = user_qs.filter(last_login__range=(last_week, timezone.now()))
         users_logged_in_last_week_count = users_logged_in_last_week.count()
 
-        aggregate_qs = get_filtered_aggregation_queryset(self.course_key, **params)
-        engaged_progress_sum = (aggregate_qs.aggregate(percent=Sum('percent')).get('percent') or 0) * 100
-        last_week_aggregates = aggregate_qs.filter(user_id__in=users_logged_in_last_week)
-        users_logged_in_last_week_progress = (last_week_aggregates.aggregate(
+        progress_qs = get_filtered_aggregation_queryset(self.course_key, **params)
+        progress_sum = (progress_qs.aggregate(percent=Sum('percent')).get('percent') or 0) * 100
+        last_week_progress = progress_qs.filter(user_id__in=users_logged_in_last_week)
+        last_week_progress_sum = (last_week_progress.aggregate(
             percent=Sum('percent')
         ).get('percent') or 0) * 100
-        users_with_progress = aggregate_qs.count()
+        users_with_progress = progress_qs.count()
 
-        def sefe_division(dividend, divisor):
+        def safe_division(dividend, divisor):
             return 0 if divisor == 0 else dividend / divisor
 
         data = {}
         data['total_users'] = total_users
-        data['total_course_progress'] = sefe_division(float(engaged_progress_sum), total_users)
+        data['total_course_progress'] = safe_division(float(progress_sum), total_users)
 
         data['active_users'] = active_users
-        data['active_users_percentage'] = sefe_division(float(active_users), total_users) * 100
-        data['active_users_progress'] = sefe_division(float(engaged_progress_sum), active_users)
+        data['active_users_percentage'] = safe_division(float(active_users), total_users) * 100
+        data['active_users_progress'] = safe_division(float(progress_sum), active_users)
 
         data['engaged_users'] = users_with_progress
-        data['engaged_users_percentage'] = sefe_division(float(users_with_progress), total_users) * 100
-        data['engaged_users_progress'] = sefe_division(float(engaged_progress_sum), users_with_progress)
+        data['engaged_users_percentage'] = safe_division(float(users_with_progress), total_users) * 100
+        data['engaged_users_progress'] = safe_division(float(progress_sum), users_with_progress)
 
         data['last_week_login_users'] = users_logged_in_last_week_count
-        data['last_week_login_users_percentage'] = sefe_division(
+        data['last_week_login_users_percentage'] = safe_division(
             float(users_logged_in_last_week_count), total_users
         ) * 100
-        data['last_week_login_users_progress'] = sefe_division(
-            float(users_logged_in_last_week_progress), users_logged_in_last_week_count
+        data['last_week_login_users_progress'] = safe_division(
+            float(last_week_progress_sum), users_logged_in_last_week_count
         )
 
         return Response(data, status=status.HTTP_200_OK)
