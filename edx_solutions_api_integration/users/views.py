@@ -4,44 +4,64 @@ import json
 import logging
 from datetime import datetime
 
+from completion_aggregator.models import Aggregator
+from course_metadata.models import CourseAggregatedMetaData
+from courseware import module_render
+from courseware.model_data import FieldDataCache
+from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import validate_email, validate_slug, ValidationError
 from django.db import IntegrityError
 from django.db.models import Count, Q
-from django.conf import settings
 from django.http import Http404
 from django.utils.translation import get_language, ugettext_lazy as _
-from rest_framework import filters
-from rest_framework.response import Response
-from rest_framework import status
-
-from courseware import module_render
-from courseware.model_data import FieldDataCache
 from django_comment_common.models import Role, FORUM_ROLE_MODERATOR
+from edx_notifications.lib.consumer import mark_notification_read
+from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
+from edx_solutions_api_integration.models import GroupProfile, APIUser as User
+from edx_solutions_api_integration.permissions import (
+    TokenBasedAPIView,
+    SecureAPIView,
+    SecureListAPIView,
+    IdsInFilterBackend,
+    HasOrgsFilterBackend,
+    MobileAPIView,
+)
+from edx_solutions_api_integration.users.serializers import (
+    UserSerializer,
+    UserCountByCitySerializer,
+    UserRolesSerializer,
+    CourseProgressSerializer,
+)
+from edx_solutions_api_integration.utils import (
+    generate_base_uri,
+    dict_has_items,
+    extract_data_params,
+    get_user_from_request_params,
+    get_profile_image_urls_by_username,
+    str2bool,
+    css_param_to_list,
+    css_data_to_list,
+    get_aggregate_exclusion_user_ids,
+    cache_course_data,
+    cache_course_user_data,
+    get_cached_data,
+)
+from edx_solutions_organizations.models import Organization, OrganizationUsersAttributes
+from edx_solutions_organizations.serializers import BasicOrganizationSerializer
+from edx_solutions_projects.serializers import BasicWorkgroupSerializer
 from gradebook.models import StudentGradebook
 from gradebook.utils import generate_user_gradebook
-from social_engagement.models import StudentSocialEngagementScore
 from instructor.access import revoke_access, update_forum_role
-from openedx.core.djangoapps.lang_pref import LANGUAGE_KEY
 from notification_prefs.views import enable_notifications
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import UsageKey, CourseKey
 from opaque_keys.edx.locations import Location, SlashSeparatedCourseKey
-from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from openedx.core.djangoapps.course_groups.models import CourseUserGroup, CourseCohort
-from openedx.core.djangoapps.content.course_structures.models import CourseStructure
-from openedx.core.djangoapps.course_groups.cohorts import (
-    get_cohort_by_name,
-    add_cohort,
-    add_user_to_cohort,
-    remove_user_from_cohort,
-)
-from openedx.core.djangoapps.user_api.models import UserPreference
-from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
-from edx_notifications.lib.consumer import mark_notification_read
-from course_metadata.models import CourseAggregatedMetaData, CourseSetting
-from completion_aggregator.models import Aggregator
+from rest_framework import filters
+from rest_framework import status
+from rest_framework.response import Response
+from social_engagement.models import StudentSocialEngagementScore
 from student.models import CourseEnrollment, CourseEnrollmentException, PasswordHistory, UserProfile, LoginFailures
 from student.roles import (
     CourseAccessRole,
@@ -58,39 +78,17 @@ from util.password_policy_validators import (
 )
 from xmodule.modulestore import InvalidLocationError
 
-from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
-from edx_solutions_organizations.models import Organization, OrganizationUsersAttributes
-from edx_solutions_api_integration.permissions import (
-    TokenBasedAPIView,
-    SecureAPIView,
-    SecureListAPIView,
-    IdsInFilterBackend,
-    HasOrgsFilterBackend,
-    MobileAPIView,
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from openedx.core.djangoapps.course_groups.cohorts import (
+    get_cohort_by_name,
+    add_cohort,
+    add_user_to_cohort,
+    remove_user_from_cohort,
 )
-from edx_solutions_api_integration.models import GroupProfile, APIUser as User
-from edx_solutions_organizations.serializers import BasicOrganizationSerializer
-from edx_solutions_api_integration.utils import (
-    generate_base_uri,
-    dict_has_items,
-    extract_data_params,
-    get_user_from_request_params,
-    get_profile_image_urls_by_username,
-    str2bool,
-    css_param_to_list,
-    css_data_to_list,
-    get_aggregate_exclusion_user_ids,
-    cache_course_data,
-    cache_course_user_data,
-    get_cached_data,
-)
-from edx_solutions_projects.serializers import BasicWorkgroupSerializer
-from edx_solutions_api_integration.users.serializers import (
-    UserSerializer,
-    UserCountByCitySerializer,
-    UserRolesSerializer,
-    CourseProgressSerializer,
-)
+from openedx.core.djangoapps.course_groups.models import CourseUserGroup, CourseCohort
+from openedx.core.djangoapps.lang_pref import LANGUAGE_KEY
+from openedx.core.djangoapps.user_api.models import UserPreference
+from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 
 log = logging.getLogger(__name__)
 AUDIT_LOG = logging.getLogger("audit")
@@ -942,18 +940,6 @@ class UsersGroupsDetail(SecureAPIView):
         existing_user.save()
         return Response({}, status=status.HTTP_204_NO_CONTENT)
 
-
-def _update_blocks(_block, _blocks):
-    children = []
-    for block_id in _block['children']:
-        _blocks[block_id]['id'] = block_id
-        children.append(_blocks[block_id])
-
-    _block['children'] = children
-    for b in _block['children']:
-        _update_blocks(b, _blocks)
-
-
 class UsersCoursesList(SecureAPIView):
     """
     ### The UsersCoursesList view allows clients to interact with the set of Course entities related to the
@@ -1030,16 +1016,6 @@ class UsersCoursesList(SecureAPIView):
         response_data = []
         for enrollment in enrollments:
             if enrollment.course_overview:
-                course_id = enrollment.course_overview.id
-                course_structure = CourseStructure.objects.get(course_id=course_id)
-                blocks = course_structure.structure['blocks'].copy()
-                for b in blocks.values():
-                    b['name'] = b.pop('display_name')
-                    b['category'] = b.pop('block_type')
-
-                course = [block for block_id, block in blocks.items() if block['category'] == 'course'][0]
-                _update_blocks(course, blocks)
-
                 course_data = {
                     "id": unicode(enrollment.course_overview.id),
                     "uri": '{}/{}'.format(base_uri, unicode(enrollment.course_overview.id)),
@@ -1048,7 +1024,6 @@ class UsersCoursesList(SecureAPIView):
                     "start": enrollment.course_overview.start,
                     "end": enrollment.course_overview.end,
                     "course_image_url": enrollment.course_overview.course_image_url,
-                    "content": course['children']
                 }
                 response_data.append(course_data)
         return Response(response_data, status=status.HTTP_200_OK)

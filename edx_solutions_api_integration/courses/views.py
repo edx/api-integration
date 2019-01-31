@@ -42,9 +42,11 @@ from mobile_api.course_info.views import apply_wrappers_to_content
 from opaque_keys.edx.keys import UsageKey
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
+from openedx.core.djangoapps.content.course_structures.models import CourseStructure
 from openedx.core.djangoapps.course_groups.cohorts import get_cohort_user_ids
 from openedx.core.djangoapps.course_groups.models import CourseUserGroup
 from openedx.core.lib.courses import course_image_url
+from opaque_keys.edx.keys import CourseKey
 from openedx.core.lib.xblock_utils import get_course_update_items
 from social_engagement.models import StudentSocialEngagementScore
 from student.models import CourseEnrollment, CourseEnrollmentAllowed
@@ -2522,3 +2524,50 @@ class CourseNavView(SecureAPIView):
         }
 
         return Response(result, status=status.HTTP_200_OK)
+
+
+def _update_blocks(_block, _blocks):
+    children = []
+    for block_id in _block['children']:
+        _blocks[block_id]['id'] = block_id
+        children.append(_blocks[block_id])
+
+    _block['children'] = children
+    for b in _block['children']:
+        _update_blocks(b, _blocks)
+
+
+class CoursesTree(SecureAPIView):
+    """
+    **Use Case**
+
+        CoursesTree returns a course tree for a list of comma seperated course ids.
+
+
+    **Example Request**
+
+        GET /api/courses/tress?course_ids=CA/CS102/2018,CA/CS104/2019
+    """
+    def get(self, request):
+        course_ids = css_param_to_list(request, 'course_ids')
+        course_ids = [get_course_key(c) for c in course_ids]
+        course_structures = CourseStructure.objects.filter(course_id__in=course_ids)
+        response_data = []
+        for course_structure in course_structures:
+            for course_id in course_ids:
+                if course_structure.course_id != course_id:
+                    continue
+
+                blocks = course_structure.structure['blocks'].copy()
+                for block in blocks.values():
+                    block['name'] = block.pop('display_name')
+                    block['category'] = block.pop('block_type')
+
+                course = [block for block_id, block in blocks.items() if block['category'] == 'course'][0]
+                _update_blocks(course, blocks)
+                course_data = {
+                    "id": str(course_id),
+                    "content": course['children']
+                }
+                response_data.append(course_data)
+        return Response(response_data, status=status.HTTP_200_OK)
