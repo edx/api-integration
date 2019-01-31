@@ -941,6 +941,7 @@ class UsersGroupsDetail(SecureAPIView):
         existing_user.save()
         return Response({}, status=status.HTTP_204_NO_CONTENT)
 
+
 class UsersCoursesList(SecureAPIView):
     """
     ### The UsersCoursesList view allows clients to interact with the set of Course entities related to the
@@ -1027,6 +1028,7 @@ class UsersCoursesList(SecureAPIView):
                     "course_image_url": enrollment.course_overview.course_image_url,
                 }
                 response_data.append(course_data)
+
         return Response(response_data, status=status.HTTP_200_OK)
 
 
