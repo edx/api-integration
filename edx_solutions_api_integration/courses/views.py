@@ -12,8 +12,9 @@ from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.cache import cache
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
-from django.db.models import Count, F, Max, Min, Prefetch, Q
+from django.db.models import Count, F, Max, Min, Prefetch, Q, Sum
 from django.http import Http404
+from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 
 from lxml import etree
@@ -74,6 +75,7 @@ from edx_solutions_api_integration.courses.utils import (
     get_num_users_started,
     get_total_completions,
     get_user_position,
+    get_filtered_aggregation_queryset,
 )
 from edx_solutions_api_integration.courseware_access import (
     course_exists,
@@ -1346,6 +1348,74 @@ class CoursesUsersList(MobileListAPIView):
             return user_qs.order_by(order_by_field)
         except FieldDoesNotExist:
             return user_qs
+
+
+class CoursesEngagementSummary(MobileListAPIView):
+    def get(self, request, course_id):  # pylint: disable=W0221
+        """
+        GET /api/courses/{course_id}/engagement-summary
+        """
+        if not request.user.is_staff:
+            return Response({}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not course_exists(course_id):
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+        self.course_key = get_course_key(course_id)
+
+        user_id = self.request.query_params.get('user_id', None)
+        params = {
+            'user_id': user_id,
+            'count': self.request.query_params.get('count', None),
+            'org_ids': get_ids_from_list_param(self.request, 'organizations'),
+            'group_ids': get_ids_from_list_param(self.request, 'groups'),
+            'exclude_users': get_aggregate_exclusion_user_ids(self.course_key),
+            'cohort_user_ids': _get_users_in_cohort(user_id, self.course_key, ignore_groupwork=True),
+        }
+        user_qs = CourseEnrollment.objects.users_enrolled_in(self.course_key).exclude(
+            id__in=params.get('exclude_users') or []
+        )
+        if params.get('org_ids'):
+            user_qs = user_qs.filter(organizations__in=params.get('org_ids') or [])
+
+        total_users = user_qs.count()
+
+        active_users = user_qs.filter(is_active=True).count()
+        last_week = timezone.now() - timezone.timedelta(days=7)
+        users_logged_in_last_week = user_qs.filter(last_login__range=(last_week, timezone.now()))
+        users_logged_in_last_week_count = users_logged_in_last_week.count()
+
+        aggregate_qs = get_filtered_aggregation_queryset(self.course_key, **params)
+        engaged_progress_sum = (aggregate_qs.aggregate(percent=Sum('percent')).get('percent') or 0) * 100
+        last_week_aggregates = aggregate_qs.filter(user_id__in=users_logged_in_last_week)
+        users_logged_in_last_week_progress = (last_week_aggregates.aggregate(
+            percent=Sum('percent')
+        ).get('percent') or 0) * 100
+        users_with_progress = aggregate_qs.count()
+
+        def sefe_division(dividend, divisor):
+            return 0 if divisor == 0 else dividend / divisor
+
+        data = {}
+        data['total_users'] = total_users
+        data['total_course_progress'] = sefe_division(float(engaged_progress_sum), total_users)
+
+        data['active_users'] = active_users
+        data['active_users_percentage'] = sefe_division(float(active_users), total_users) * 100
+        data['active_users_progress'] = sefe_division(float(engaged_progress_sum), active_users)
+
+        data['engaged_users'] = users_with_progress
+        data['engaged_users_percentage'] = sefe_division(float(users_with_progress), total_users) * 100
+        data['engaged_users_progress'] = sefe_division(float(engaged_progress_sum), users_with_progress)
+
+        data['last_week_login_users'] = users_logged_in_last_week_count
+        data['last_week_login_users_percentage'] = sefe_division(
+            float(users_logged_in_last_week_count), total_users
+        ) * 100
+        data['last_week_login_users_progress'] = sefe_division(
+            float(users_logged_in_last_week_progress), users_logged_in_last_week_count
+        )
+
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class CoursesUsersPassedList(SecureListAPIView):
