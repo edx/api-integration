@@ -90,6 +90,7 @@ from edx_solutions_api_integration.users.serializers import (
     UserRolesSerializer,
     CourseProgressSerializer,
 )
+from lms.lib.comment_client.user import User as CCUser
 
 log = logging.getLogger(__name__)
 AUDIT_LOG = logging.getLogger("audit")
@@ -391,6 +392,8 @@ class UsersList(SecureListAPIView):
         # require at least either ids or username filters
         if set(self.request.query_params.keys()) & set(['username', 'ids']):
             qs = self.filter_queryset(self.queryset)
+            for user in qs:
+                CCUser.from_django_user(user).retire('Deleted username')
             qs.delete()
             return Response({}, status.HTTP_204_NO_CONTENT)
         else:
