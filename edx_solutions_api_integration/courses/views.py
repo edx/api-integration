@@ -12,8 +12,9 @@ from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.cache import cache
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
-from django.db.models import Count, F, Max, Min, Prefetch, Q
+from django.db.models import Count, F, Max, Min, Prefetch, Q, Sum
 from django.http import Http404
+from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 
 from lxml import etree
@@ -74,6 +75,7 @@ from edx_solutions_api_integration.courses.utils import (
     get_num_users_started,
     get_total_completions,
     get_user_position,
+    get_filtered_aggregation_queryset,
 )
 from edx_solutions_api_integration.courseware_access import (
     course_exists,
@@ -1346,6 +1348,99 @@ class CoursesUsersList(MobileListAPIView):
             return user_qs.order_by(order_by_field)
         except FieldDoesNotExist:
             return user_qs
+
+
+class CoursesEngagementSummary(MobileListAPIView):
+    """
+    ### The CoursesEngagementSummary view allows clients to fetch course engagement summary
+
+    **Example Request**
+
+        * GET /api/courses/{course_id}/engagement-summary
+        * GET supports filtering of course engagement summary by organizations, groups
+        * To get course engagement summary for an organization
+        ```/api/courses/{course_id}/engagement-summary?organizations={organization_id}```
+
+    **GET Response Values**
+
+        * {
+            "engaged_users": 8,
+            "total_users": 21,
+            "active_users": 12,
+            "last_week_login_users": 1,
+            "total_course_progress": 0.5024027959807782,
+            "active_users_progress": 0.8792048929663618,
+            "active_users_percentage": 57.14285714285714,
+            "engaged_users_progress": 1.3188073394495428,
+            "engaged_users_percentage": 38.095238095238095,
+            "last_week_login_users_progress": 0.9174311926605511,
+            "last_week_login_users_percentage": 4.761904761904762,
+        }
+    """
+    def get(self, request, course_id):  # pylint: disable=W0221
+        """
+        GET /api/courses/{course_id}/engagement-summary
+        """
+        if not request.user.is_staff:
+            return Response({}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not course_exists(course_id):
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+        self.course_key = get_course_key(course_id)
+
+        user_id = self.request.query_params.get('user_id', None)
+        params = {
+            'user_id': user_id,
+            'org_ids': get_ids_from_list_param(self.request, 'organizations'),
+            'group_ids': get_ids_from_list_param(self.request, 'groups'),
+            'exclude_users': get_aggregate_exclusion_user_ids(self.course_key),
+            'cohort_user_ids': _get_users_in_cohort(user_id, self.course_key, ignore_groupwork=True),
+        }
+        user_qs = CourseEnrollment.objects.users_enrolled_in(self.course_key).exclude(
+            id__in=params.get('exclude_users') or []
+        )
+        if params.get('org_ids'):
+            user_qs = user_qs.filter(organizations__in=params.get('org_ids') or [])
+
+        total_users = user_qs.count()
+
+        active_users = user_qs.filter(is_active=True).count()
+        last_week = timezone.now() - timezone.timedelta(days=7)
+        users_logged_in_last_week = user_qs.filter(last_login__range=(last_week, timezone.now()))
+        users_logged_in_last_week_count = users_logged_in_last_week.count()
+
+        progress_qs = get_filtered_aggregation_queryset(self.course_key, **params)
+        progress_sum = (progress_qs.aggregate(percent=Sum('percent')).get('percent') or 0) * 100
+        last_week_progress = progress_qs.filter(user_id__in=users_logged_in_last_week)
+        last_week_progress_sum = (last_week_progress.aggregate(
+            percent=Sum('percent')
+        ).get('percent') or 0) * 100
+        users_with_progress = progress_qs.count()
+
+        def safe_division(dividend, divisor):
+            return 0 if divisor == 0 else dividend / divisor
+
+        data = {}
+        data['total_users'] = total_users
+        data['total_course_progress'] = safe_division(float(progress_sum), total_users)
+
+        data['active_users'] = active_users
+        data['active_users_percentage'] = safe_division(float(active_users), total_users) * 100
+        data['active_users_progress'] = safe_division(float(progress_sum), active_users)
+
+        data['engaged_users'] = users_with_progress
+        data['engaged_users_percentage'] = safe_division(float(users_with_progress), total_users) * 100
+        data['engaged_users_progress'] = safe_division(float(progress_sum), users_with_progress)
+
+        data['last_week_login_users'] = users_logged_in_last_week_count
+        data['last_week_login_users_percentage'] = safe_division(
+            float(users_logged_in_last_week_count), total_users
+        ) * 100
+        data['last_week_login_users_progress'] = safe_division(
+            float(last_week_progress_sum), users_logged_in_last_week_count
+        )
+
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class CoursesUsersPassedList(SecureListAPIView):
