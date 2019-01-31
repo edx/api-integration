@@ -58,7 +58,7 @@ urlpatterns = patterns(
     url(r'^{0}/updates/*$'.format(COURSE_ID_PATTERN), courses_views.CoursesUpdates.as_view()),
     url(r'^{0}/users/(?P<user_id>[0-9]+)$'.format(COURSE_ID_PATTERN), courses_views.CoursesUsersDetail.as_view()),
     url(r'^{0}/users/*$'.format(COURSE_ID_PATTERN), courses_views.CoursesUsersList.as_view()),
-    url(r'^{0}/engagement-summary/*$'.format(COURSE_ID_PATTERN), courses_views.CoursesEngagementSummary.as_view()),
+    url(r'^{0}/engagement_summary/*$'.format(COURSE_ID_PATTERN), courses_views.CoursesEngagementSummary.as_view()),
     url(r'^{0}/users/passed$'.format(COURSE_ID_PATTERN), courses_views.CoursesUsersPassedList.as_view()),
     url(r'^{0}/workgroups/*$'.format(COURSE_ID_PATTERN), courses_views.CoursesWorkgroupsList.as_view()),
     url(r'^{0}/navigation/{1}$'.format(COURSE_ID_PATTERN, settings.USAGE_KEY_PATTERN),
