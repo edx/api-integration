@@ -1014,7 +1014,7 @@ class UsersCoursesList(SecureAPIView):
             user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
-        enrollments = CourseEnrollment.enrollments_for_user(user=user)
+        enrollments = CourseEnrollment.enrollments_for_user(user=user).order_by('-created')
         response_data = []
         for enrollment in enrollments:
             if enrollment.course_overview:
@@ -1024,7 +1024,8 @@ class UsersCoursesList(SecureAPIView):
                     "is_active": enrollment.is_active,
                     "name": enrollment.course_overview.display_name,
                     "start": enrollment.course_overview.start,
-                    "end": enrollment.course_overview.end
+                    "end": enrollment.course_overview.end,
+                    "course_image_url": enrollment.course_overview.course_image_url,
                 }
                 response_data.append(course_data)
 
