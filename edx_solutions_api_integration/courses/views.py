@@ -2526,27 +2526,32 @@ class CourseNavView(SecureAPIView):
         return Response(result, status=status.HTTP_200_OK)
 
 
-def _update_blocks(_block, _blocks):
-    children = []
-    for block_id in _block['children']:
-        _blocks[block_id]['id'] = block_id
-        children.append(_blocks[block_id])
-
-    _block['children'] = children
-    for b in _block['children']:
-        _update_blocks(b, _blocks)
-
-
-class CoursesTree(SecureAPIView):
+class CoursesTree(MobileListAPIView):
     """
     **Use Case**
 
         CoursesTree returns a course tree for a list of comma seperated course ids.
+        Response will be a list of courses with content and id. content is actual course tree.
 
 
     **Example Request**
 
         GET /api/courses/tress?course_ids=CA/CS102/2018,CA/CS104/2019
+
+
+    **Example Response**
+    [
+        {
+            "id": **,
+            "content": {
+            }
+        },
+        {
+            "id": **,
+            "content": {
+            }
+        },
+    ]
     """
     def get(self, request):
         course_ids = css_param_to_list(request, 'course_ids')
@@ -2558,16 +2563,28 @@ class CoursesTree(SecureAPIView):
                 if course_structure.course_id != course_id:
                     continue
 
-                blocks = course_structure.structure['blocks'].copy()
+                blocks = course_structure.structure.get('blocks', {}).copy()
                 for block in blocks.values():
                     block['name'] = block.pop('display_name')
                     block['category'] = block.pop('block_type')
 
                 course = [block for block_id, block in blocks.items() if block['category'] == 'course'][0]
-                _update_blocks(course, blocks)
+                self._update_blocks(course, blocks)
                 course_data = {
                     "id": str(course_id),
                     "content": course['children']
                 }
                 response_data.append(course_data)
         return Response(response_data, status=status.HTTP_200_OK)
+
+    def _update_blocks(self, _block, _blocks):
+        # add actual blocks from _blocks instead of block ids in the _block
+
+        children = []
+        for block_id in _block['children']:
+            _blocks[block_id]['id'] = block_id
+            children.append(_blocks[block_id])
+
+        _block['children'] = children
+        for b in _block['children']:
+            self._update_blocks(b, _blocks)
