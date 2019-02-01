@@ -2536,7 +2536,7 @@ class CoursesTree(MobileListAPIView):
 
     **Example Request**
 
-        GET /api/courses/tress?course_ids=CA/CS102/2018,CA/CS104/2019
+        GET /api/courses/trees?course_ids=CA/CS102/2018,CA/CS104/2019
 
 
     **Example Response**
