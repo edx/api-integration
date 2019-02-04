@@ -2439,8 +2439,9 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['last_name'], test_last_name)
         self.assertEqual(response.data['full_name'], u'{} {}'.format(test_first_name, test_last_name))
 
+    @patch('edx_solutions_api_integration.users.views.CCUser')
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
-    def test_user_delete(self, store):
+    def test_user_delete(self, store, mock_user):
         test_uri = self.users_base_uri
 
         organizations = []
