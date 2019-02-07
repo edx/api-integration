@@ -2439,9 +2439,9 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['last_name'], test_last_name)
         self.assertEqual(response.data['full_name'], u'{} {}'.format(test_first_name, test_last_name))
 
-    @patch('edx_solutions_api_integration.users.views.CCUser')
+    @patch('edx_solutions_api_integration.users.views.delete_user')
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
-    def test_user_delete(self, store, mock_user):
+    def test_user_delete(self, store, mock_delete_user):
         test_uri = self.users_base_uri
 
         organizations = []
@@ -2468,6 +2468,8 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             self.assertEqual(response.status_code, 201)
             user_ids.append(response.data['id'])
 
+        users = User.objects.filter(id__in=user_ids)
+
         # add first half to ABC Organization
         for user in User.objects.filter(id__in=user_ids[:15]):
             user.organizations.add(organizations[0])
@@ -2478,35 +2480,33 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             CourseEnrollmentFactory.create(user=user, course_id=course2.id)
 
         # delete 1 user by id
-        response = self.do_delete('{}?ids={}'.format(test_uri, user_ids[0]))
+        response = self.do_delete('{}?ids={}'.format(test_uri, users[0]).id)
         self.assertEqual(response.status_code, 204)
-        self.assertIsNone(User.objects.filter(id=user_ids[0]).first())
+        mock_delete_user.assert_called_once_with(users[0])
 
         # delete multiple users by id
-        response = self.do_delete('{}?ids={}'.format(test_uri, ','.join([str(i) for i in user_ids[1:10]])))
+        mock_delete_user.reset_mock()
+        response = self.do_delete('{}?ids={}'.format(test_uri, ','.join([str(u.id) for u in users[1:10]])))
         self.assertEqual(response.status_code, 204)
-        self.assertEqual(User.objects.filter(id__in=user_ids[1:10]).count(), 0)
+        mock_delete_user.assert_has_calls([mock.call(u) for u in users[1:10]])
 
         # delete 1 user by username
-        response = self.do_delete('{}?username={}'.format(test_uri, 'test_user12'))
+        mock_delete_user.reset_mock()
+        response = self.do_delete('{}?username={}'.format(test_uri, users[12].username))
         self.assertEqual(response.status_code, 204)
-        self.assertEqual(User.objects.filter(username='test_user12').count(), 0)
+        mock_delete_user.assert_called_once_with(users[12])
 
         # require either username or ids
         response = self.do_delete('{}?name=John&match=partial'.format(test_uri))
         self.assertEqual(response.status_code, 400)
 
         # other parameters are ignored
+        mock_delete_user.reset_mock()
         response = self.do_delete('{}?ids={}&page=10&page_size=2&name=John&match=partial'.format(
-            test_uri, ','.join([str(i) for i in user_ids[10:15]])
+            test_uri, ','.join([str(u.id) for u in users[10:15]])
         ))
         self.assertEqual(response.status_code, 204)
-        self.assertEqual(User.objects.filter(id__in=user_ids[10:15]).count(), 0)
-
-        # assert that only the last 15 users exist
-        self.assertEqual(User.objects.filter(id__in=user_ids[:15]).count(), 0)
-        self.assertEqual(User.objects.filter(id__in=user_ids[15:]).count(), 15)
-
+        mock_delete_user.assert_has_calls([mock.call(u) for u in users[10:15]])
 
 
 @ddt.ddt
