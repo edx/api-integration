@@ -91,6 +91,7 @@ from edx_solutions_api_integration.users.serializers import (
     CourseProgressSerializer,
 )
 from lms.lib.comment_client.user import User as CCUser
+from lms.lib.comment_client.utils import CommentClientRequestError
 
 log = logging.getLogger(__name__)
 AUDIT_LOG = logging.getLogger("audit")
@@ -393,7 +394,11 @@ class UsersList(SecureListAPIView):
         if set(self.request.query_params.keys()) & set(['username', 'ids']):
             qs = self.filter_queryset(self.queryset)
             for user in qs:
-                CCUser.from_django_user(user).retire('Deleted username')
+                try:
+                    CCUser.from_django_user(user).retire('Deleted username')
+                except CommentClientRequestError as e:
+                    if e.message != u'{"message":"User not found."}':
+                        raise
             qs.delete()
             return Response({}, status.HTTP_204_NO_CONTENT)
         else:
