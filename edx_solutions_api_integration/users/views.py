@@ -397,6 +397,7 @@ class UsersList(SecureListAPIView):
                 try:
                     CCUser.from_django_user(user).retire('Deleted username')
                 except CommentClientRequestError as e:
+                    # Proceed if discussion user does not exist
                     if e.message != u'{"message":"User not found."}':
                         raise
             qs.delete()
