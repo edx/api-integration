@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='api-integration',
-    version='2.5.3',
+    version='2.5.4',
     description='RESTful api integration for edX platform',
     long_description=open('README.rst').read(),
     author='edX',
