@@ -2480,7 +2480,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             CourseEnrollmentFactory.create(user=user, course_id=course2.id)
 
         # delete 1 user by id
-        response = self.do_delete('{}?ids={}'.format(test_uri, users[0]).id)
+        response = self.do_delete('{}?ids={}'.format(test_uri, users[0].id))
         self.assertEqual(response.status_code, 204)
         mock_delete_user.assert_called_once_with(users[0])
 
