@@ -91,8 +91,6 @@ from edx_solutions_api_integration.users.serializers import (
     UserRolesSerializer,
     CourseProgressSerializer,
 )
-from lms.lib.comment_client.user import User as CCUser
-from lms.lib.comment_client.utils import CommentClientRequestError
 
 log = logging.getLogger(__name__)
 AUDIT_LOG = logging.getLogger("audit")
@@ -393,14 +391,9 @@ class UsersList(SecureListAPIView):
         """
         # require at least either ids or username filters
         if set(self.request.query_params.keys()) & set(['username', 'ids']):
-            qs =self.filter_queryset(self.queryset)
+            qs = self.filter_queryset(self.queryset)
             for user in qs:
-                try:
-                    delete_user(user)
-                except CommentClientRequestError as e:
-                    # Proceed if discussion user does not exist
-                    if e.message != u'{"message":"User not found."}':
-                        raise
+                delete_user(user)
             return Response({}, status.HTTP_204_NO_CONTENT)
         else:
             return Response({'message': _('username or ids are missing')}, status.HTTP_400_BAD_REQUEST)
