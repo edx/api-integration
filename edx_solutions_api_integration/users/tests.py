@@ -2485,17 +2485,12 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 204)
 
         def assert_delete_users_call_args(mock, ids):
-            from nose.tools import set_trace
-            set_trace()
             call_args_ids = list(mock.call_args[0][0].values_list('id', flat=True))
             self.assertEqual(
                 call_args_ids,
                 ids
             )
         assert_delete_users_call_args(mock_delete_users, user_ids[:1])
-        from nose.tools import set_trace
-        set_trace()
-
 
         # delete multiple users by id
         mock_delete_users.reset_mock()
