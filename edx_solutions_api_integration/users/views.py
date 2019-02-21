@@ -37,6 +37,7 @@ from openedx.core.djangoapps.course_groups.cohorts import (
     remove_user_from_cohort,
 )
 from openedx.core.djangoapps.user_api.models import UserPreference
+from openedx.core.djangoapps.user_api.accounts.api import delete_users
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from edx_notifications.lib.consumer import mark_notification_read
 from course_metadata.models import CourseAggregatedMetaData, CourseSetting
@@ -90,8 +91,6 @@ from edx_solutions_api_integration.users.serializers import (
     UserRolesSerializer,
     CourseProgressSerializer,
 )
-from lms.lib.comment_client.user import User as CCUser
-from lms.lib.comment_client.utils import CommentClientRequestError
 
 log = logging.getLogger(__name__)
 AUDIT_LOG = logging.getLogger("audit")
@@ -393,14 +392,7 @@ class UsersList(SecureListAPIView):
         # require at least either ids or username filters
         if set(self.request.query_params.keys()) & set(['username', 'ids']):
             qs = self.filter_queryset(self.queryset)
-            for user in qs:
-                try:
-                    CCUser.from_django_user(user).retire('Deleted username')
-                except CommentClientRequestError as e:
-                    # Proceed if discussion user does not exist
-                    if e.message != u'{"message":"User not found."}':
-                        raise
-            qs.delete()
+            delete_users(qs)
             return Response({}, status.HTTP_204_NO_CONTENT)
         else:
             return Response({'message': _('username or ids are missing')}, status.HTTP_400_BAD_REQUEST)
