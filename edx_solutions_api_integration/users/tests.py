@@ -62,6 +62,7 @@ from xmodule.modulestore.tests.django_utils import (
 )
 from django.contrib.auth.models import User
 from edx_solutions_api_integration.courseware_access import get_course_key
+from edx_solutions_api_integration.models import APIUser
 from edx_solutions_api_integration.test_utils import (
     get_non_atomic_database_settings,
     CourseGradingMixin,
@@ -2439,9 +2440,9 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['last_name'], test_last_name)
         self.assertEqual(response.data['full_name'], u'{} {}'.format(test_first_name, test_last_name))
 
-    @patch('edx_solutions_api_integration.users.views.delete_user')
+    @patch('edx_solutions_api_integration.users.views.delete_users')
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
-    def test_user_delete(self, store, mock_delete_user):
+    def test_user_delete(self, store, mock_delete_users):
         test_uri = self.users_base_uri
 
         organizations = []
@@ -2482,31 +2483,43 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         # delete 1 user by id
         response = self.do_delete('{}?ids={}'.format(test_uri, users[0].id))
         self.assertEqual(response.status_code, 204)
-        mock_delete_user.assert_called_once_with(users[0])
+
+        def assert_delete_users_call_args(mock, ids):
+            from nose.tools import set_trace
+            set_trace()
+            call_args_ids = list(mock.call_args[0][0].values_list('id', flat=True))
+            self.assertEqual(
+                call_args_ids,
+                ids
+            )
+        assert_delete_users_call_args(mock_delete_users, user_ids[:1])
+        from nose.tools import set_trace
+        set_trace()
+
 
         # delete multiple users by id
-        mock_delete_user.reset_mock()
+        mock_delete_users.reset_mock()
         response = self.do_delete('{}?ids={}'.format(test_uri, ','.join([str(u.id) for u in users[1:10]])))
         self.assertEqual(response.status_code, 204)
-        mock_delete_user.assert_has_calls([mock.call(u) for u in users[1:10]])
+        assert_delete_users_call_args(mock_delete_users, user_ids[1:10])
 
         # delete 1 user by username
-        mock_delete_user.reset_mock()
+        mock_delete_users.reset_mock()
         response = self.do_delete('{}?username={}'.format(test_uri, users[12].username))
         self.assertEqual(response.status_code, 204)
-        mock_delete_user.assert_called_once_with(users[12])
+        assert_delete_users_call_args(mock_delete_users, [user_ids[12], ])
 
         # require either username or ids
         response = self.do_delete('{}?name=John&match=partial'.format(test_uri))
         self.assertEqual(response.status_code, 400)
 
         # other parameters are ignored
-        mock_delete_user.reset_mock()
+        mock_delete_users.reset_mock()
         response = self.do_delete('{}?ids={}&page=10&page_size=2&name=John&match=partial'.format(
             test_uri, ','.join([str(u.id) for u in users[10:15]])
         ))
         self.assertEqual(response.status_code, 204)
-        mock_delete_user.assert_has_calls([mock.call(u) for u in users[10:15]])
+        assert_delete_users_call_args(mock_delete_users, user_ids[10:15])
 
 
 @ddt.ddt
