@@ -36,7 +36,6 @@ class ImportParticipantsViewSet(SecureViewSet):
         """Import new participants into the LMS, a company and course."""
         errors, response = [], {}
         data = self._validate_data(request, errors, new=True)
-
         if not errors:
             self._create_user(data, errors, response)
             self._enroll_user(data, errors)
@@ -62,6 +61,7 @@ class ImportParticipantsViewSet(SecureViewSet):
         :param new: if `True`, new user will be created and enrolled, otherwise existing user will be enrolled
         :returns `request.data` copy with added `course`, `course_key` and ('company` if `new` else `user_object`)
         """
+
         validated_data = request.data.copy()
         internal = validated_data.get('internal', False)
         statuses = validated_data.get('statuses', [])
@@ -141,7 +141,7 @@ class ImportParticipantsViewSet(SecureViewSet):
         # Check if course is internal (if required).
         if internal and not CourseGroupRelationship.objects.filter(
                 course_id=course_id,
-                group__type="tag:internal"
+                group__groupprofile__group_type="tag:internal"
         ).exists():
             self._add_error(
                 errors,
