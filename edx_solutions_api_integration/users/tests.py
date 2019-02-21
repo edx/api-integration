@@ -2521,6 +2521,9 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 204)
         assert_delete_users_call_args(mock_delete_users, user_ids[10:15])
 
+        # Assert the correct number of calls has been made to CCUser
+        self.assertEqual(mock_user.from_django_user().retire.call_count, 15)
+
 
 @ddt.ddt
 class TokenBasedUsersApiTests(CacheIsolationTestCase, APIClientMixin, OAuth2TokenMixin):
