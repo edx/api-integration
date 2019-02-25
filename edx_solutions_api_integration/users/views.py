@@ -349,6 +349,8 @@ class UsersList(SecureListAPIView):
         email = self.request.query_params.get('email', None)
         org_ids = self.request.query_params.get('organizations', None)
         courses = css_param_to_list(self.request, 'courses')
+        emails = css_param_to_list(self.request, 'emails')
+        usernames = css_param_to_list(self.request, 'usernames')
         organization_display_name = self.request.query_params.get('organization_display_name', None)
 
         # filter internal admin course ids
@@ -396,8 +398,14 @@ class UsersList(SecureListAPIView):
             if name:
                 queryset = queryset.filter(Q(profile__name=name) | Q(first_name=name) | Q(last_name=name))
 
+            if usernames:
+                queryset = queryset.filter(username__in=usernames)
+
             if email:
                 queryset = queryset.filter(email=email)
+
+            if emails:
+                queryset = queryset.filter(email__in=emails)
 
             if courses:
                 courses = map(CourseKey.from_string, courses)
