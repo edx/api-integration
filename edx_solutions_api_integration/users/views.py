@@ -257,6 +257,8 @@ class UsersList(SecureListAPIView):
         'previous': None, 'results':[]}
         'next' and 'previous' keys would have value of None if there are not next or previous page after current page.
 
+    - POST: Provides paginated list of users
+
     - POST: Provides the ability to append to the User entity set
         * email: __required__, The unique email address for the User being created
         * username: __required__, The unique username for the User being created
@@ -313,13 +315,20 @@ class UsersList(SecureListAPIView):
         """
         queryset = self.queryset
 
-        name = self.request.query_params.get('name', None)
-        search_query_string = self.request.query_params.get('search_query_string', None)
-        match = self.request.query_params.get('match', None)
-        email = self.request.query_params.get('email', None)
-        org_ids = self.request.query_params.get('organizations', None)
-        courses = css_param_to_list(self.request, 'courses')
-        organization_display_name = self.request.query_params.get('organization_display_name', None)
+        if self.request.method == 'GET':
+            query_params = self.request.GET.copy()
+            courses = css_param_to_list(self.request, 'courses')
+
+        elif self.request.method == 'POST':
+            query_params = self.request.data.copy()
+            courses = css_data_to_list(self.request, 'courses')
+
+        name = query_params.get('name', None)
+        search_query_string = query_params.get('search_query_string', None)
+        match = query_params.get('match', None)
+        email = query_params.get('email', None)
+        org_ids = query_params.get('organizations', None)
+        organization_display_name = query_params.get('organization_display_name', None)
 
         if org_ids:
             org_ids = map(int, org_ids.split(','))
@@ -400,6 +409,10 @@ class UsersList(SecureListAPIView):
         """
         POST /api/users/
         """
+        # Provides paginated list of users, for internal courses
+        if request.data.get('match', None) == 'partial':
+            return self.list(request)
+
         response_data = {}
         base_uri = generate_base_uri(request)
 
