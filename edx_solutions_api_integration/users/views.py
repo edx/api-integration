@@ -410,7 +410,8 @@ class UsersList(SecureListAPIView):
         POST /api/users/
         """
         # Provides paginated list of users, for internal courses
-        if request.data.get('match', None) == 'partial':
+        match = request.data.get('match', None)
+        if match == 'partial':
             return self.list(request)
 
         response_data = {}
