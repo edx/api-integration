@@ -2,7 +2,9 @@
 
 import json
 import logging
+import operator
 from datetime import datetime
+from functools import reduce
 
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
@@ -266,8 +268,10 @@ class UsersList(SecureListAPIView):
         GET /api/users?courses={rse_id}&match=partial
         GET /api/users?courses={rse_id}&match=partial&internal_admin_flag=True&type=internal
         GET /api/users?email={john@example.com}
+        GET /api/users?email={john@example.com,john2@example.com}
         GET /api/users?email={john@example}&match=partial
         GET /api/users?email={john@example}&match=partial&internal_admin_flag=True&type=internal
+        GET /api/users?email={john@example,john2@example.com}&match=partial
         GET /api/users?name={john doe}
         GET /api/users?name={joh}&match=partial
         GET /api/users?name={joh}&match=partial&internal_admin_flag=True&type=internal
@@ -275,8 +279,9 @@ class UsersList(SecureListAPIView):
         GET /api/users?organization_display_name={xyz}&match=partial
         GET /api/users?organization_display_name={xyz}&match=partial&internal_admin_flag=True&type=internal
         GET /api/users?username={john}
-            * email: string, filters user set by email address
-            * username: string, filters user set by username
+        GET /api/users?username={john,john2}
+            * email: string, filters user set by single email address or comma-separated email addresses
+            * username: string, filters user set by single username or comma-separated usernames
             * name: string, filters user set by full name
         GET /api/users?has_organizations={true}
             * has_organizations: boolean, filters user set with organization association
@@ -335,7 +340,6 @@ class UsersList(SecureListAPIView):
     serializer_class = UserSerializer
     course_key = None
     filter_backends = (filters.DjangoFilterBackend, IdsInFilterBackend, HasOrgsFilterBackend)
-    filter_fields = ('username', )
 
     def get_queryset(self):
         """
@@ -346,11 +350,10 @@ class UsersList(SecureListAPIView):
         name = self.request.query_params.get('name', None)
         search_query_string = self.request.query_params.get('search_query_string', None)
         match = self.request.query_params.get('match', None)
-        email = self.request.query_params.get('email', None)
+        emails = css_param_to_list(self.request, 'email')
         org_ids = self.request.query_params.get('organizations', None)
         courses = css_param_to_list(self.request, 'courses')
-        emails = css_param_to_list(self.request, 'emails')
-        usernames = css_param_to_list(self.request, 'usernames')
+        usernames = css_param_to_list(self.request, 'username')
         organization_display_name = self.request.query_params.get('organization_display_name', None)
 
         # filter internal admin course ids
@@ -377,8 +380,9 @@ class UsersList(SecureListAPIView):
                         Q(profile__name__icontains=name) | Q(first_name__icontains=name) | Q(last_name__icontains=name)
                     )
 
-                if email:
-                    queryset = queryset.filter(email__icontains=email)
+                if emails:
+                    query = reduce(operator.or_, (Q(email__contains=email) for email in emails))
+                    queryset = queryset.filter(query)
 
                 if organization_display_name is not None:
                     queryset = queryset.filter(organizations__display_name__icontains=organization_display_name)
@@ -400,9 +404,6 @@ class UsersList(SecureListAPIView):
 
             if usernames:
                 queryset = queryset.filter(username__in=usernames)
-
-            if email:
-                queryset = queryset.filter(email=email)
 
             if emails:
                 queryset = queryset.filter(email__in=emails)
@@ -434,7 +435,7 @@ class UsersList(SecureListAPIView):
         """
         # require at least either ids or username filters
         if set(self.request.query_params.keys()) & set(['username', 'ids']):
-            qs = self.filter_queryset(self.queryset)
+            qs = self.filter_queryset(self.get_queryset())
             delete_users(qs)
             return Response({}, status.HTTP_204_NO_CONTENT)
         else:
