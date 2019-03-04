@@ -226,7 +226,7 @@ def _manage_role(course_descriptor, user, role, action):
                         pass
 
 
-def _get_internal_course_ids(request, courses=None):
+def _get_internal_course_ids(request, courses=[]):
     """
     Helper method for filtering/getting course ids of internal admin
     """
@@ -352,11 +352,10 @@ class UsersList(SecureListAPIView):
         organization_display_name = self.request.query_params.get('organization_display_name', None)
 
         # filter internal admin course ids
-        internal_courses = self.request.query_params.get('internal_admin_flag', None)
-        if internal_courses:
+        if self.request.query_params.get('internal_admin_flag'):
             courses = _get_internal_course_ids(self.request, courses)
             if not courses:
-                queryset = queryset.none()
+                return queryset.none()
 
         if org_ids:
             org_ids = map(int, org_ids.split(','))
