@@ -141,6 +141,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.test_first_name = str(uuid.uuid4())
         self.test_last_name = str(uuid.uuid4())
         self.test_city = str(uuid.uuid4())
+        self.test_group_name = str(uuid.uuid4())
         self.courses_base_uri = '/api/server/courses'
         self.groups_base_uri = '/api/server/groups'
         self.org_base_uri = '/api/server/organizations/'
@@ -433,6 +434,46 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(response.data['results'][0]['full_name'], 'Steve Jobs')
+
+        data = {'name': self.test_group_name, 'type': 'internal'}
+        resp = self.do_post(self.groups_base_uri, data)
+
+        uri = resp.data['uri'] + '/courses'
+        data = {'course_id': unicode(course1.id)}
+        self.do_post(uri, data)
+
+        # fetch user data by partial name match for internal admin
+        response = self.do_get('{}?name={}&match=partial&internal_admin_flag=True&type=internal'.format(test_uri, 'Jo'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['full_name'], 'John Doe')
+
+        # fetch user data by partial email match for internal admin
+        response = self.do_get(
+            '{}?email={}&match=partial&internal_admin_flag=True&type=internal'.format(test_uri, 'example.com')
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 2)
+        self.assertEqual(response.data['results'][0]['full_name'], 'John Doe')
+        self.assertEqual(response.data['results'][1]['full_name'], 'Micheal Mcdonald')
+
+        # fetch user data by partial organization display_name match for internal admin
+        response = self.do_get(
+            '{}?organization_display_name={}&match=partial&internal_admin_flag=True&type=internal'.format(test_uri, 'ABC')
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 2)
+        self.assertEqual(response.data['results'][0]['full_name'], 'John Doe')
+        self.assertEqual(response.data['results'][1]['full_name'], 'Micheal Mcdonald')
+
+        # fetch user data by partial course id match for internal admin
+        response = self.do_get(
+            '{}?courses={}&match=partial&internal_admin_flag=True&type=internal'.format(test_uri, 'edx')
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 2)
+        self.assertEqual(response.data['results'][0]['full_name'], 'John Doe')
+        self.assertEqual(response.data['results'][1]['full_name'], 'Micheal Mcdonald')
 
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_user_list_get_multiple_filters(self, store):

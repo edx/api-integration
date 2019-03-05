@@ -68,7 +68,7 @@ from edx_solutions_api_integration.permissions import (
     HasOrgsFilterBackend,
     MobileAPIView,
 )
-from edx_solutions_api_integration.models import GroupProfile, APIUser as User
+from edx_solutions_api_integration.models import CourseGroupRelationship, GroupProfile, APIUser as User
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from edx_solutions_api_integration.utils import (
     generate_base_uri,
@@ -227,6 +227,31 @@ def _manage_role(course_descriptor, user, role, action):
                         pass
 
 
+def _get_internal_course_ids(request, courses=[]):
+    """
+    Helper method for filtering/getting course ids of internal admin
+    """
+    internal_course_ids = []
+    group_type = request.query_params.get('type', None)
+    if group_type:
+        groups = Group.objects.select_related("groupprofile").filter(groupprofile__group_type=group_type)
+        for group in groups:
+            if courses:
+                courses_filter_list = [
+                    Q(group=group) & Q(course_id__icontains=course) for
+                    course in courses]
+                courses_filter_list = reduce(lambda a, b: a | b, courses_filter_list)
+                members = CourseGroupRelationship.objects.filter(courses_filter_list)
+            else:
+                members = CourseGroupRelationship.objects.filter(group=group)
+
+            internal_course_ids.extend([member.course_id for member in members])
+
+    upper_bound = getattr(settings, 'API_LOOKUP_UPPER_BOUND', 100)
+    internal_course_ids = internal_course_ids[:upper_bound]
+    return internal_course_ids
+
+
 class UsersList(SecureListAPIView):
     """
     ### The UsersList view allows clients to retrieve/append a list of User entities
@@ -239,12 +264,16 @@ class UsersList(SecureListAPIView):
         GET /api/users?organizations=1,2,3
         GET /api/users?courses={course_id},{course_id2}
         GET /api/users?courses={rse_id}&match=partial
+        GET /api/users?courses={rse_id}&match=partial&internal_admin_flag=True&type=internal
         GET /api/users?email={john@example.com}
         GET /api/users?email={john@example}&match=partial
+        GET /api/users?email={john@example}&match=partial&internal_admin_flag=True&type=internal
         GET /api/users?name={john doe}
         GET /api/users?name={joh}&match=partial
+        GET /api/users?name={joh}&match=partial&internal_admin_flag=True&type=internal
         GET /api/users?search_query_string={joh}&match=partial
         GET /api/users?organization_display_name={xyz}&match=partial
+        GET /api/users?organization_display_name={xyz}&match=partial&internal_admin_flag=True&type=internal
         GET /api/users?username={john}
             * email: string, filters user set by email address
             * username: string, filters user set by username
@@ -321,6 +350,12 @@ class UsersList(SecureListAPIView):
         org_ids = self.request.query_params.get('organizations', None)
         courses = css_param_to_list(self.request, 'courses')
         organization_display_name = self.request.query_params.get('organization_display_name', None)
+
+        # filter internal admin course ids
+        if self.request.query_params.get('internal_admin_flag'):
+            courses = _get_internal_course_ids(self.request, courses)
+            if not courses:
+                return queryset.none()
 
         if org_ids:
             org_ids = map(int, org_ids.split(','))
