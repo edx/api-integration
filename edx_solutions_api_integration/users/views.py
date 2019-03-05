@@ -243,11 +243,11 @@ def _get_internal_course_ids(request, courses=[]):
                 members = CourseGroupRelationship.objects.filter(courses_filter_list)
             else:
                 members = CourseGroupRelationship.objects.filter(group=group)
-            for member in members:
-                internal_course_ids.append(member.course_id)
-    if internal_course_ids:
-        upper_bound = getattr(settings, 'API_LOOKUP_UPPER_BOUND', 100)
-        internal_course_ids = internal_course_ids[:upper_bound]
+
+            internal_course_ids.extend([member.course_id for member in members])
+
+    upper_bound = getattr(settings, 'API_LOOKUP_UPPER_BOUND', 100)
+    internal_course_ids = internal_course_ids[:upper_bound]
     return internal_course_ids
 
 
