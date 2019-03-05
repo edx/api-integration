@@ -235,15 +235,14 @@ def _get_internal_course_ids(request, courses=[]):
     if group_type:
         groups = Group.objects.select_related("groupprofile").filter(groupprofile__group_type=group_type)
         for group in groups:
-            existing_group = Group.objects.get(id=group.id)
             if courses:
                 courses_filter_list = [
-                    Q(group=existing_group) & Q(course_id__icontains=course) for
+                    Q(group=group) & Q(course_id__icontains=course) for
                     course in courses]
                 courses_filter_list = reduce(lambda a, b: a | b, courses_filter_list)
                 members = CourseGroupRelationship.objects.filter(courses_filter_list)
             else:
-                members = CourseGroupRelationship.objects.filter(group=existing_group)
+                members = CourseGroupRelationship.objects.filter(group=group)
             for member in members:
                 internal_course_ids.append(member.course_id)
     if internal_course_ids:
