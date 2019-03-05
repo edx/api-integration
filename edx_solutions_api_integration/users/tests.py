@@ -15,6 +15,7 @@ import six
 import json
 
 from datetime import datetime
+from mock import patch
 
 from completion.models import BlockCompletion
 from completion.waffle import WAFFLE_NAMESPACE, ENABLE_COMPLETION_TRACKING
@@ -61,6 +62,7 @@ from xmodule.modulestore.tests.django_utils import (
 )
 from django.contrib.auth.models import User
 from edx_solutions_api_integration.courseware_access import get_course_key
+from edx_solutions_api_integration.models import APIUser
 from edx_solutions_api_integration.test_utils import (
     get_non_atomic_database_settings,
     CourseGradingMixin,
@@ -864,6 +866,37 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['full_name'], '{} {}'.format(self.test_first_name, self.test_last_name))
         self.assertEqual(response.data['is_active'], False)
         self.assertIsNotNone(response.data['created'])
+
+    @patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': True,
+                                                  'ENABLE_MAX_FAILED_LOGIN_ATTEMPTS': True,
+                                                  'PREVENT_CONCURRENT_LOGINS': False})
+    @override_settings(MAX_FAILED_LOGIN_ATTEMPTS_ALLOWED=3)
+    def test_user_detail_post_locked_out(self):
+        test_uri = self.users_base_uri
+        local_username = self.test_username + str(randint(11, 99))
+        data = {'email': self.test_email,
+                'username': local_username, 'password': self.test_password,
+                'first_name': self.test_first_name, 'last_name': self.test_last_name}
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 201)
+        test_uri = test_uri + '/' + str(response.data['id'])
+        auth_data = {'username': local_username, 'password': 'x'}
+        for i in xrange(3):
+            response = self.do_post(self.sessions_base_uri, auth_data)
+            self.assertEqual(response.status_code, 401)
+
+        # check to see if this response indicates blockout
+        response = self.do_post(self.sessions_base_uri, auth_data)
+        self.assertEqual(response.status_code, 403)
+
+        # reset user password to reset lockout counter to zero
+        response = self.do_post(test_uri, data)
+        self.assertEqual(response.status_code, 200)
+
+        # check to see if counter is reset and user can login
+        auth_data['password'] = self.test_password
+        self.do_post(self.sessions_base_uri, auth_data)
+        self.assertEqual(response.status_code, 200)
 
     def test_user_detail_invalid_email(self):
         test_uri = '{}/{}'.format(self.users_base_uri, self.user.id)
@@ -2448,8 +2481,9 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['last_name'], test_last_name)
         self.assertEqual(response.data['full_name'], u'{} {}'.format(test_first_name, test_last_name))
 
+    @patch('edx_solutions_api_integration.users.views.delete_users')
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
-    def test_user_delete(self, store):
+    def test_user_delete(self, store, mock_delete_users):
         test_uri = self.users_base_uri
 
         organizations = []
@@ -2476,6 +2510,8 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             self.assertEqual(response.status_code, 201)
             user_ids.append(response.data['id'])
 
+        users = User.objects.filter(id__in=user_ids)
+
         # add first half to ABC Organization
         for user in User.objects.filter(id__in=user_ids[:15]):
             user.organizations.add(organizations[0])
@@ -2486,35 +2522,40 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             CourseEnrollmentFactory.create(user=user, course_id=course2.id)
 
         # delete 1 user by id
-        response = self.do_delete('{}?ids={}'.format(test_uri, user_ids[0]))
+        response = self.do_delete('{}?ids={}'.format(test_uri, users[0].id))
         self.assertEqual(response.status_code, 204)
-        self.assertIsNone(User.objects.filter(id=user_ids[0]).first())
+
+        def assert_delete_users_call_args(mock, ids):
+            call_args_ids = list(mock.call_args[0][0].values_list('id', flat=True))
+            self.assertEqual(
+                call_args_ids,
+                ids
+            )
+        assert_delete_users_call_args(mock_delete_users, user_ids[:1])
 
         # delete multiple users by id
-        response = self.do_delete('{}?ids={}'.format(test_uri, ','.join([str(i) for i in user_ids[1:10]])))
+        mock_delete_users.reset_mock()
+        response = self.do_delete('{}?ids={}'.format(test_uri, ','.join([str(u.id) for u in users[1:10]])))
         self.assertEqual(response.status_code, 204)
-        self.assertEqual(User.objects.filter(id__in=user_ids[1:10]).count(), 0)
+        assert_delete_users_call_args(mock_delete_users, user_ids[1:10])
 
         # delete 1 user by username
-        response = self.do_delete('{}?username={}'.format(test_uri, 'test_user12'))
+        mock_delete_users.reset_mock()
+        response = self.do_delete('{}?username={}'.format(test_uri, users[12].username))
         self.assertEqual(response.status_code, 204)
-        self.assertEqual(User.objects.filter(username='test_user12').count(), 0)
+        assert_delete_users_call_args(mock_delete_users, [user_ids[12], ])
 
         # require either username or ids
         response = self.do_delete('{}?name=John&match=partial'.format(test_uri))
         self.assertEqual(response.status_code, 400)
 
         # other parameters are ignored
+        mock_delete_users.reset_mock()
         response = self.do_delete('{}?ids={}&page=10&page_size=2&name=John&match=partial'.format(
-            test_uri, ','.join([str(i) for i in user_ids[10:15]])
+            test_uri, ','.join([str(u.id) for u in users[10:15]])
         ))
         self.assertEqual(response.status_code, 204)
-        self.assertEqual(User.objects.filter(id__in=user_ids[10:15]).count(), 0)
-
-        # assert that only the last 15 users exist
-        self.assertEqual(User.objects.filter(id__in=user_ids[:15]).count(), 0)
-        self.assertEqual(User.objects.filter(id__in=user_ids[15:]).count(), 15)
-
+        assert_delete_users_call_args(mock_delete_users, user_ids[10:15])
 
 
 @ddt.ddt

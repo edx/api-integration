@@ -12,8 +12,9 @@ from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.cache import cache
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
-from django.db.models import Count, F, Max, Min, Prefetch, Q
+from django.db.models import Count, F, Max, Min, Prefetch, Q, Sum
 from django.http import Http404
+from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 
 from lxml import etree
@@ -42,9 +43,11 @@ from mobile_api.course_info.views import apply_wrappers_to_content
 from opaque_keys.edx.keys import UsageKey
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
+from openedx.core.djangoapps.content.course_structures.models import CourseStructure
 from openedx.core.djangoapps.course_groups.cohorts import get_cohort_user_ids
 from openedx.core.djangoapps.course_groups.models import CourseUserGroup
 from openedx.core.lib.courses import course_image_url
+from opaque_keys.edx.keys import CourseKey
 from openedx.core.lib.xblock_utils import get_course_update_items
 from social_engagement.models import StudentSocialEngagementScore
 from student.models import CourseEnrollment, CourseEnrollmentAllowed
@@ -74,6 +77,7 @@ from edx_solutions_api_integration.courses.utils import (
     get_num_users_started,
     get_total_completions,
     get_user_position,
+    get_filtered_aggregation_queryset,
 )
 from edx_solutions_api_integration.courseware_access import (
     course_exists,
@@ -1177,7 +1181,9 @@ class CoursesUsersList(MobileListAPIView):
         * GET supports dynamic fields which means we can pass list of fields we want.
         for example if we want to get only user's first_name and last_name
         ```/api/courses/{course_id}/users?fields=first_name,last_name```
-        * GET supports filtering of user by organization(s), groups
+        * GET supports direct filtering of users by user_id
+        ```/api/courses/{course_id}/users?users={user_id1},{user_id2}
+        * GET supports filtering of users by organizations, groups
          * To get users enrolled in a course and are also member of organization
          ```/api/courses/{course_id}/users?organizations={organization_id}```
          * organizations filter can be a single id or multiple ids separated by comma
@@ -1297,50 +1303,146 @@ class CoursesUsersList(MobileListAPIView):
         """
         :return: queryset for course users list.
         """
-        users = CourseEnrollment.objects.users_enrolled_in(self.course_key)
+        user_qs = CourseEnrollment.objects.users_enrolled_in(self.course_key)
         attribute_keys = css_param_to_list(self.request, 'attribute_keys')
         attribute_values = css_param_to_list(self.request, 'attribute_values')
         orgs = get_ids_from_list_param(self.request, 'organizations')
         groups = get_ids_from_list_param(self.request, 'groups')
+        users = get_ids_from_list_param(self.request, 'users')
         workgroups = get_ids_from_list_param(self.request, 'workgroups')
         exclude_groups = get_ids_from_list_param(self.request, 'exclude_groups')
         additional_fields = self.request.query_params.get('additional_fields', [])
         order_by_field = self.request.query_params.get('order_by', 'id')
         if orgs:
-            users = users.filter(organizations__in=orgs)
+            user_qs = user_qs.filter(organizations__in=orgs)
         if groups:
-            users = users.filter(groups__in=groups).distinct()
+            user_qs = user_qs.filter(groups__in=groups).distinct()
+        if users:
+            user_qs = user_qs.filter(id__in=users).distinct()
         if workgroups:
-            users = users.filter(workgroups__in=workgroups).distinct()
+            user_qs = user_qs.filter(workgroups__in=workgroups).distinct()
         if exclude_groups:
-            users = users.exclude(groups__in=exclude_groups)
+            user_qs = user_qs.exclude(groups__in=exclude_groups)
         if 'organizations' in additional_fields:
-            users = users.prefetch_related('organizations')
+            user_qs = user_qs.prefetch_related('organizations')
         if 'roles' in additional_fields:
-            users = users.prefetch_related('courseaccessrole_set')
+            user_qs = user_qs.prefetch_related('courseaccessrole_set')
         if 'grades' in additional_fields:
-            users = users.prefetch_related('studentgradebook_set')
+            user_qs = user_qs.prefetch_related('studentgradebook_set')
         if 'courses_enrolled' in additional_fields:
-            users = users.prefetch_related('courseenrollment_set')
+            user_qs = user_qs.prefetch_related('courseenrollment_set')
         if 'course_groups' in additional_fields:
-            users = users.prefetch_related(
+            user_qs = user_qs.prefetch_related(
                 Prefetch('course_groups', queryset=CourseUserGroup.objects.filter(course_id=self.course_key))
             )
 
-        self.user_organizations = Organization.objects.filter(users__in=users).distinct()
+        self.user_organizations = Organization.objects.filter(users__in=user_qs).distinct()
         if orgs:
             self.user_organizations.filter(id__in=orgs).distinct()
 
-        users = Organization.get_all_users_by_organization_attribute_filter(
-            users, self.user_organizations, attribute_keys, attribute_values
+        user_qs = Organization.get_all_users_by_organization_attribute_filter(
+            user_qs, self.user_organizations, attribute_keys, attribute_values
         )
-        users = users.select_related('profile')
-        users = users.prefetch_related('user_attributes')
+        user_qs = user_qs.select_related('profile')
+        user_qs = user_qs.prefetch_related('user_attributes')
         try:
             User._meta.get_field(order_by_field)
-            return users.order_by(order_by_field)
+            return user_qs.order_by(order_by_field)
         except FieldDoesNotExist:
-            return users
+            return user_qs
+
+
+class CoursesEngagementSummary(MobileListAPIView):
+    """
+    ### The CoursesEngagementSummary view allows clients to fetch course engagement summary
+
+    **Example Request**
+
+        * GET /api/courses/{course_id}/engagement-summary
+        * GET supports filtering of course engagement summary by organizations, groups
+        * To get course engagement summary for an organization
+        ```/api/courses/{course_id}/engagement-summary?organizations={organization_id}```
+
+    **GET Response Values**
+
+        * {
+            "engaged_users": 8,
+            "total_users": 21,
+            "active_users": 12,
+            "last_week_login_users": 1,
+            "total_course_progress": 0.5024027959807782,
+            "active_users_progress": 0.8792048929663618,
+            "active_users_percentage": 57.14285714285714,
+            "engaged_users_progress": 1.3188073394495428,
+            "engaged_users_percentage": 38.095238095238095,
+            "last_week_login_users_progress": 0.9174311926605511,
+            "last_week_login_users_percentage": 4.761904761904762,
+        }
+    """
+    def get(self, request, course_id):  # pylint: disable=W0221
+        """
+        GET /api/courses/{course_id}/engagement-summary
+        """
+        if not request.user.is_staff:
+            return Response({}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not course_exists(course_id):
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+        self.course_key = get_course_key(course_id)
+
+        user_id = self.request.query_params.get('user_id', None)
+        params = {
+            'user_id': user_id,
+            'org_ids': get_ids_from_list_param(self.request, 'organizations'),
+            'group_ids': get_ids_from_list_param(self.request, 'groups'),
+            'exclude_users': get_aggregate_exclusion_user_ids(self.course_key),
+            'cohort_user_ids': _get_users_in_cohort(user_id, self.course_key, ignore_groupwork=True),
+        }
+        user_qs = CourseEnrollment.objects.users_enrolled_in(self.course_key).exclude(
+            id__in=params.get('exclude_users') or []
+        )
+        if params.get('org_ids'):
+            user_qs = user_qs.filter(organizations__in=params.get('org_ids') or [])
+
+        total_users = user_qs.count()
+
+        active_users = user_qs.filter(is_active=True).count()
+        last_week = timezone.now() - timezone.timedelta(days=7)
+        users_logged_in_last_week = user_qs.filter(last_login__range=(last_week, timezone.now()))
+        users_logged_in_last_week_count = users_logged_in_last_week.count()
+
+        progress_qs = get_filtered_aggregation_queryset(self.course_key, **params)
+        progress_sum = (progress_qs.aggregate(percent=Sum('percent')).get('percent') or 0) * 100
+        last_week_progress = progress_qs.filter(user_id__in=users_logged_in_last_week)
+        last_week_progress_sum = (last_week_progress.aggregate(
+            percent=Sum('percent')
+        ).get('percent') or 0) * 100
+        users_with_progress = progress_qs.count()
+
+        def safe_division(dividend, divisor):
+            return 0 if divisor == 0 else dividend / divisor
+
+        data = {}
+        data['total_users'] = total_users
+        data['total_course_progress'] = safe_division(float(progress_sum), total_users)
+
+        data['active_users'] = active_users
+        data['active_users_percentage'] = safe_division(float(active_users), total_users) * 100
+        data['active_users_progress'] = safe_division(float(progress_sum), active_users)
+
+        data['engaged_users'] = users_with_progress
+        data['engaged_users_percentage'] = safe_division(float(users_with_progress), total_users) * 100
+        data['engaged_users_progress'] = safe_division(float(progress_sum), users_with_progress)
+
+        data['last_week_login_users'] = users_logged_in_last_week_count
+        data['last_week_login_users_percentage'] = safe_division(
+            float(users_logged_in_last_week_count), total_users
+        ) * 100
+        data['last_week_login_users_progress'] = safe_division(
+            float(last_week_progress_sum), users_logged_in_last_week_count
+        )
+
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class CoursesUsersPassedList(SecureListAPIView):
@@ -2517,3 +2619,67 @@ class CourseNavView(SecureAPIView):
         }
 
         return Response(result, status=status.HTTP_200_OK)
+
+
+class CoursesTree(MobileListAPIView):
+    """
+    **Use Case**
+
+        CoursesTree returns a course tree for a list of comma seperated course ids.
+        Response will be a list of courses with content and id. content is actual course tree.
+
+
+    **Example Request**
+
+        GET /api/courses/tree?course_ids=CA/CS102/2018,CA/CS104/2019
+
+
+    **Example Response**
+    [
+        {
+            "id": **,
+            "content": {
+            }
+        },
+        {
+            "id": **,
+            "content": {
+            }
+        },
+    ]
+    """
+    def get(self, request):
+        course_ids = css_param_to_list(request, 'course_ids')
+        course_ids = [get_course_key(c) for c in course_ids]
+        course_structures = CourseStructure.objects.filter(course_id__in=course_ids)
+        response_data = []
+        for course_structure in course_structures:
+            for course_id in course_ids:
+                if course_structure.course_id != course_id:
+                    continue
+
+                blocks = course_structure.structure.get('blocks', {}).copy()
+                for block in blocks.values():
+                    block['name'] = block.pop('display_name')
+                    block['category'] = block.pop('block_type')
+
+                course = [block for block_id, block in blocks.items() if block['category'] == 'course'][0]
+                self._update_blocks(course, blocks)
+                course_data = {
+                    "id": str(course_id),
+                    "content": course['children']
+                }
+                response_data.append(course_data)
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    def _update_blocks(self, _block, _blocks):
+        # add actual blocks from _blocks instead of block ids in the _block
+
+        children = []
+        for block_id in _block['children']:
+            _blocks[block_id]['id'] = block_id
+            children.append(_blocks[block_id])
+
+        _block['children'] = children
+        for b in _block['children']:
+            self._update_blocks(b, _blocks)

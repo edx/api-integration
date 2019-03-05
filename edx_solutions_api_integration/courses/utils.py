@@ -2,7 +2,7 @@ from completion_aggregator.models import Aggregator
 from django.db.models import Q, Sum, Avg
 
 
-def _get_filtered_aggregation_queryset(course_key, **kwargs):
+def get_filtered_aggregation_queryset(course_key, **kwargs):
     queryset = Aggregator.objects.filter(
         course_key__exact=course_key,
         user__is_active=True,
@@ -59,10 +59,12 @@ def generate_leaderboard(course_key, **kwargs):
     ]
 
     """
-    queryset = _get_filtered_aggregation_queryset(course_key, **kwargs)
+    queryset = get_filtered_aggregation_queryset(course_key, **kwargs)
     queryset = queryset.values(
         'user__id',
         'user__username',
+        'user__first_name',
+        'user__last_name',
         'user__profile__title',
         'user__profile__profile_image_uploaded_at',
         'earned',
@@ -73,13 +75,13 @@ def generate_leaderboard(course_key, **kwargs):
 
 
 def get_total_completions(course_key, **kwargs):
-    queryset = _get_filtered_aggregation_queryset(course_key, **kwargs)
+    queryset = get_filtered_aggregation_queryset(course_key, **kwargs)
     aggregate = queryset.aggregate(earned=Sum('earned'), possible=Avg('possible'))
     return aggregate.get('earned'), aggregate.get('possible')
 
 
 def get_num_users_started(course_key, **kwargs):
-    queryset = _get_filtered_aggregation_queryset(course_key, **kwargs)
+    queryset = get_filtered_aggregation_queryset(course_key, **kwargs)
     return queryset.distinct().count()
 
 

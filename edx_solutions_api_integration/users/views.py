@@ -37,11 +37,12 @@ from openedx.core.djangoapps.course_groups.cohorts import (
     remove_user_from_cohort,
 )
 from openedx.core.djangoapps.user_api.models import UserPreference
+from openedx.core.djangoapps.user_api.accounts.api import delete_users
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from edx_notifications.lib.consumer import mark_notification_read
 from course_metadata.models import CourseAggregatedMetaData, CourseSetting
 from completion_aggregator.models import Aggregator
-from student.models import CourseEnrollment, CourseEnrollmentException, PasswordHistory, UserProfile
+from student.models import CourseEnrollment, CourseEnrollmentException, PasswordHistory, UserProfile, LoginFailures
 from student.roles import (
     CourseAccessRole,
     CourseInstructorRole,
@@ -426,7 +427,7 @@ class UsersList(SecureListAPIView):
         # require at least either ids or username filters
         if set(self.request.query_params.keys()) & set(['username', 'ids']):
             qs = self.filter_queryset(self.queryset)
-            qs.delete()
+            delete_users(qs)
             return Response({}, status.HTTP_204_NO_CONTENT)
         else:
             return Response({'message': _('username or ids are missing')}, status.HTTP_400_BAD_REQUEST)
@@ -783,6 +784,10 @@ class UsersDetail(SecureAPIView):
             existing_user.save()
             update_user_password_hash = existing_user.password
 
+            # clear failed login attempts counters, if applicable
+            if LoginFailures.is_feature_enabled():
+                LoginFailures.clear_lockout_counter(existing_user)
+
             if update_user_password_hash != old_password_hash:
                 # add this account creation to password history
                 # NOTE, this will be a NOP unless the feature has been turned on in configuration
@@ -1026,7 +1031,8 @@ class UsersCoursesList(SecureAPIView):
             }
             return Response(response_data, status=status.HTTP_409_CONFLICT)
 
-        log.debug('User "{}" has been automatically added in cohort "{}" for course "{}"'.format(  # pylint: disable=W1202
+        log.debug(u'User "{}" has been automatically added in cohort "{}" for course "{}"'.format(
+            # pylint: disable=W1202
             user.username, default_cohort.name, course_descriptor.display_name)
         )  # pylint: disable=C0330
         response_data['uri'] = '{}/{}'.format(base_uri, course_key)
@@ -1044,7 +1050,7 @@ class UsersCoursesList(SecureAPIView):
             user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
-        enrollments = CourseEnrollment.enrollments_for_user(user=user)
+        enrollments = CourseEnrollment.enrollments_for_user(user=user).order_by('-created')
         response_data = []
         for enrollment in enrollments:
             if enrollment.course_overview:
@@ -1054,7 +1060,8 @@ class UsersCoursesList(SecureAPIView):
                     "is_active": enrollment.is_active,
                     "name": enrollment.course_overview.display_name,
                     "start": enrollment.course_overview.start,
-                    "end": enrollment.course_overview.end
+                    "end": enrollment.course_overview.end,
+                    "course_image_url": enrollment.course_overview.course_image_url,
                 }
                 response_data.append(course_data)
 
