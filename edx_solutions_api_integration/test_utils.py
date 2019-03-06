@@ -20,9 +20,6 @@ from util.db import OuterAtomic
 from xmodule.modulestore.django import SignalHandler
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
-from course_metadata.signals import (
-    course_publish_handler_in_course_metadata as listener_in_course_metadata
-)
 from gradebook.signals import on_course_grade_changed
 
 
@@ -275,9 +272,6 @@ class SignalDisconnectTestMixin(object):
         """
         connects signals defined in solutions apps
         """
-        SignalHandler.course_published.connect(
-            listener_in_course_metadata, dispatch_uid='course_metadata'
-        )
         PROBLEM_WEIGHTED_SCORE_CHANGED.connect(on_course_grade_changed)
 
     @staticmethod
@@ -285,9 +279,6 @@ class SignalDisconnectTestMixin(object):
         """
         Disconnects signals defined in solutions apps
         """
-        SignalHandler.course_published.disconnect(
-            listener_in_course_metadata, dispatch_uid='course_metadata'
-        )
         PROBLEM_WEIGHTED_SCORE_CHANGED.disconnect(on_course_grade_changed)
 
 
