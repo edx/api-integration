@@ -7,6 +7,8 @@ import logging
 import datetime
 import urllib2 as urllib
 import io
+
+from django.db import connection
 import random
 from itertools import product
 from collections import namedtuple
@@ -20,6 +22,7 @@ from opaque_keys.edx.keys import CourseKey
 from xmodule.modulestore.django import modulestore
 from xmodule.modulestore import ModuleStoreEnum
 
+from django.contrib.auth.models import User
 from student.models import UserProfile
 from courseware.models import StudentModule
 
@@ -81,37 +84,41 @@ class Command(BaseCommand):
         Given a course_id, returns a QuerySet of all the active students
         in the course.
         """
-        students = UserProfile.objects.filter(
-            user__courseenrollment__course_id=course_key,
-            user__courseenrollment__is_active=True,
+        return User.objects.filter(
+            courseenrollment__course_id=course_key,
+            courseenrollment__is_active=True,
         )
-        return students
 
     @staticmethod
-    def generate_combinations(users, blocks, overwrite_answers=True):
-        combinations = product(users, blocks)
+    def generate_combinations(students, blocks, course_key):
+        # User Cartesian multiplication to find all possible
+        # student vs block combinations. This needs to be a list!
+        combinations = [item for item in product(students, blocks)]
 
-        # Abandoning this for now
-        # if not overwrite_answers:
-        #     with transaction.atomic():
-        #         combinations = [
-        #             c for c in combinations if not StudentModule.objects.filter(
-        #                 student_id=c[0].user,
-        #                 module_state_key=c[1]
-        #             ).exists()
-        #         ]
+        # Remove combinations that already have entries on the answers table
+        responses = StudentModule.objects.filter(
+            student__in=students,
+            module_state_key__in=[block.location for block in blocks]
+        )
+        # Compile list of combinations to be skipped and map course run info.
+        # The casting to str() is needed to avoid the need to call
+        # map_to_course on every location, which could lead to a query explosion
+        skip_combinations = [
+            [item.student, str(item.module_state_key)] for item in responses
+        ]
 
-        return combinations
+        # Returns combinations that aren't already stored
+        return [c for c in combinations if [c[0], str(c[1].location)] not in skip_combinations]
 
     @staticmethod
-    def create_dummy_submissions(user, block):
+    def generate_dummy_submission(student, block, course_key):
         """
         Generates a random answers for a specified user and block
 
         The currently supported blocks are poll and survey
         """
-        def select_random_answer(choices):
-            return random.choices(choices)
+        location = block.location
+        answer = {}
 
         if block.category == 'poll':
             # Possible answers come in this format:
@@ -124,11 +131,6 @@ class Command(BaseCommand):
                 "submissions_count": 1,
                 "choice": random.choice(possible_answers),
             }
-            print(answer)
-            # StudentModule.objects.create(
-            #     student_id=user,
-            #     state=answer,
-            # )
         elif block.category == 'survey':
             # Questions come in this format:
             # ('enjoy', {'img': None, 'img_alt': None, 'label': 'Are you enjoying the course?'})
@@ -144,7 +146,13 @@ class Command(BaseCommand):
                 "choices": {key: random.choice(possible_answers) for key in questions},
             }
 
-            print(answer)
+        return StudentModule(
+            module_type='problem',
+            module_state_key=location,
+            student=student,
+            course_id=course_key,
+            state=answer,
+        )
 
     def handle(self, *args, **options):
         """
@@ -154,7 +162,7 @@ class Command(BaseCommand):
         To use this command to generate answers for polls and suveys, you'll
         need to create a course, add polls/surveys and users to it.
         """
-        from django.db import connection
+        base = len(connection.queries)
         if not options.get('course_id'):
             raise CommandError("add_test_poll_responses command requires the parameter --course-id")
 
@@ -164,14 +172,16 @@ class Command(BaseCommand):
         # Get data from store and models
         courses = store.get_course(course_key)
         blocks = self.get_course_blocks(store, course_key, ['poll', 'survey'])
-        users = self.get_enrolled_students(course_key)
+        students = self.get_enrolled_students(course_key)
 
         # Create product between users and polls
-        combinations = self.generate_combinations(users, blocks)
-        # import pdb; pdb.set_trace()
+        combinations = self.generate_combinations(students, blocks, course_key)
 
+        submissions = []
         # Zip through items, limiting range with num_responses
-        for index, [user, block] in zip(range(options['num_responses']), combinations):
-            with transaction.atomic():
-                self.create_dummy_submissions(user, block)
-        import pdb; pdb.set_trace()
+        for index, [student, block] in zip(range(options['num_responses']), combinations):
+            submissions.append(self.generate_dummy_submission(student, block, course_key))
+
+        if submissions:
+            StudentModule.objects.bulk_create(submissions)
+        print(len(connection.queries)-base)
