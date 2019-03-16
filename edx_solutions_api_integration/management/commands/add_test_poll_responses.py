@@ -162,7 +162,6 @@ class Command(BaseCommand):
         To use this command to generate answers for polls and suveys, you'll
         need to create a course, add polls/surveys and users to it.
         """
-        base = len(connection.queries)
         if not options.get('course_id'):
             raise CommandError("add_test_poll_responses command requires the parameter --course-id")
 
@@ -184,4 +183,3 @@ class Command(BaseCommand):
 
         if submissions:
             StudentModule.objects.bulk_create(submissions)
-        print(len(connection.queries)-base)
