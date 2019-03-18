@@ -435,7 +435,9 @@ class UsersList(SecureListAPIView):
         # require at least either ids or username filters
         if set(self.request.query_params.keys()) & set(['username', 'ids']):
             qs = self.filter_queryset(self.get_queryset())
-            delete_users(qs)
+            results = delete_users(qs)
+            if results:
+                return Response(results, status.HTTP_200_OK)
             return Response({}, status.HTTP_204_NO_CONTENT)
         else:
             return Response({'message': _('username or ids are missing')}, status.HTTP_400_BAD_REQUEST)

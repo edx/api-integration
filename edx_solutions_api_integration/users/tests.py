@@ -2522,6 +2522,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             CourseEnrollmentFactory.create(user=user, course_id=course2.id)
 
         # delete 1 user by id
+        mock_delete_users.side_effect = lambda _: {}
         response = self.do_delete('{}?ids={}'.format(test_uri, users[0].id))
         self.assertEqual(response.status_code, 204)
 
