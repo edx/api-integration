@@ -161,7 +161,7 @@ class SimpleUserSerializer(DynamicFieldsModelSerializer):
     class Meta(object):
         """ Serializer/field specification """
         model = APIUser
-        fields = ("id", "email", "username", "first_name", "last_name", "created", "is_active")
+        fields = ("id", "email", "username", "first_name", "last_name", "created", "is_active", "last_login")
         read_only_fields = ("id", "email", "username")
 
 
