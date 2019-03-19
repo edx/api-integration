@@ -7,6 +7,7 @@ import logging
 import datetime
 import urllib2 as urllib
 import io
+import json
 
 from django.db import connection
 import random
@@ -24,14 +25,14 @@ from xmodule.modulestore import ModuleStoreEnum
 
 from django.contrib.auth.models import User
 from student.models import UserProfile
-from courseware.models import StudentModule
+from courseware.models import StudentModule, XModuleUserStateSummaryField
 
 from django.db import transaction
 
 
 # Variables
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 # Classes
 
@@ -56,7 +57,15 @@ class Command(BaseCommand):
                  "generating 10k responses. Setting this to 0 will generate"
                  "a dummy response for every user in every poll.",
         ),
+        make_option(
+            "--batch-size",
+            dest="batch_size",
+            default=500,
+            type="int",
+            help="Batch size to use when adding responses to the database.",
+        ),
     )
+    state_summary = {}
 
     @staticmethod
     def get_course_blocks(
@@ -81,19 +90,16 @@ class Command(BaseCommand):
     @staticmethod
     def get_enrolled_students(course_key):
         """
-        Given a course_id, returns a QuerySet of all the active students
+        Given a course_id, returns a QuerySet of all the students
         in the course.
         """
-        return User.objects.filter(
-            courseenrollment__course_id=course_key,
-            courseenrollment__is_active=True,
-        )
+        return User.objects.filter(courseenrollment__course_id=course_key)
 
     @staticmethod
-    def generate_combinations(students, blocks, course_key):
+    def generate_combinations(students, blocks, course_key, limit):
         # User Cartesian multiplication to find all possible
-        # student vs block combinations. This needs to be a list!
-        combinations = [item for item in product(students, blocks)]
+        # student vs block combinations.
+        combinations = product(students, blocks)
 
         # Remove combinations that already have entries on the answers table
         responses = StudentModule.objects.filter(
@@ -107,11 +113,16 @@ class Command(BaseCommand):
             [item.student, str(item.module_state_key)] for item in responses
         ]
 
-        # Returns combinations that aren't already stored
-        return [c for c in combinations if [c[0], str(c[1].location)] not in skip_combinations]
+        count = 0
+        # Returns generator of combinations that aren't already stored
+        for c in combinations:
+            if count >= limit:
+                break
+            if [c[0], str(c[1].location)] not in skip_combinations:
+                count += 1
+                yield c
 
-    @staticmethod
-    def generate_dummy_submission(student, block, course_key):
+    def generate_dummy_submission(self, student, block, course_key):
         """
         Generates a random answers for a specified user and block
 
@@ -127,9 +138,10 @@ class Command(BaseCommand):
             possible_answers = [a[0] for a in block.answers]
             # Answer format for StudentModule model:
             # {"submissions_count": 1, "choice": "R"}
+            choice = random.choice(possible_answers)
             answer = {
                 "submissions_count": 1,
-                "choice": random.choice(possible_answers),
+                "choice": choice,
             }
         elif block.category == 'survey':
             # Questions come in this format:
@@ -138,12 +150,12 @@ class Command(BaseCommand):
             questions = [q[0] for q in block.questions]
             # This happens similarly with answers
             possible_answers = [a[0] for a in block.answers]
-
             # Answer format for StudentModule model:
             # {"submissions_count": 1, "choices": {"enjoy": "Y", "learn": "Y", "recommend": "N"}}
+            choices = {key: random.choice(possible_answers) for key in questions}
             answer = {
                 "submissions_count": 1,
-                "choices": {key: random.choice(possible_answers) for key in questions},
+                "choices": choices,
             }
 
         return StudentModule(
@@ -151,7 +163,7 @@ class Command(BaseCommand):
             module_state_key=location,
             student=student,
             course_id=course_key,
-            state=answer,
+            state=json.dumps(answer),
         )
 
     def handle(self, *args, **options):
@@ -171,15 +183,28 @@ class Command(BaseCommand):
         # Get data from store and models
         courses = store.get_course(course_key)
         blocks = self.get_course_blocks(store, course_key, ['poll', 'survey'])
+        # Filter users that and in course
         students = self.get_enrolled_students(course_key)
-
-        # Create product between users and polls
-        combinations = self.generate_combinations(students, blocks, course_key)
+        logger.info("Found {} users on course {}.", len(students), course_key)
 
         submissions = []
-        # Zip through items, limiting range with num_responses
-        for index, [student, block] in zip(range(options['num_responses']), combinations):
-            submissions.append(self.generate_dummy_submission(student, block, course_key))
+        # iterate over every combination that doesn't already exists on db
+        for [student, block] in self.generate_combinations(
+            students,
+            blocks,
+            course_key,
+            limit=options['num_responses']
+        ):
+            submissions.append(self.generate_dummy_submission(
+                student,
+                block,
+                course_key
+            ))
 
         if submissions:
-            StudentModule.objects.bulk_create(submissions)
+            logger.info("Generated {} submissions...".format(len(submissions)))
+            # Generate submissions
+            StudentModule.objects.bulk_create(submissions, batch_size=options['batch_size'])
+            # TODO: Update state summary on XModuleUserStateSummaryField
+
+        logger.info("Poll and survey response generation completed successfully.")
