@@ -1,38 +1,27 @@
 """
-Management command to migrate profile images from s3 bucket to open edx profile images storage
-./manage.py lms migrate_profile_images  --settings=aws --aws-access-key="x" --aws-access-secret="x" --bucket-name="b"
+Command to generate dummy problem responses xblock poll in a course
+./manage.py lms add_test_poll_responses --settings=devstack --course-id=TestX/TS101/2019_T1
 """
 
-import logging
-import datetime
-import urllib2 as urllib
-import io
 import json
-
-from django.db import connection
+import logging
 import random
-from itertools import product
-from collections import namedtuple
-
-from optparse import make_option
-from django.core.management.base import BaseCommand, CommandError
-
-from edx_solutions_api_integration.models import APIUser as User
-from course_blocks.api import get_course_blocks
-from opaque_keys.edx.keys import CourseKey
-from xmodule.modulestore.django import modulestore
-from xmodule.modulestore import ModuleStoreEnum
 
 from django.contrib.auth.models import User
-from student.models import UserProfile
-from courseware.models import StudentModule, XModuleUserStateSummaryField
+from django.core.management.base import BaseCommand, CommandError
+from itertools import product
+from optparse import make_option
 
-from django.db import transaction
+from courseware.models import StudentModule  # pylint: disable=import-error
+from edx_solutions_api_integration.models import APIUser as User
+from opaque_keys.edx.keys import CourseKey
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.django import modulestore
 
 
 # Variables
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)  # pylint: disable=locally-disabled, invalid-name
 
 # Classes
 
@@ -68,7 +57,7 @@ class Command(BaseCommand):
     state_summary = {}
 
     @staticmethod
-    def get_course_blocks(
+    def get_course_blocks(  # pylint: disable=bad-continuation
         store,
         course_key,
         categories,
@@ -96,7 +85,11 @@ class Command(BaseCommand):
         return User.objects.filter(courseenrollment__course_id=course_key)
 
     @staticmethod
-    def generate_combinations(students, blocks, course_key, limit):
+    def generate_combinations(students, blocks, limit):
+        """
+        Generates all possible user X block combination that aren't
+        already on the database
+        """
         # User Cartesian multiplication to find all possible
         # student vs block combinations.
         combinations = product(students, blocks)
@@ -115,14 +108,15 @@ class Command(BaseCommand):
 
         count = 0
         # Returns generator of combinations that aren't already stored
-        for c in combinations:
+        for combination in combinations:
             if count >= limit:
                 break
-            if [c[0], str(c[1].location)] not in skip_combinations:
+            if [combination[0], str(combination[1].location)] not in skip_combinations:
                 count += 1
-                yield c
+                yield combination
 
-    def generate_dummy_submission(self, student, block, course_key):
+    @staticmethod
+    def generate_dummy_submission(student, block, course_key):
         """
         Generates a random answers for a specified user and block
 
@@ -181,20 +175,14 @@ class Command(BaseCommand):
         course_key = CourseKey.from_string(options['course_id'])
 
         # Get data from store and models
-        courses = store.get_course(course_key)
         blocks = self.get_course_blocks(store, course_key, ['poll', 'survey'])
         # Filter users that and in course
         students = self.get_enrolled_students(course_key)
-        logger.info("Found {} users on course {}.", len(students), course_key)
+        logger.info("Found %i users on course %s.", len(students), course_key)
 
         submissions = []
         # iterate over every combination that doesn't already exists on db
-        for [student, block] in self.generate_combinations(
-            students,
-            blocks,
-            course_key,
-            limit=options['num_responses']
-        ):
+        for [student, block] in self.generate_combinations(students, blocks, options['num_responses']):
             submissions.append(self.generate_dummy_submission(
                 student,
                 block,
@@ -202,7 +190,7 @@ class Command(BaseCommand):
             ))
 
         if submissions:
-            logger.info("Generated {} submissions...".format(len(submissions)))
+            logger.info("Generated %i submissions...", len(submissions))
             # Generate submissions
             StudentModule.objects.bulk_create(submissions, batch_size=options['batch_size'])
             # TODO: Update state summary on XModuleUserStateSummaryField
