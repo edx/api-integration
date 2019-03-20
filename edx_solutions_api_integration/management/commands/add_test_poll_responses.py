@@ -68,13 +68,11 @@ class Command(BaseCommand):
 
         By default, only returns only XBlocks that are published.
         """
-        return [
-            block for block in store.get_items(
-                course_key,
-                qualifiers={"category": categories},
-                revision=revision,
-            )
-        ]
+        return store.get_items(
+            course_key,
+            qualifiers={"category": categories},
+            revision=revision,
+        )
 
     @staticmethod
     def get_enrolled_students(course_key):
@@ -103,17 +101,17 @@ class Command(BaseCommand):
         # The casting to str() is needed to avoid the need to call
         # map_to_course on every location, which could lead to a query explosion
         skip_combinations = [
-            [item.student, str(item.module_state_key)] for item in responses
+            (item.student, str(item.module_state_key)) for item in responses
         ]
 
         count = 0
         # Returns generator of combinations that aren't already stored
-        for combination in combinations:
+        for student, block in combinations:
             if count >= limit:
                 break
-            if [combination[0], str(combination[1].location)] not in skip_combinations:
+            if (student, str(block.location)) not in skip_combinations:
                 count += 1
-                yield combination
+                yield student, block
 
     @staticmethod
     def generate_dummy_submission(student, block, course_key):
@@ -129,7 +127,7 @@ class Command(BaseCommand):
             # Possible answers come in this format:
             # ('G', {'img': None, 'img_alt': None, 'label': 'Green'})
             # and we only need the 'G' bit for saving the answer
-            possible_answers = [a[0] for a in block.answers]
+            possible_answers = [answer for answer, _ in block.answers]
             # Answer format for StudentModule model:
             # {"submissions_count": 1, "choice": "R"}
             choice = random.choice(possible_answers)
@@ -141,9 +139,9 @@ class Command(BaseCommand):
             # Questions come in this format:
             # ('enjoy', {'img': None, 'img_alt': None, 'label': 'Are you enjoying the course?'})
             # and we only need the 'enjoy' part
-            questions = [q[0] for q in block.questions]
+            questions = [question for question, _ in block.questions]
             # This happens similarly with answers
-            possible_answers = [a[0] for a in block.answers]
+            possible_answers = [answer for answer, _ in block.answers]
             # Answer format for StudentModule model:
             # {"submissions_count": 1, "choices": {"enjoy": "Y", "learn": "Y", "recommend": "N"}}
             choices = {key: random.choice(possible_answers) for key in questions}
@@ -194,5 +192,6 @@ class Command(BaseCommand):
             # Generate submissions
             StudentModule.objects.bulk_create(submissions, batch_size=options['batch_size'])
             # TODO: Update state summary on XModuleUserStateSummaryField
-
-        logger.info("Poll and survey response generation completed successfully.")
+            logger.info("Poll and survey response generation completed successfully.")
+        else:
+            logger.info("No new submissions were generated.")
