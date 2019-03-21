@@ -3,6 +3,7 @@
 import json
 import logging
 import operator
+import os
 from datetime import datetime
 from functools import reduce
 
@@ -92,6 +93,7 @@ from edx_solutions_api_integration.users.serializers import (
     UserRolesSerializer,
     CourseProgressSerializer,
 )
+from openedx.core.djangoapps.user_api.accounts.image_helpers import get_profile_image_names, get_profile_image_storage
 
 log = logging.getLogger(__name__)
 AUDIT_LOG = logging.getLogger("audit")
@@ -732,6 +734,18 @@ class UsersDetail(SecureAPIView):
         existing_user.save()
 
         username = request.data.get('username', None)
+        old_username = str(existing_user.username)
+        if username and old_username != username:
+            storage = get_profile_image_storage()
+            profile_image_names = get_profile_image_names(old_username)
+            new_profile_image_names = get_profile_image_names(username)
+            for old_image_size, old_image_name in profile_image_names.items():
+                for new_image_size, new_image_name in new_profile_image_names.items():
+                    if new_image_size == old_image_size:
+                        old_image_path = storage.path(old_image_name)
+                        new_image_path = storage.location + '/' + new_image_name
+                        if storage.exists(old_image_name):
+                            os.rename(old_image_path, new_image_path)
         if username:
             try:
                 validate_slug(username)
