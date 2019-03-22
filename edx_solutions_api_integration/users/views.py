@@ -740,12 +740,15 @@ class UsersDetail(SecureAPIView):
             profile_image_names = get_profile_image_names(old_username)
             new_profile_image_names = get_profile_image_names(username)
             for old_image_size, old_image_name in profile_image_names.items():
-                for new_image_size, new_image_name in new_profile_image_names.items():
-                    if new_image_size == old_image_size:
-                        old_image_path = storage.path(old_image_name)
-                        new_image_path = storage.location + '/' + new_image_name
-                        if storage.exists(old_image_name):
-                            os.rename(old_image_path, new_image_path)
+                if storage.exists(old_image_name):
+                    for new_image_size, new_image_name in new_profile_image_names.items():
+                        if new_image_size == old_image_size:
+                            old_image_path = storage.path(old_image_name)
+                            new_image_path = storage.location + '/' + new_image_name
+                            try:
+                                os.rename(old_image_path, new_image_path)
+                            except OSError:
+                                raise
         if username:
             try:
                 validate_slug(username)
