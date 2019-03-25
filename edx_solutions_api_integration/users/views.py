@@ -763,9 +763,6 @@ class UsersDetail(SecureAPIView):
                                 old_image_path = storage.path(old_image_name)
                                 new_image_path = storage.location + '/' + new_image_name
                                 try:
-                                    print(old_image_path)
-                                    print(new_image_path)
-                                    print("nexttttttttttttttttttt")
                                     os.rename(old_image_path, new_image_path)
                                 except OSError:
                                     raise
