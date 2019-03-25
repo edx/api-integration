@@ -734,21 +734,6 @@ class UsersDetail(SecureAPIView):
         existing_user.save()
 
         username = request.data.get('username', None)
-        old_username = str(existing_user.username)
-        if username and old_username != username:
-            storage = get_profile_image_storage()
-            profile_image_names = get_profile_image_names(old_username)
-            new_profile_image_names = get_profile_image_names(username)
-            for old_image_size, old_image_name in profile_image_names.items():
-                if storage.exists(old_image_name):
-                    for new_image_size, new_image_name in new_profile_image_names.items():
-                        if new_image_size == old_image_size:
-                            old_image_path = storage.path(old_image_name)
-                            new_image_path = storage.location + '/' + new_image_name
-                            try:
-                                os.rename(old_image_path, new_image_path)
-                            except OSError:
-                                raise
         if username:
             try:
                 validate_slug(username)
@@ -756,6 +741,7 @@ class UsersDetail(SecureAPIView):
                 response_data['message'] = _('Username should only consist of A-Z and 0-9, with no spaces.')
                 return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
 
+            old_username = str(existing_user.username)
             existing_username = User.objects.filter(username=username).filter(~Q(id=user_id))
             if existing_username:
                 response_data['message'] = "User '%s' already exists" % (username)
@@ -765,6 +751,24 @@ class UsersDetail(SecureAPIView):
             existing_user.username = username
             response_data['username'] = existing_user.username
             existing_user.save()
+
+            if old_username != username:
+                storage = get_profile_image_storage()
+                profile_image_names = get_profile_image_names(old_username)
+                new_profile_image_names = get_profile_image_names(username)
+                for old_image_size, old_image_name in profile_image_names.items():
+                    if storage.exists(old_image_name):
+                        for new_image_size, new_image_name in new_profile_image_names.items():
+                            if new_image_size == old_image_size:
+                                old_image_path = storage.path(old_image_name)
+                                new_image_path = storage.location + '/' + new_image_name
+                                try:
+                                    print(old_image_path)
+                                    print(new_image_path)
+                                    print("nexttttttttttttttttttt")
+                                    os.rename(old_image_path, new_image_path)
+                                except OSError:
+                                    raise
 
         password = request.data.get('password')
         if password:
