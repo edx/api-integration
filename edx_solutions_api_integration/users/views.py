@@ -353,9 +353,10 @@ class UsersList(SecureListAPIView):
         courses = css_param_to_list(self.request, 'courses')
         usernames = css_param_to_list(self.request, 'username')
         organization_display_name = self.request.query_params.get('organization_display_name', None)
+        internal_admin_flag = self.request.query_params.get('internal_admin_flag', None)
 
         # filter internal admin course ids
-        if self.request.query_params.get('internal_admin_flag'):
+        if internal_admin_flag:
             courses = _get_internal_course_ids(self.request, courses)
             if not courses:
                 return queryset.none()
@@ -386,7 +387,7 @@ class UsersList(SecureListAPIView):
                     queryset = queryset.filter(organizations__display_name__icontains=organization_display_name)
 
             if courses:
-                if search_query_string is not None:
+                if search_query_string or internal_admin_flag:
                     # filter courses by exact course_id
                     courses = map(CourseKey.from_string, courses)
                     queryset = queryset.filter(courseenrollment__course_id__in=courses, courseenrollment__is_active=True).distinct()
