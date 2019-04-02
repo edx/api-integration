@@ -3,6 +3,7 @@
 import json
 import logging
 import operator
+import os
 from datetime import datetime
 from functools import reduce
 
@@ -41,6 +42,7 @@ from openedx.core.djangoapps.course_groups.cohorts import (
 from openedx.core.djangoapps.user_api.models import UserPreference
 from openedx.core.djangoapps.user_api.accounts.api import delete_users
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
+from openedx.core.djangoapps.user_api.accounts.image_helpers import get_profile_image_names, get_profile_image_storage
 from edx_notifications.lib.consumer import mark_notification_read
 from completion_aggregator.models import Aggregator
 from student.models import CourseEnrollment, CourseEnrollmentException, PasswordHistory, UserProfile, LoginFailures
@@ -740,6 +742,7 @@ class UsersDetail(SecureAPIView):
                 response_data['message'] = _('Username should only consist of A-Z and 0-9, with no spaces.')
                 return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
 
+            old_username = str(existing_user.username)
             existing_username = User.objects.filter(username=username).filter(~Q(id=user_id))
             if existing_username:
                 response_data['message'] = "User '%s' already exists" % (username)
@@ -749,6 +752,19 @@ class UsersDetail(SecureAPIView):
             existing_user.username = username
             response_data['username'] = existing_user.username
             existing_user.save()
+
+            if old_username != username:
+                storage = get_profile_image_storage()
+                profile_image_names = get_profile_image_names(old_username)
+                new_profile_image_names = get_profile_image_names(username)
+                for old_image_size, old_image_name in profile_image_names.items():
+                    if storage.exists(old_image_name):
+                        old_image_path = storage.path(old_image_name)
+                        new_image_path = os.path.join(storage.location, new_profile_image_names[old_image_size])
+                        try:
+                            os.rename(old_image_path, new_image_path)
+                        except OSError:
+                            raise
 
         password = request.data.get('password')
         if password:
