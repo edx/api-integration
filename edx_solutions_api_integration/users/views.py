@@ -760,7 +760,7 @@ class UsersDetail(SecureAPIView):
                 for old_image_size, old_image_name in profile_image_names.items():
                     if storage.exists(old_image_name):
                         old_image_path = storage.path(old_image_name)
-                        new_image_path = storage.location + '/' + new_profile_image_names[old_image_size]
+                        new_image_path = os.path.join(storage.location, new_profile_image_names[old_image_size])
                         try:
                             os.rename(old_image_path, new_image_path)
                         except OSError:
