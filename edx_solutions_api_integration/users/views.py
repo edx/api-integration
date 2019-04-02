@@ -42,6 +42,7 @@ from openedx.core.djangoapps.course_groups.cohorts import (
 from openedx.core.djangoapps.user_api.models import UserPreference
 from openedx.core.djangoapps.user_api.accounts.api import delete_users
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
+from openedx.core.djangoapps.user_api.accounts.image_helpers import get_profile_image_names, get_profile_image_storage
 from edx_notifications.lib.consumer import mark_notification_read
 from completion_aggregator.models import Aggregator
 from student.models import CourseEnrollment, CourseEnrollmentException, PasswordHistory, UserProfile, LoginFailures
@@ -93,7 +94,6 @@ from edx_solutions_api_integration.users.serializers import (
     UserRolesSerializer,
     CourseProgressSerializer,
 )
-from openedx.core.djangoapps.user_api.accounts.image_helpers import get_profile_image_names, get_profile_image_storage
 
 log = logging.getLogger(__name__)
 AUDIT_LOG = logging.getLogger("audit")
@@ -758,14 +758,12 @@ class UsersDetail(SecureAPIView):
                 new_profile_image_names = get_profile_image_names(username)
                 for old_image_size, old_image_name in profile_image_names.items():
                     if storage.exists(old_image_name):
-                        for new_image_size, new_image_name in new_profile_image_names.items():
-                            if new_image_size == old_image_size:
-                                old_image_path = storage.path(old_image_name)
-                                new_image_path = storage.location + '/' + new_image_name
-                                try:
-                                    os.rename(old_image_path, new_image_path)
-                                except OSError:
-                                    raise
+                        old_image_path = storage.path(old_image_name)
+                        new_image_path = storage.location + '/' + new_profile_image_names[old_image_size]
+                        try:
+                            os.rename(old_image_path, new_image_path)
+                        except OSError:
+                            raise
 
         password = request.data.get('password')
         if password:
