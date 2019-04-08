@@ -43,6 +43,7 @@ from openedx.core.djangoapps.user_api.models import UserPreference
 from openedx.core.djangoapps.user_api.accounts.api import delete_users
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from openedx.core.djangoapps.user_api.accounts.image_helpers import get_profile_image_names, get_profile_image_storage
+from openedx.features.course_experience.views.course_outline import CourseOutlineFragmentView
 from edx_notifications.lib.consumer import mark_notification_read
 from completion_aggregator.models import Aggregator
 from student.models import CourseEnrollment, CourseEnrollmentException, PasswordHistory, UserProfile, LoginFailures
@@ -54,6 +55,7 @@ from student.roles import (
     CourseAssistantRole,
     UserBasedRole,
 )
+from util.milestones_helpers import get_course_content_milestones
 from util.bad_request_rate_limiter import BadRequestRateLimiter
 from util.password_policy_validators import (
     validate_password_length, validate_password_complexity,
@@ -1974,3 +1976,20 @@ class ClientSpecificAttributesView(MobileAPIView):
         item.save()
 
         return Response({}, status=status.HTTP_200_OK)
+
+
+class UserMilestonesList(SecureListAPIView):
+    """
+    ### The UserMilestonesList view allows clients to retrieve a list of user milestones and their status
+     in a course
+    - URI: ```/api/users/{user_id}/courses/{course_id}/milestones```
+    - GET: Provides list of user milestones and their status in a course
+    """
+
+    def get(self, request, course_id, *args, **kwargs):
+        """
+        GET /api/users/{user_id}/courses/{course_id}/milestones
+        """
+
+        gated_content = CourseOutlineFragmentView().get_content_milestones(request, course_id)
+        return Response(gated_content, status=status.HTTP_200_OK)

@@ -75,6 +75,7 @@ from edx_solutions_api_integration.courses.utils import (
     generate_leaderboard,
     get_num_users_started,
     get_total_completions,
+    get_content_milestones,
     get_user_position,
     get_filtered_aggregation_queryset,
 )
@@ -789,6 +790,8 @@ class CoursesDetail(MobileAPIView):
             image_url = ''
             if hasattr(course_descriptor, 'course_image') and course_descriptor.course_image:
                 image_url = course_image_url(course_descriptor)
+
+            response_data['gated_content'] = get_content_milestones(user.id, course_id)
             response_data['language'] = course_descriptor.language
             response_data['course_image_url'] = image_url
             response_data['resources'] = []
