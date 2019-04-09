@@ -55,7 +55,6 @@ from student.roles import (
     CourseAssistantRole,
     UserBasedRole,
 )
-from util.milestones_helpers import get_course_content_milestones
 from util.bad_request_rate_limiter import BadRequestRateLimiter
 from util.password_policy_validators import (
     validate_password_length, validate_password_complexity,
