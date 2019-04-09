@@ -1,8 +1,6 @@
 from completion_aggregator.models import Aggregator
 from django.db.models import Q, Sum, Avg
 
-from util.milestones_helpers import get_course_content_milestones
-
 
 def get_filtered_aggregation_queryset(course_key, **kwargs):
     queryset = Aggregator.objects.filter(
@@ -127,25 +125,3 @@ def get_user_position(course_key, **kwargs):
         data['position'] = users_above + 1
         data['completions'] = user_completions * 100
     return data
-
-
-def get_content_milestones(user_id, course_key):
-        """
-        Returns dict of subsections with prerequisites and whether the prerequisite has been completed or not
-        """
-
-        all_course_prereqs = get_course_content_milestones(course_key)
-
-        content_ids_of_unfulfilled_prereqs = [
-            milestone['content_id']
-            for milestone in get_course_content_milestones(course_key, user_id=user_id)
-        ]
-
-        course_content_milestones = {
-            milestone['content_id']: {
-                'completed_prereqs': milestone['content_id'] not in content_ids_of_unfulfilled_prereqs
-            }
-            for milestone in all_course_prereqs
-        }
-
-        return course_content_milestones
