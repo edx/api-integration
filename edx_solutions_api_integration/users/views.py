@@ -752,14 +752,13 @@ class UsersDetail(SecureAPIView):
             existing_user.username = username
             response_data['username'] = existing_user.username
             existing_user.save()
-
             if old_username != username:
                 storage = get_profile_image_storage()
                 profile_image_names = get_profile_image_names(old_username)
                 new_profile_image_names = get_profile_image_names(username)
                 for old_image_size, old_image_name in profile_image_names.items():
                     if storage.exists(old_image_name):
-                        old_image_path = storage.path(old_image_name)
+                        old_image_path = os.path.join(storage.location, old_image_name)
                         new_image_path = os.path.join(storage.location, new_profile_image_names[old_image_size])
                         try:
                             os.rename(old_image_path, new_image_path)
