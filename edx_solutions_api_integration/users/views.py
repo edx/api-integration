@@ -44,6 +44,7 @@ from openedx.core.djangoapps.user_api.accounts.api import delete_users
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from openedx.core.djangoapps.user_api.accounts.image_helpers import get_profile_image_names, get_profile_image_storage
 from edx_notifications.lib.consumer import mark_notification_read
+from course_metadata.models import CourseAggregatedMetaData, CourseSetting
 from completion_aggregator.models import Aggregator
 from student.models import CourseEnrollment, CourseEnrollmentException, PasswordHistory, UserProfile, LoginFailures
 from student.roles import (
@@ -759,6 +760,19 @@ class UsersDetail(SecureAPIView):
                 for old_image_size, old_image_name in profile_image_names.items():
                     if storage.exists(old_image_name):
                         old_image_path = os.path.join(storage.location, old_image_name)
+                        new_image_path = os.path.join(storage.location, new_profile_image_names[old_image_size])
+                        try:
+                            os.rename(old_image_path, new_image_path)
+                        except OSError:
+                            raise
+
+            if old_username != username:
+                storage = get_profile_image_storage()
+                profile_image_names = get_profile_image_names(old_username)
+                new_profile_image_names = get_profile_image_names(username)
+                for old_image_size, old_image_name in profile_image_names.items():
+                    if storage.exists(old_image_name):
+                        old_image_path = storage.path(old_image_name)
                         new_image_path = os.path.join(storage.location, new_profile_image_names[old_image_size])
                         try:
                             os.rename(old_image_path, new_image_path)
@@ -1785,6 +1799,8 @@ class UsersCourseProgressList(SecureListAPIView):
                 aggregation_name='course'
             ).values('course_key', 'earned', 'possible', 'percent')
         }
+        course_meta_data = CourseAggregatedMetaData.objects.filter(id__in=course_keys)\
+            .values('id', 'total_assessments')
         course_overview = CourseOverview.objects.filter(id__in=course_keys)
         if str2bool(mobile_only):
             course_overview = course_overview.filter(mobile_available=True)
@@ -1803,6 +1819,7 @@ class UsersCourseProgressList(SecureListAPIView):
         serializer = CourseProgressSerializer(enrollments, many=True, context={
             'student_progress': student_progress,
             'course_overview': course_overview,
+            'course_metadata': course_meta_data,
             'user_grades': user_grades,
         })
 
