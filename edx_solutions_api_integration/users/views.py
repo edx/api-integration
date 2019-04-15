@@ -384,7 +384,7 @@ class UsersList(SecureListAPIView):
                     )
 
                 if emails:
-                    query = reduce(operator.or_, (Q(email__contains=email) for email in emails))
+                    query = reduce(operator.or_, (Q(email__icontains=email) for email in emails))
                     queryset = queryset.filter(query)
 
                 if organization_display_name is not None:
