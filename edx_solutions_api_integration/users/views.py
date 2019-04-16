@@ -761,14 +761,17 @@ class UsersDetail(SecureAPIView):
                 for old_image_size, old_image_name in profile_image_names.items():
                     if storage.exists(old_image_name):
                         try:
-                            file = storage.open(old_image_name)
-                            storage.save(new_profile_image_names[old_image_size], ContentFile(file.read()))
-                        except OSError:
+                            image_file = storage.open(old_image_name)
+                        except IOError:
+                            raise
+                        try:
+                            storage.save(new_profile_image_names[old_image_size], ContentFile(image_file.read()))
+                        except Exception:
                             raise
                         else:
                             try:
                                 storage.delete(old_image_name)
-                            except OSError:
+                            except Exception:
                                 raise
 
         password = request.data.get('password')
