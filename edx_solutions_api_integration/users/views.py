@@ -10,6 +10,7 @@ from functools import reduce
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.validators import validate_email, validate_slug, ValidationError
+from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from django.db.models import Count, Q
 from django.conf import settings
@@ -753,19 +754,20 @@ class UsersDetail(SecureAPIView):
             existing_user.username = username
             response_data['username'] = existing_user.username
             existing_user.save()
-
             if old_username != username:
                 storage = get_profile_image_storage()
                 profile_image_names = get_profile_image_names(old_username)
                 new_profile_image_names = get_profile_image_names(username)
                 for old_image_size, old_image_name in profile_image_names.items():
                     if storage.exists(old_image_name):
-                        old_image_path = storage.path(old_image_name)
-                        new_image_path = os.path.join(storage.location, new_profile_image_names[old_image_size])
                         try:
-                            os.rename(old_image_path, new_image_path)
-                        except OSError:
-                            raise
+                            image_file = storage.open(old_image_name)
+                            storage.save(new_profile_image_names[old_image_size], ContentFile(image_file.read()))
+                        except IOError:
+                            response_data['message'] = _('Could not update profile image')
+                            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+                        else:
+                            storage.delete(old_image_name)
 
         password = request.data.get('password')
         if password:
