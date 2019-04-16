@@ -762,17 +762,12 @@ class UsersDetail(SecureAPIView):
                     if storage.exists(old_image_name):
                         try:
                             image_file = storage.open(old_image_name)
-                        except IOError:
-                            raise
-                        try:
                             storage.save(new_profile_image_names[old_image_size], ContentFile(image_file.read()))
-                        except Exception:
-                            raise
+                        except IOError:
+                            response_data['message'] = _('Could not update profile image')
+                            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
                         else:
-                            try:
-                                storage.delete(old_image_name)
-                            except Exception:
-                                raise
+                            storage.delete(old_image_name)
 
         password = request.data.get('password')
         if password:
