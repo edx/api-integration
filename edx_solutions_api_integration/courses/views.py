@@ -2631,8 +2631,10 @@ class CoursesTree(MobileListAPIView):
 
     **Example Request**
 
-        GET /api/courses/tree?course_ids=CA/CS102/2018,CA/CS104/2019
-
+        POST /api/courses/tree
+        {
+            course_ids: ['CA/CS102/2018', 'CA/CS104/2019']
+        }
 
     **Example Response**
     [
@@ -2648,8 +2650,8 @@ class CoursesTree(MobileListAPIView):
         },
     ]
     """
-    def get(self, request):
-        course_ids = css_param_to_list(request, 'course_ids')
+    def post(self, request):
+        course_ids = request.data.get('course_ids')
         course_ids = [get_course_key(c) for c in course_ids]
         course_structures = CourseStructure.objects.filter(course_id__in=course_ids)
         response_data = []
