@@ -1410,22 +1410,14 @@ class UsersPreferences(SecureAPIView):
 
         status_code = status.HTTP_200_OK
         for key in request.data.keys():
-            value = request.data[key]
-
-            # see if the key already exists
-            found = None
-            for preference in user.preferences.all():
-                if preference.key == key:
-                    found = preference
-                    break
-
-            if found:
-                found.value = value
-                found.save()
-            else:
-                preference = UserPreference.objects.create(user_id=user_id, key=key, value=value)
-                preference.save()
-                status_code = status.HTTP_201_CREATED
+	        try:
+		        preference, created = UserPreference.objects.get_or_create(user_id=user_id, key=key)
+		        preference.value = request.data[key]
+		        preference.save()
+		        if created:
+			        status_code = status.HTTP_201_CREATED
+	        except IntegrityError:
+		        status_code = status.HTTP_304_NOT_MODIFIED
 
         return Response({}, status_code)
 
