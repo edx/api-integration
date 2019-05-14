@@ -7,7 +7,6 @@ from pytz import UTC
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
-from django.test.utils import override_settings
 
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from edx_solutions_api_integration.tasks import update_image_explorer_schema
@@ -42,7 +41,6 @@ class Command(BaseCommand):
         ),
     )
 
-    @override_settings(CELERY_ALWAYS_EAGER=True)
     def handle(self, *args, **options):
         course_id = options.get('course_id')
         user_id = options.get('user_id')
