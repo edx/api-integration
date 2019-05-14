@@ -33,11 +33,20 @@ class Command(BaseCommand):
             dest="course_id",
             help="Single Course ID to process IE instances in",
         ),
+        make_option(
+            "--revert",
+            dest="revert",
+            action="store_true",
+            default=False,
+            help="Revert in case something goes wrong for this script"
+        ),
     )
 
+    @override_settings(CELERY_ALWAYS_EAGER=True)
     def handle(self, *args, **options):
         course_id = options.get('course_id')
         user_id = options.get('user_id')
+        revert = options.get('revert')
 
         if not user_id:
             raise CommandError("--user-id parameter is missing. Please provide a staff user id")
@@ -49,7 +58,7 @@ class Command(BaseCommand):
 
         if course_id:
             logger.info('IE schema update task queued for Course: {}'.format(course_id))
-            update_image_explorer_schema.delay(user_id, [course_id])
+            update_image_explorer_schema.delay(user_id, [course_id], revert)
 
         else:
             # run on all open courses
@@ -61,7 +70,7 @@ class Command(BaseCommand):
             logger.info('IE schema update command: queuing task for {} Open Courses'.format(len(open_courses)))
 
             for course_ids in self.chunks(open_courses, self.batch_size):
-                update_image_explorer_schema.delay(user_id, course_ids)
+                update_image_explorer_schema.delay(user_id, course_ids, revert)
 
     def chunks(self, l, n):
         """Yield successive n-sized chunks from l."""

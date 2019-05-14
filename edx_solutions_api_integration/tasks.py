@@ -17,7 +17,7 @@ store = modulestore()
 
 
 @task(name=u'lms.djangoapps.api_integration.tasks.update_image_explorer_schema')
-def update_image_explorer_schema(staff_user_id, course_ids):
+def update_image_explorer_schema(staff_user_id, course_ids, revert=False):
     for course_id in course_ids:
         course_key = CourseKey.from_string(course_id)
         ie_blocks = store.get_items(
@@ -32,7 +32,33 @@ def update_image_explorer_schema(staff_user_id, course_ids):
                 logger.error('Invalid Image Explorer XML data for block `{}` in Course: {}. Skipping'
                              .format(block.parent.block_id, course_id))
             else:
-                _upgrade_xml_schema(block, course_id, staff_user_id)
+                if revert:
+                    _revert_upgrade_schema(block, course_id, staff_user_id)
+                else:
+                    _upgrade_xml_schema(block, course_id, staff_user_id)
+
+
+def _revert_upgrade_schema(block, course_id, staff_user_id):
+    xmltree = etree.fromstring(block.data)
+    script_processed = xmltree.attrib.get('script_processed', False)
+
+    if not script_processed:
+        return
+
+    logger.info('Reverting back IE schema for block `{}` in course `{}`'.format(block.parent.block_id, course_id))
+    xmltree.set('schema_version', '1')
+    xmltree.attrib.pop('script_processed')  # remove processed marker
+    hotspots_element = xmltree.find('hotspots')
+    hotspot_elements = hotspots_element.findall('hotspot')
+
+    for index, hotspot_element in enumerate(hotspot_elements):
+        if hotspot_element.get('x').endswith('%') or hotspot_element.get('y').endswith('%'):
+            _convert_to_percentage_coordinates(xmltree, hotspot_element, course_id, revert=True)
+
+    block.data = etree.tostring(xmltree)
+    store.update_item(xblock=block, user_id=staff_user_id)
+    logger.info('Successfully reverted IE schema for block `{}` in course: `{}`'
+                .format(block.parent.block_id, course_id))
 
 
 def _upgrade_xml_schema(block, course_id, staff_user_id):
@@ -44,6 +70,9 @@ def _upgrade_xml_schema(block, course_id, staff_user_id):
 
     logger.info('Updating IE schema for block `{}` in course `{}`'.format(block.parent.block_id, course_id))
     xmltree.set('schema_version', '2')
+
+    # mark this as updated from script for tracking purpose
+    xmltree.set('script_processed', '1')
     hotspots_element = xmltree.find('hotspots')
     hotspot_elements = hotspots_element.findall('hotspot')
 
@@ -57,7 +86,7 @@ def _upgrade_xml_schema(block, course_id, staff_user_id):
                 .format(block.parent.block_id, course_id))
 
 
-def _convert_to_percentage_coordinates(xmltree, hotspot, course_id):
+def _convert_to_percentage_coordinates(xmltree, hotspot, course_id, revert=False):
     background = xmltree.find('background')
     width = background.get('width')
     height = background.get('height')
@@ -69,7 +98,10 @@ def _convert_to_percentage_coordinates(xmltree, hotspot, course_id):
             width, height = img_size
 
     if width and height:
-        width, height = _convert_pixel_to_percentage(width, height, hotspot.get('x'), hotspot.get('y'))
+        if revert:
+            width, height = _convert_percentage_to_pixels(width, height, hotspot.get('x'), hotspot.get('y'))
+        else:
+            width, height = _convert_pixel_to_percentage(width, height, hotspot.get('x'), hotspot.get('y'))
         hotspot.set('x', width)
         hotspot.set('y', height)
 
@@ -93,7 +125,7 @@ def _replace_static_from_url(url, course_id):
         return url
 
     url = '"{}"'.format(url)
-    lms_relative_url = replace_static_urls(url, course_id=course_id)
+    lms_relative_url = replace_static_urls(url, course_id=CourseKey.from_string(course_id))
     lms_relative_url = lms_relative_url.strip('"')
     return _make_url_absolute(lms_relative_url)
 
@@ -112,5 +144,11 @@ def _convert_pixel_to_percentage(width, height, x_in_pixel, y_in_pixel):
     return '{}%'.format(x_in_percentage), '{}%'.format(y_in_percentage)
 
 
-def _save_updated_block(self, block):
-    store.update_item(xblock=block, user_id=self.staff_user_id)
+def _convert_percentage_to_pixels(width, height, x_in_percent, y_in_percent):
+    x_in_percent = x_in_percent.replace('%', '')
+    y_in_percent = y_in_percent.replace('%', '')
+
+    x_in_px= (float(x_in_percent) * width) / 100
+    y_in_px = (float(y_in_percent) * height) / 100
+
+    return str(x_in_px), str(y_in_px)
