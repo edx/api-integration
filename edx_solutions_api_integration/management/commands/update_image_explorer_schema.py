@@ -35,7 +35,6 @@ class Command(BaseCommand):
         ),
     )
 
-    @override_settings(CELERY_ALWAYS_EAGER=True)
     def handle(self, *args, **options):
         course_id = options.get('course_id')
         user_id = options.get('user_id')
