@@ -737,7 +737,6 @@ class UsersDetail(SecureAPIView):
         existing_user.save()
 
         username = request.data.get('username', None)
-        import pdb; pdb.set_trace()
         if username:
             try:
                 validate_slug(username)
