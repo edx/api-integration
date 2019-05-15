@@ -138,8 +138,8 @@ def _make_url_absolute(url):
 
 
 def _convert_pixel_to_percentage(width, height, x_in_pixel, y_in_pixel):
-    x_in_percentage = (float(x_in_pixel) / width) * 100
-    y_in_percentage = (float(y_in_pixel) / height) * 100
+    x_in_percentage = ((float(x_in_pixel) + 20.5) / width) * 100
+    y_in_percentage = ((float(y_in_pixel) + 20.5) / height) * 100
 
     return '{}%'.format(x_in_percentage), '{}%'.format(y_in_percentage)
 
@@ -151,4 +151,4 @@ def _convert_percentage_to_pixels(width, height, x_in_percent, y_in_percent):
     x_in_px= (float(x_in_percent) * width) / 100
     y_in_px = (float(y_in_percent) * height) / 100
 
-    return str(x_in_px), str(y_in_px)
+    return str(x_in_px - 20.5), str(y_in_px - 20.5)
