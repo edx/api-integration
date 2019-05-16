@@ -1091,7 +1091,7 @@ class UsersCoursesList(SecureAPIView):
                     "start": enrollment.course_overview.start,
                     "end": enrollment.course_overview.end,
                     "effort": enrollment.course_overview.effort,
-                    "course_image_url": enrollment.course_overview.course_image_url,
+                    "course_image_urls": enrollment.course_overview.image_urls,
                 }
                 response_data.append(course_data)
 
