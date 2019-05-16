@@ -996,10 +996,9 @@ class CoursesOverview(SecureAPIView):
             response_data['sections'] = _parse_overview_html(existing_content)
         else:
             response_data['overview_html'] = existing_content
-        image_url = ''
-        if hasattr(course_descriptor, 'course_image') and course_descriptor.course_image:
-            image_url = course_image_url(course_descriptor)
-        response_data['course_image_url'] = image_url
+
+        course_overview = CourseOverview.get_from_id(course_key)
+        response_data['course_image_urls'] = course_overview.image_urls
         response_data['course_video'] = get_course_about_section(request, course_descriptor, 'video')
         return Response(response_data, status=status.HTTP_200_OK)
 
