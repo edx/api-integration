@@ -740,6 +740,7 @@ class UsersDetail(SecureAPIView):
                 validate_slug(username)
             except ValidationError:
                 response_data['message'] = _('Username should only consist of A-Z and 0-9, with no spaces.')
+                response_data['code'] = _('invalid_username')
                 return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
 
             old_username = str(existing_user.username)
@@ -747,6 +748,7 @@ class UsersDetail(SecureAPIView):
             if existing_username:
                 response_data['message'] = "User '%s' already exists" % (username)
                 response_data['field_conflict'] = "username"
+                response_data['code'] = "invalid_username"
                 return Response(response_data, status=status.HTTP_409_CONFLICT)
 
             existing_user.username = username
@@ -779,6 +781,7 @@ class UsersDetail(SecureAPIView):
                     # bad user? tick the rate limiter counter
                     AUDIT_LOG.warning("API::Bad password in password_reset.")
                     response_data['message'] = _('Password: ') + '; '.join(err.messages)
+                    response_data['code'] = _('invalid_password')
                     return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
             # also, check the password reuse policy
             err_msg = None
