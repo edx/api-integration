@@ -995,10 +995,9 @@ class CoursesOverview(SecureAPIView):
             response_data['sections'] = _parse_overview_html(existing_content)
         else:
             response_data['overview_html'] = existing_content
-        image_url = ''
-        if hasattr(course_descriptor, 'course_image') and course_descriptor.course_image:
-            image_url = course_image_url(course_descriptor)
-        response_data['course_image_url'] = image_url
+
+        course_overview = CourseOverview.get_from_id(course_key)
+        response_data['course_image_urls'] = course_overview.image_urls
         response_data['course_video'] = get_course_about_section(request, course_descriptor, 'video')
         return Response(response_data, status=status.HTTP_200_OK)
 
@@ -2623,8 +2622,10 @@ class CoursesTree(MobileListAPIView):
 
     **Example Request**
 
-        GET /api/courses/tree?course_ids=CA/CS102/2018,CA/CS104/2019
-
+        POST /api/courses/tree
+        {
+            course_ids: ['CA/CS102/2018', 'CA/CS104/2019']
+        }
 
     **Example Response**
     [
@@ -2640,8 +2641,8 @@ class CoursesTree(MobileListAPIView):
         },
     ]
     """
-    def get(self, request):
-        course_ids = css_param_to_list(request, 'course_ids')
+    def post(self, request):
+        course_ids = request.data.get('course_ids')
         course_ids = [get_course_key(c) for c in course_ids]
         course_structures = CourseStructure.objects.filter(course_id__in=course_ids)
         response_data = []

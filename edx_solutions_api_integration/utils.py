@@ -7,6 +7,9 @@ import re
 import datetime
 import ast
 
+from PIL import Image
+import urllib
+
 from django.core.cache import cache
 from django.utils.timezone import now
 from dateutil.parser import parse
@@ -25,6 +28,7 @@ from openedx.core.djangoapps.user_api.accounts.image_helpers import (
 from openedx.core.djangoapps.user_api.accounts.serializers import PROFILE_IMAGE_KEY_PREFIX
 from openedx.core.djangoapps.waffle_utils import WaffleSwitchNamespace
 from student.roles import CourseRole, CourseObserverRole
+from opaque_keys.edx.keys import CourseKey
 
 USER_METRICS_CACHE_TTL = 60 * 60
 COURSE_METRICS_CACHE_TTL = 30 * 60
@@ -449,3 +453,32 @@ def is_cohort_available():
     :return: bool
     """
     return WAFFLE_COHORT_SWITCHES.is_enabled(COHORT_SWITCH)
+
+
+def replace_static_from_url(url, course_id):
+    """
+    Converts /static assets links to absolute links
+    """
+    if not url:
+        return url
+    try:
+        from static_replace import replace_static_urls
+    except ImportError:
+        return url
+
+    url = '"{}"'.format(url)
+    lms_relative_url = replace_static_urls(url, course_id=CourseKey.from_string(course_id))
+    lms_relative_url = lms_relative_url.strip('"')
+    return prefix_with_lms_base(lms_relative_url)
+
+
+def get_image_dimensions(image_url):
+    """
+    Get dimensions of a remote image
+    """
+    try:
+        img = Image.open(urllib.urlopen(image_url))
+    except Exception as e:
+        return None
+    else:
+        return img.size
