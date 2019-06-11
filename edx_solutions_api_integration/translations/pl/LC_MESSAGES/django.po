@@ -1,0 +1,355 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+# 
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2019-06-11 14:40-0400\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: edx_solutions_api_integration/courses/views.py:858
+#: edx_solutions_api_integration/groups/views.py:378
+#: edx_solutions_api_integration/users/views.py:920
+msgid "group_id is missing"
+msgstr "Brak group_id"
+
+#: edx_solutions_api_integration/courses/views.py:1962
+msgid "Both start_date and end_date parameters are required"
+msgstr "Zarówno parametr start_date jak i end_date są wymagane"
+
+#: edx_solutions_api_integration/courses/views.py:1965
+msgid ""
+"Interval parameter is not valid. It should be one of these 'days', 'weeks', "
+"'months'"
+msgstr ""
+"Parametr przedziału czasowego jest niepoprawny. Musi on zostać wyrażony jako "
+"jeden z tych ‚dni’, ‚tygodni’, ‚miesięcy’"
+
+#: edx_solutions_api_integration/courses/views.py:1971
+msgid "date format is invalid"
+msgstr "niepoprawny format danych"
+
+#: edx_solutions_api_integration/courses/views.py:2204
+msgid "content_id is missing"
+msgstr "Brak content_id"
+
+#: edx_solutions_api_integration/courses/views.py:2206
+#: edx_solutions_api_integration/groups/views.py:255
+msgid "user_id is missing"
+msgstr "Brak user_id"
+
+#: edx_solutions_api_integration/courses/views.py:2212
+msgid "content_id is invalid"
+msgstr "Niepoprawny content_id"
+
+#: edx_solutions_api_integration/courses/views.py:2217
+msgid "user_id is invalid"
+msgstr "Niepoprawny userd_id"
+
+#: edx_solutions_api_integration/groups/views.py:382
+msgid "relationship_type is missing"
+msgstr "Brak relationship_type"
+
+#: edx_solutions_api_integration/groups/views.py:548
+#: edx_solutions_api_integration/users/views.py:1037
+msgid "course_id is missing"
+msgstr "Brak course_id"
+
+#: edx_solutions_api_integration/imports/views.py:78
+msgid "Empty field: {}"
+msgstr "Puste pole: {}"
+
+#: edx_solutions_api_integration/imports/views.py:78
+msgid "Processing Participant"
+msgstr "Przetwarzanie uczestnika"
+
+#: edx_solutions_api_integration/imports/views.py:84
+msgid "Status '{}' doesn't exist"
+msgstr "Status '{}' nie istnieje"
+
+#: edx_solutions_api_integration/imports/views.py:85
+#: edx_solutions_api_integration/imports/views.py:127
+#: edx_solutions_api_integration/imports/views.py:137
+#: edx_solutions_api_integration/imports/views.py:149
+msgid "Enrolling Participant in Course"
+msgstr "Rejestrowanie uczestnika na kurs"
+
+#: edx_solutions_api_integration/imports/views.py:94
+msgid "Email \"{}\" or username \"{}\" already exists"
+msgstr "Adres e-mail \"{}\" lub użytkownik \"{}\" już istnieją"
+
+#: edx_solutions_api_integration/imports/views.py:95
+#: edx_solutions_api_integration/imports/views.py:177
+msgid "Registering Participant"
+msgstr "Rejestrowanie uczestnika"
+
+#: edx_solutions_api_integration/imports/views.py:105
+msgid "Company {} doesn't exist"
+msgstr "Firma {} nie istnieje!"
+
+#: edx_solutions_api_integration/imports/views.py:106
+#: edx_solutions_api_integration/imports/views.py:186
+msgid "Enrolling Participant in Company"
+msgstr "Rejestrowanie uczestnika w firmie"
+
+#: edx_solutions_api_integration/imports/views.py:116
+msgid "User with email \"{}\" does not exist"
+msgstr "Użytkownik o adresie e-mail \"{}\" nie istnieje"
+
+#: edx_solutions_api_integration/imports/views.py:117
+msgid "Retrieving existing Participant"
+msgstr "Pobieranie danych istniejącego użytkownika"
+
+#: edx_solutions_api_integration/imports/views.py:126
+msgid "User with email \"{}\" is already enrolled"
+msgstr "Użytkownik o adresie e-mail \"{}\" jest już zarejestrowany"
+
+#: edx_solutions_api_integration/imports/views.py:136
+msgid "Course {} doesn't exist"
+msgstr "Kurs {} nie istnieje"
+
+#: edx_solutions_api_integration/imports/views.py:148
+msgid "Course {} is not Internal"
+msgstr "Kurs {} nie jest kursem wewnętrznym"
+
+#: edx_solutions_api_integration/imports/views.py:229
+msgid "Setting Participant's Status"
+msgstr "Ustawienie statusu uczestnika"
+
+#: edx_solutions_api_integration/imports/views.py:234
+msgid "Reason: {}, Activity: {}, Participant: {}"
+msgstr "Przyczyna: {}, Aktywność: {}, Uczestnik: {}"
+
+#: edx_solutions_api_integration/imports/views.py:234
+msgid "No email"
+msgstr "Brak adresu e-mail"
+
+#: edx_solutions_api_integration/sessions/test_login_ratelimit.py:54
+#: edx_solutions_api_integration/sessions/test_login_ratelimit.py:68
+#: edx_solutions_api_integration/sessions/views.py:72
+msgid "Rate limit exceeded in api login."
+msgstr ""
+
+#: edx_solutions_api_integration/sessions/test_security.py:77
+#: edx_solutions_api_integration/sessions/test_security.py:98
+#: edx_solutions_api_integration/sessions/views.py:94
+msgid ""
+"This account has been temporarily locked due to excessive login failures. "
+"Try again later."
+msgstr ""
+
+#: edx_solutions_api_integration/sessions/test_security.py:114
+msgid "Password: Invalid Length (must be 4 characters or more)"
+msgstr ""
+
+#: edx_solutions_api_integration/sessions/test_security.py:124
+msgid "Password: Invalid Length (must be 12 characters or fewer)"
+msgstr ""
+
+#: edx_solutions_api_integration/sessions/test_security.py:135
+msgid ""
+"Password: Must be more complex (must contain 2 or more uppercase characters)"
+msgstr ""
+
+#: edx_solutions_api_integration/sessions/test_security.py:146
+msgid ""
+"Password: Must be more complex (must contain 2 or more lowercase characters)"
+msgstr ""
+
+#: edx_solutions_api_integration/sessions/test_security.py:156
+msgid ""
+"Password: Must be more complex (must contain 2 or more uppercase characters, "
+"must contain 2 or more punctuation characters)"
+msgstr ""
+
+#: edx_solutions_api_integration/sessions/test_security.py:167
+msgid ""
+"Password: Must be more complex (must contain 2 or more uppercase characters, "
+"must contain 2 or more digits)"
+msgstr ""
+
+#: edx_solutions_api_integration/sessions/test_security.py:190
+#: edx_solutions_api_integration/users/views.py:491
+msgid "Valid e-mail is required."
+msgstr ""
+
+#: edx_solutions_api_integration/sessions/test_security.py:199
+#: edx_solutions_api_integration/users/tests.py:1015
+#: edx_solutions_api_integration/users/views.py:497
+#: edx_solutions_api_integration/users/views.py:743
+msgid "Username should only consist of A-Z and 0-9, with no spaces."
+msgstr ""
+
+#: edx_solutions_api_integration/sessions/views.py:79
+#: edx_solutions_api_integration/users/views.py:458
+msgid "username is missing"
+msgstr "brak nazwy użytkownika"
+
+#: edx_solutions_api_integration/sessions/views.py:83
+#: edx_solutions_api_integration/users/views.py:462
+msgid "password is missing"
+msgstr "brak hasła"
+
+#: edx_solutions_api_integration/sessions/views.py:102
+#: edx_solutions_api_integration/users/test_user_password_reset.py:61
+msgid ""
+"Your password has expired due to password policy on this account. You must "
+"reset your password before you can log in again."
+msgstr ""
+
+#: edx_solutions_api_integration/users/test_user_password_reset.py:113
+#, fuzzy
+#| msgid ""
+#| "You are re-using a password that you have used recently. You must have "
+#| "{0} distinct password(s) before reusing a previous password."
+msgid ""
+"You are re-using a password that you have used recently. You must have 4 "
+"distinct password(s) before reusing a previous password."
+msgstr ""
+"Używasz ponownie hasła, którego używałeś niedawno. Musisz ustawić {0} rożne "
+"hasło(-a), zanim powrócisz do poprzedniego."
+
+#: edx_solutions_api_integration/users/test_user_password_reset.py:154
+#, fuzzy
+#| msgid ""
+#| "You are re-using a password that you have used recently. You must have "
+#| "{0} distinct password(s) before reusing a previous password."
+msgid ""
+"You are re-using a password that you have used recently. You must have 20 "
+"distinct password(s) before reusing a previous password."
+msgstr ""
+"Używasz ponownie hasła, którego używałeś niedawno. Musisz ustawić {0} rożne "
+"hasło(-a), zanim powrócisz do poprzedniego."
+
+#: edx_solutions_api_integration/users/test_user_password_reset.py:177
+#, fuzzy
+#| msgid ""
+#| "You are resetting passwords too frequently. Due to security policies, {0} "
+#| "day(s) must elapse between password resets"
+msgid ""
+"You are resetting passwords too frequently. Due to security policies, 1 "
+"day(s) must elapse between password resets"
+msgstr ""
+"Zbyt często resetujesz swoje hasło. Ze względów bezpieczeństwa musi upłynąć "
+"{0} dni, zanim będziesz mógł zmienić hasło."
+
+#: edx_solutions_api_integration/users/test_user_password_reset.py:216
+#: edx_solutions_api_integration/users/views.py:694
+msgid "Rate limit exceeded in password_reset."
+msgstr ""
+
+#: edx_solutions_api_integration/users/test_user_password_reset.py:279
+#: edx_solutions_api_integration/users/test_user_password_reset.py:362
+msgid "Password: Must be more complex (must contain 2 or more digits)"
+msgstr ""
+
+#: edx_solutions_api_integration/users/test_user_password_reset.py:289
+msgid ""
+"Password: Must be more complex (must contain 2 or more uppercase characters, "
+"must contain 2 or more lowercase characters)"
+msgstr ""
+
+#: edx_solutions_api_integration/users/test_user_password_reset.py:320
+#: edx_solutions_api_integration/users/test_user_password_reset.py:472
+#: edx_solutions_api_integration/users/test_user_password_reset.py:505
+msgid ""
+"Password: Must be more complex (must contain 2 or more digits, must contain "
+"2 or more punctuation characters)"
+msgstr ""
+
+#: edx_solutions_api_integration/users/test_user_password_reset.py:340
+msgid ""
+"Password: Must be more complex (must contain 1 or more non ascii characters)"
+msgstr ""
+
+#: edx_solutions_api_integration/users/test_user_password_reset.py:483
+msgid ""
+"Password: Must be more complex (must contain 2 or more punctuation "
+"characters, must contain 2 or more uppercase characters)"
+msgstr ""
+
+#: edx_solutions_api_integration/users/test_user_password_reset.py:494
+msgid ""
+"Password: Must be more complex (must contain 2 or more digits, must contain "
+"2 or more uppercase characters)"
+msgstr ""
+
+#: edx_solutions_api_integration/users/views.py:446
+msgid "username or ids are missing"
+msgstr "brak nazwy użytkownika lub id "
+
+#: edx_solutions_api_integration/users/views.py:486
+#: edx_solutions_api_integration/users/views.py:785
+msgid "Password: "
+msgstr "Hasło:"
+
+#: edx_solutions_api_integration/users/views.py:504
+#, python-brace-format
+msgid "Username '{username}' or email '{email}' already exists"
+msgstr ""
+"Nazwa użytkownika '{username}' lub adres e-mail '{email}' są już "
+"zarejestrowane"
+
+#: edx_solutions_api_integration/users/views.py:724
+msgid "Invalid email address {}."
+msgstr "Nieprawidłowy adres e-mail {}."
+
+#: edx_solutions_api_integration/users/views.py:730
+msgid "A user with that email address already exists."
+msgstr "Użytkownik o tym adresie e-mail już istnieje!"
+
+#: edx_solutions_api_integration/users/views.py:744
+msgid "invalid_username"
+msgstr "invalid_username"
+
+#: edx_solutions_api_integration/users/views.py:768
+msgid "Could not update profile image"
+msgstr "Nie udało się zaktualizować zdjęcia profilowego"
+
+#: edx_solutions_api_integration/users/views.py:786
+msgid "invalid_password"
+msgstr "invalid_password"
+
+#: edx_solutions_api_integration/users/views.py:796
+#, python-brace-format
+msgid ""
+"You are re-using a password that you have used recently. You must have {0} "
+"distinct password(s) before reusing a previous password."
+msgstr ""
+"Używasz ponownie hasła, którego używałeś niedawno. Musisz ustawić {0} rożne "
+"hasło(-a), zanim powrócisz do poprzedniego."
+
+#: edx_solutions_api_integration/users/views.py:803
+#, python-brace-format
+msgid ""
+"You are resetting passwords too frequently. Due to security policies, {0} "
+"day(s) must elapse between password resets"
+msgstr ""
+"Zbyt często resetujesz swoje hasło. Ze względów bezpieczeństwa musi upłynąć "
+"{0} dni, zanim będziesz mógł zmienić hasło."
+
+#: edx_solutions_api_integration/users/views.py:1056
+#, python-brace-format
+msgid ""
+"Student {student} already added to cohort {cohort_name} for course {course}"
+msgstr ""
+"Uczeń {student} został już dodany do grupy kursantów {cohort_name} na kursie "
+"{course}"
+
+#: edx_solutions_api_integration/users/views.py:1319
+msgid "Student not enrolled in given course"
+msgstr "Uczeń nie jest zarejestrowany na tym kursie"
+
+#: edx_solutions_api_integration/users/views.py:1734
+msgid "read field is missing"
+msgstr "Brak pola odczytu"
