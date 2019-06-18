@@ -22,7 +22,7 @@ class BaseCourseLeadersSerializer(serializers.Serializer):
     title = serializers.CharField(source='user__profile__title')
     profile_image = serializers.SerializerMethodField()
     name_initials = serializers.SerializerMethodField()
-    full_name = serializers.SerializerMethodField()
+    display_name = serializers.SerializerMethodField()
 
     def get_profile_image(self, data):
         """
@@ -37,8 +37,9 @@ class BaseCourseLeadersSerializer(serializers.Serializer):
         last = data['user__last_name'][0] if data['user__last_name'] else ''
         return ('%s%s' % (first, last)).title()
 
-    def get_full_name(self, data):
-        return ('%s %s' % (data['user__first_name'], data['user__last_name'])).strip()
+    def get_display_name(self, data):
+        last = data['user__last_name'][0] if data['user__last_name'] else ''
+        return ('%s %s' % (data['user__first_name'], last)).strip()
 
 
 class CourseProficiencyLeadersSerializer(BaseCourseLeadersSerializer):
