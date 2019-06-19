@@ -53,6 +53,8 @@ from xmodule.modulestore.tests.django_utils import (
 )
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
+from course_metadata.models import CourseAggregatedMetaData
+
 from edx_solutions_api_integration.courseware_access import get_course_descriptor, get_course_key
 from edx_solutions_api_integration.test_utils import (
     APIClientMixin, CourseGradingMixin, SignalDisconnectTestMixin,
@@ -1592,6 +1594,9 @@ class CoursesApiTests(
         user_completions, course_total_assesments = 50, 100
 
         CourseEnrollmentFactory.create(user=user, course_id=course.id)
+        CourseAggregatedMetaData.objects.update_or_create(
+            id=course.id, defaults={'total_assessments': course_total_assesments}
+        )
         section_breakdown = [
             {
                 "category": "Homework",
@@ -2433,6 +2438,9 @@ class CoursesApiTests(
         self.login()
         users_to_add, user_grade, user_completions, total_assessments = 5, 0.6, 10, 20
         course = CourseFactory()
+        CourseAggregatedMetaData.objects.update_or_create(
+            id=course.id, defaults={'total_assessments': total_assessments}
+        )
         for idx in xrange(0, users_to_add):
             user = UserFactory()
             created_user_id = user.id
