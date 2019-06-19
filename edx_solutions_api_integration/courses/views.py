@@ -25,6 +25,7 @@ from rest_framework.response import Response
 
 from completion.models import BlockCompletion
 from completion_aggregator.models import Aggregator
+from course_metadata.models import CourseAggregatedMetaData
 from courseware.courses import (
     get_course_about_section,
     get_course_info_section,
@@ -1206,6 +1207,7 @@ class CoursesUsersList(MobileListAPIView):
     """
     serializer_class = UserSerializer
     course_key = None
+    course_meta_data = None
     user_organizations = []
 
     def post(self, request, course_id):
@@ -1254,6 +1256,11 @@ class CoursesUsersList(MobileListAPIView):
         if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         self.course_key = get_course_key(course_id)
+        try:
+            self.course_meta_data = CourseAggregatedMetaData.objects.get(id=self.course_key)
+        except CourseAggregatedMetaData.DoesNotExist:
+            self.course_meta_data = None
+
         return super(CoursesUsersList, self).list(request)
 
     def get_serializer_context(self):
@@ -1286,6 +1293,7 @@ class CoursesUsersList(MobileListAPIView):
         serializer_context.update({
             'course_id': self.course_key,
             'default_fields': default_fields,
+            'course_meta_data': self.course_meta_data,
             'active_attributes': active_attributes,
         })
         return serializer_context
