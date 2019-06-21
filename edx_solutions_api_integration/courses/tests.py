@@ -37,7 +37,6 @@ from django.utils import timezone
 from django_comment_common.models import FORUM_ROLE_MODERATOR, Role
 from freezegun import freeze_time
 from instructor.access import allow_access
-from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
 from requests.exceptions import ConnectionError
 from rest_framework import status
@@ -342,7 +341,6 @@ class CoursesApiTests(
             end=cls.course_end_date,
             language=cls.language,
         )
-        cls.course_overview = CourseOverview.get_from_id(cls.course.id)
         cls.test_data = '<html>{}</html>'.format(str(uuid.uuid4()))
 
         cls.chapter = ItemFactory.create(
@@ -1025,14 +1023,14 @@ class CoursesApiTests(
         self.assertGreater(len(response.data), 0)
         asset_id = self.test_course_id.split(":")[1]
         self.assertEqual(response.data['overview_html'], self.overview.data.format(asset_id, asset_id)[1:])
-        self.assertEqual(self.course_overview.image_urls, response.data['course_image_urls'])
+        self.assertIn(self.course.course_image, response.data['course_image_url'])
 
     def test_courses_overview_get_parsed(self):
         test_uri = self.base_courses_uri + '/' + self.test_course_id + '/overview?parse=true'
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertGreater(len(response.data), 0)
-        self.assertEqual(self.course_overview.image_urls, response.data['course_image_urls'])
+        self.assertIn(self.course.course_image, response.data['course_image_url'])
         sections = response.data['sections']
         self.assertEqual(len(sections), 4)
         self.assertIsNotNone(self._find_item_by_class(sections, 'about'))
