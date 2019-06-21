@@ -3,6 +3,10 @@ import logging
 from lxml import etree
 from celery.task import task
 
+from django.contrib.auth.models import User
+
+import lms.lib.comment_client as cc
+from lms.lib.comment_client.utils import CommentClientError
 from xmodule.modulestore.django import modulestore
 from opaque_keys.edx.keys import CourseKey
 from edx_solutions_api_integration.utils import (
@@ -121,3 +125,36 @@ def _convert_percentage_to_pixels(width, height, x_in_percent, y_in_percent):
     y_in_px = (float(y_in_percent) * height) / 100
 
     return str(x_in_px - 20.5), str(y_in_px - 20.5)
+
+
+@task(name=u'lms.djangoapps.api_integration.tasks.cs_sync_user_ifno')
+def cs_sync_user_info():
+    success_count = 0
+    failed_count = 0
+
+    for user in User.objects.all().iterator():
+        cc_user = cc.User.from_django_user(user)
+        try:
+            cc_user.save()
+        except CommentClientError as e:
+            logger.error('cs_sync_script user `{}` update failed with error {}, trying a different username..'
+                         .format(user.id, e.message))
+
+            cc_user.username = '{}_1'.format(cc_user.username)
+
+            try:
+                cc_user.save()
+            except CommentClientError as e:
+                failed_count += 1
+                logger.error('cs_sync_script could not update user `{}` info. Retry failed with error {}'
+                             .format(user.id, e.message))
+            else:
+                success_count += 1
+                logger.info('cs_sync_script user info successfully updated for user `{}`'.format(user.id))
+        else:
+            success_count += 1
+            logger.info('cs_sync_script user info successfully updated for user `{}`'.format(user.id))
+
+
+    logger.info('cs_sync_script completed: {} users updated out of {}'
+                .format(success_count, success_count + failed_count))
