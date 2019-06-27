@@ -434,7 +434,11 @@ def _get_courses_metrics_completions_leaders_list(course_key, **kwargs):
         if total_users > leader_boards_cache_cohort_size:
             cache_course_data('progress_leaderboard', course_id, {'leaders': data['leaders']})
     else:
-        cache_course_data('progress', course_id, {'course_avg': data['course_avg']})
+        cache_course_data('progress', course_id, {
+            'course_avg': data['course_avg'],
+            'total_users': data['total_users'],
+            'total_possible_completions': data['total_possible_completions'],
+        })
 
         # set user data in cache only if the user exists
         if user_id:
