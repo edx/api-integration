@@ -77,7 +77,6 @@ from edx_solutions_api_integration.courses.utils import (
     get_total_completions,
     get_user_position,
     get_filtered_aggregation_queryset,
-    Round,
 )
 from edx_solutions_api_integration.courseware_access import (
     course_exists,
@@ -113,6 +112,7 @@ from edx_solutions_api_integration.utils import (
     is_cohort_available,
     str2bool,
     strip_xblock_wrapper_div,
+    Round,
 )
 from edx_solutions_organizations.models import Organization
 from edx_solutions_projects.models import Project, Workgroup

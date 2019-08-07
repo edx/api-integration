@@ -1,5 +1,5 @@
 from completion_aggregator.models import Aggregator
-from django.db.models import Q, Sum, Avg, Func
+from django.db.models import Q, Sum, Avg
 
 
 def get_filtered_aggregation_queryset(course_key, **kwargs):
@@ -126,7 +126,3 @@ def get_user_position(course_key, **kwargs):
         data['completions'] = user_completions * 100
     return data
 
-
-class Round(Func):
-    function = 'ROUND'
-    template = '%(function)s(%(expressions)s, 0)'

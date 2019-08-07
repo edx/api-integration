@@ -15,6 +15,7 @@ from django.utils.timezone import now
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta, MO
 from django.conf import settings
+from django.db.models import Func
 from django.shortcuts import get_object_or_404
 from lms.djangoapps.notification_prefs.views import UsernameCipher
 from rest_framework.exceptions import ParseError
@@ -482,3 +483,8 @@ def get_image_dimensions(image_url):
         return None
     else:
         return img.size
+
+
+class Round(Func):
+    function = 'ROUND'
+    template = '%(function)s(%(expressions)s, 0)'
