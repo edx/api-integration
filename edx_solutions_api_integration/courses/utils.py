@@ -125,4 +125,3 @@ def get_user_position(course_key, **kwargs):
         data['position'] = users_above + 1
         data['completions'] = user_completions * 100
     return data
-
