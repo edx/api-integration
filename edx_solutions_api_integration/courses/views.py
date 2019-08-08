@@ -112,6 +112,7 @@ from edx_solutions_api_integration.utils import (
     is_cohort_available,
     str2bool,
     strip_xblock_wrapper_div,
+    Round,
 )
 from edx_solutions_organizations.models import Organization
 from edx_solutions_projects.models import Project, Workgroup
@@ -1407,7 +1408,7 @@ class CoursesEngagementSummary(MobileListAPIView):
         users_logged_in_last_week_count = users_logged_in_last_week.count()
 
         progress_qs = get_filtered_aggregation_queryset(self.course_key, **params)
-        progress_sum = (progress_qs.aggregate(percent=Sum('percent')).get('percent') or 0) * 100
+        progress_sum = progress_qs.aggregate(percent=Sum(Round(F('percent')*100))).get('percent') or 0
         last_week_progress = progress_qs.filter(user_id__in=users_logged_in_last_week)
         last_week_progress_sum = (last_week_progress.aggregate(
             percent=Sum('percent')
