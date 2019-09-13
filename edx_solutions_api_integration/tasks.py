@@ -17,7 +17,7 @@ store = modulestore()
 
 
 @task(name=u'lms.djangoapps.api_integration.tasks.convert_ooyala_ids_to_bcove')
-def convert_ooyala_ids_to_bcove(staff_user_id, course_ids):
+def convert_ooyala_ids_to_bcove(staff_user_id, course_ids, revert=False):
     xblock_settings = settings.XBLOCK_SETTINGS if hasattr(settings, "XBLOCK_SETTINGS") else {}
     bcove_policy = xblock_settings.get('OoyalaPlayerBlock', {}).get('BCOVE_POLICY')
 
@@ -35,7 +35,17 @@ def convert_ooyala_ids_to_bcove(staff_user_id, course_ids):
         for block in oo_blocks:
             content_id = block.content_id
 
-            if content_id and not is_bcove_id(content_id):
+            if content_id and revert:
+                # write reference id back to content_id and empty out reference id
+                if is_bcove_id(content_id) and block.reference_id:
+                    block.content_id = block.reference_id
+                    block.reference_id = ''
+
+                    store.update_item(xblock=block, user_id=staff_user_id)
+
+                    logger.info('Successfully reverted Brightcove ID for block `{}` in course: `{}`'
+                                .format(block.parent.block_id, course_id))
+            elif content_id and not is_bcove_id(content_id):
                 bcove_video_id = get_brightcove_video_id(content_id, bcove_policy)
 
                 if bcove_video_id:

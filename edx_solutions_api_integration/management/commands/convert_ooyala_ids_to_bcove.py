@@ -31,11 +31,19 @@ class Command(BaseCommand):
             dest="course_id",
             help="Single Course ID to process Ooyala instances in",
         ),
+        make_option(
+            "--revert",
+            dest="revert",
+            action="store_true",
+            default=False,
+            help="Revert all the converted Ids back to previous state"
+        ),
     )
 
     def handle(self, *args, **options):
         course_id = options.get('course_id')
         user_id = options.get('user_id')
+        revert = options.get('revert')
 
         if not user_id:
             raise CommandError("--user-id parameter is missing. Please provide a staff user id")
@@ -47,7 +55,7 @@ class Command(BaseCommand):
 
         if course_id:
             logger.info('Ooyala IDs update task queued for Course: {}'.format(course_id))
-            convert_ooyala_ids_to_bcove.delay(user_id, [course_id])
+            convert_ooyala_ids_to_bcove.delay(user_id, [course_id], revert)
         else:
             # run on all open courses
             open_courses = CourseOverview.objects.filter(
@@ -58,7 +66,7 @@ class Command(BaseCommand):
             logger.info('Ooyala IDs update command: queuing task for {} Open Courses'.format(len(open_courses)))
 
             for course_ids in self.chunks(open_courses, self.batch_size):
-                convert_ooyala_ids_to_bcove.delay(user_id, course_ids)
+                convert_ooyala_ids_to_bcove.delay(user_id, course_ids, revert)
 
     def chunks(self, l, n):
         """Yield successive n-sized chunks from l."""
