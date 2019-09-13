@@ -1,160 +1,96 @@
 import logging
+import json
 
-from lxml import etree
 from celery.task import task
+import urllib2
 
-from django.contrib.auth.models import User
+from django.conf import settings
 
-import lms.lib.comment_client as cc
-from lms.lib.comment_client.utils import CommentClientError
 from xmodule.modulestore.django import modulestore
 from opaque_keys.edx.keys import CourseKey
-from edx_solutions_api_integration.utils import (
-    replace_static_from_url,
-    get_image_dimensions,
-)
 
+PLAYBACK_API_ENDPOINT = 'https://edge.api.brightcove.com/playback/v1/accounts/{account_id}/videos/ref:{reference_id}'
+BRIGHTCOVE_ACCOUNT_ID = '6057949416001'
 
 logger = logging.getLogger('edx.celery.task')
 store = modulestore()
 
 
-@task(name=u'lms.djangoapps.api_integration.tasks.update_image_explorer_schema')
-def update_image_explorer_schema(staff_user_id, course_ids, revert=False):
+@task(name=u'lms.djangoapps.api_integration.tasks.convert_ooyala_ids_to_bcove')
+def convert_ooyala_ids_to_bcove(staff_user_id, course_ids, revert=False):
+    xblock_settings = settings.XBLOCK_SETTINGS if hasattr(settings, "XBLOCK_SETTINGS") else {}
+    bcove_policy = xblock_settings.get('OoyalaPlayerBlock', {}).get('BCOVE_POLICY')
+
+    if not bcove_policy:
+        logger.error('BCOVE POLICY value not found in settings. Exiting.')
+        return True
+
     for course_id in course_ids:
         course_key = CourseKey.from_string(course_id)
-        ie_blocks = store.get_items(
+        oo_blocks = store.get_items(
             course_key,
-            qualifiers={"category": 'image-explorer'}
+            qualifiers={"category": 'ooyala-player'}
         )
 
-        for block in ie_blocks:
-            try:
-                etree.fromstring(block.data)
-            except:
-                logger.error('Invalid Image Explorer XML data for block `{}` in Course: {}. Skipping'
-                             .format(block.parent.block_id, course_id))
-            else:
-                if revert:
-                    _revert_upgrade_schema(block, course_id, staff_user_id)
-                else:
-                    _upgrade_xml_schema(block, course_id, staff_user_id)
+        for block in oo_blocks:
+            content_id = block.content_id
+
+            if content_id and revert:
+                # write reference id back to content_id and empty out reference id
+                if is_bcove_id(content_id) and block.reference_id:
+                    block.content_id = block.reference_id
+                    block.reference_id = ''
+
+                    store.update_item(xblock=block, user_id=staff_user_id)
+
+                    logger.info('Successfully reverted Brightcove ID for block `{}` in course: `{}`'
+                                .format(block.parent.block_id, course_id))
+            elif content_id and not is_bcove_id(content_id):
+                bcove_video_id = get_brightcove_video_id(content_id, bcove_policy)
+
+                if bcove_video_id:
+                    block.content_id = bcove_video_id
+                    block.reference_id = content_id
+
+                    store.update_item(xblock=block, user_id=staff_user_id)
+
+                    logger.info('Successfully Updated Ooyala ID for block `{}` in course: `{}`'
+                                .format(block.parent.block_id, course_id))
 
 
-def _revert_upgrade_schema(block, course_id, staff_user_id):
-    xmltree = etree.fromstring(block.data)
-    script_processed = xmltree.attrib.get('script_processed', False)
-
-    if not script_processed:
-        return
-
-    logger.info('Reverting back IE schema for block `{}` in course `{}`'.format(block.parent.block_id, course_id))
-    xmltree.set('schema_version', '1')
-    xmltree.attrib.pop('script_processed')  # remove processed marker
-    hotspots_element = xmltree.find('hotspots')
-    hotspot_elements = hotspots_element.findall('hotspot')
-
-    for index, hotspot_element in enumerate(hotspot_elements):
-        if hotspot_element.get('x').endswith('%') or hotspot_element.get('y').endswith('%'):
-            _convert_to_percentage_coordinates(xmltree, hotspot_element, course_id, revert=True)
-
-    block.data = etree.tostring(xmltree)
-    store.update_item(xblock=block, user_id=staff_user_id)
-    logger.info('Successfully reverted IE schema for block `{}` in course: `{}`'
-                .format(block.parent.block_id, course_id))
+def is_bcove_id(video_id):
+    """
+    Checks if video_id belongs to Brightcove
+    Brightcove IDs are all numeric
+    """
+    try:
+        int(video_id)
+    except ValueError:
+        return False
+    else:
+        return True
 
 
-def _upgrade_xml_schema(block, course_id, staff_user_id):
-    xmltree = etree.fromstring(block.data)
-    schema_version = int(xmltree.attrib.get('schema_version', 1))
+def get_brightcove_video_id(reference_id, bcove_policy):
+    """
+    Get a Brightcove video id against reference id
+    using Brightcove Playback API
+    """
+    bc_video_id = None
+    api_endpoint = PLAYBACK_API_ENDPOINT.format(
+        account_id=BRIGHTCOVE_ACCOUNT_ID,
+        reference_id=reference_id
+    )
 
-    if schema_version > 1:
-        return
+    request = urllib2.Request(api_endpoint, headers={"BCOV-Policy": bcove_policy})
 
-    hotspots_element = xmltree.find('hotspots')
-    hotspot_elements = hotspots_element.findall('hotspot')
-    update_schema = False
+    try:
+        response = urllib2.urlopen(request).read()
+        video_data = json.loads(response)
+    except Exception as e:
+        logger.warning('Brightcove ID retrieval failed against reference ID: `{}`'.format(reference_id))
+    else:
+        logger.info('Successful retrieval of Brightcove ID against reference ID: `{}`'.format(reference_id))
+        bc_video_id = video_data.get('id')
 
-    for index, hotspot_element in enumerate(hotspot_elements):
-        if not hotspot_element.get('x').endswith('%') or not hotspot_element.get('y').endswith('%'):
-            update_schema = True
-            _convert_to_percentage_coordinates(xmltree, hotspot_element, course_id)
-
-    if update_schema:
-        xmltree.set('schema_version', '2')
-        # mark this as updated from script for tracking purpose
-        xmltree.set('script_processed', '1')
-        block.data = etree.tostring(xmltree)
-        store.update_item(xblock=block, user_id=staff_user_id)
-        logger.info('Successfully Updated IE schema for block `{}` in course: `{}`'
-                    .format(block.parent.block_id, course_id))
-
-
-def _convert_to_percentage_coordinates(xmltree, hotspot, course_id, revert=False):
-    background = xmltree.find('background')
-    width = background.get('width')
-    height = background.get('height')
-
-    if None in (width, height):
-        image_url = replace_static_from_url(background.get('src'), course_id=course_id)
-        img_size = get_image_dimensions(image_url)
-        if img_size:
-            width, height = img_size
-
-    if width and height:
-        if revert:
-            width, height = _convert_percentage_to_pixels(width, height, hotspot.get('x'), hotspot.get('y'))
-        else:
-            width, height = _convert_pixel_to_percentage(width, height, hotspot.get('x'), hotspot.get('y'))
-        hotspot.set('x', width)
-        hotspot.set('y', height)
-
-
-def _convert_pixel_to_percentage(width, height, x_in_pixel, y_in_pixel):
-    x_in_percentage = ((float(x_in_pixel) + 20.5) / width) * 100
-    y_in_percentage = ((float(y_in_pixel) + 20.5) / height) * 100
-
-    return '{}%'.format(x_in_percentage), '{}%'.format(y_in_percentage)
-
-
-def _convert_percentage_to_pixels(width, height, x_in_percent, y_in_percent):
-    x_in_percent = x_in_percent.replace('%', '')
-    y_in_percent = y_in_percent.replace('%', '')
-
-    x_in_px= (float(x_in_percent) * width) / 100
-    y_in_px = (float(y_in_percent) * height) / 100
-
-    return str(x_in_px - 20.5), str(y_in_px - 20.5)
-
-
-@task(name=u'lms.djangoapps.api_integration.tasks.cs_sync_user_ifno')
-def cs_sync_user_info():
-    success_count = 0
-    failed_count = 0
-
-    for user in User.objects.all().iterator():
-        cc_user = cc.User.from_django_user(user)
-        try:
-            cc_user.save()
-        except CommentClientError as e:
-            logger.error('cs_sync_script user `{}` update failed with error {}, trying a different username..'
-                         .format(user.id, e.message))
-
-            cc_user.username = '{}_1'.format(cc_user.username)
-
-            try:
-                cc_user.save()
-            except CommentClientError as e:
-                failed_count += 1
-                logger.error('cs_sync_script could not update user `{}` info. Retry failed with error {}'
-                             .format(user.id, e.message))
-            else:
-                success_count += 1
-                logger.info('cs_sync_script user info successfully updated for user `{}`'.format(user.id))
-        else:
-            success_count += 1
-            logger.info('cs_sync_script user info successfully updated for user `{}`'.format(user.id))
-
-
-    logger.info('cs_sync_script completed: {} users updated out of {}'
-                .format(success_count, success_count + failed_count))
+    return bc_video_id
