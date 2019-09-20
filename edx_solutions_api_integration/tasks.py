@@ -119,7 +119,7 @@ def convert_ooyala_embeds(staff_user_id, course_ids, revert=False):
 
 
 def blocks_to_clean(course_key):
-    categories = ['html']
+    categories = ['html', 'image-explorer']
     for category in categories:
         yield store.get_items(course_key, qualifiers={"category": category})
 
