@@ -102,7 +102,7 @@ def get_brightcove_video_id(reference_id, bcove_policy):
 
 
 @task(name=u'lms.djangoapps.api_integration.tasks.convert_ooyala_embeds')
-def convert_ooyala_embeds(staff_user_id, course_ids, revert=False):
+def convert_ooyala_embeds(staff_user_id, course_ids):
     xblock_settings = settings.XBLOCK_SETTINGS if hasattr(settings, "XBLOCK_SETTINGS") else {}
     bcove_policy = xblock_settings.get('OoyalaPlayerBlock', {}).get('BCOVE_POLICY')
 
