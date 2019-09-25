@@ -119,7 +119,7 @@ def convert_ooyala_embeds(staff_user_id, course_ids):
 
 
 def blocks_to_clean(course_key):
-    categories = ['html', 'image-explorer']
+    categories = ['html', 'image-explorer','adventure',]
     for category in categories:
         yield store.get_items(course_key, qualifiers={"category": category})
 
@@ -128,19 +128,39 @@ def transform_ooyala_embeds(block, user_id, course_id, bcove_policy):
     """
     Transforms ooyala embeds in the given block
     """
-    soup = BeautifulSoup(block.data, 'html.parser')
-    soup, bcove_ids, updated = cleanup_ooyala_tags(soup, bcove_policy)
+    # adventure has different format for ooyala tags
+    if block.category == 'adventure':
+        updated = False
+        soup = BeautifulSoup(block.xml_content, 'html.parser')
 
-    # insert new embeds in the block
-    if bcove_ids:
-        soup = insert_bcove_embed(block.category, soup, bcove_ids)
+        for oo_tag in soup.find_all('ooyala-player'):
+            oo_id = oo_tag.attrs.get('content_id', '')
 
-    # update back block's data
-    if updated:
-        block.data = str(soup)
-        store.update_item(xblock=block, user_id=user_id)
-        logger.info('Successfully transformed Ooyala embeds for block `{}` in course: `{}`'
-                    .format(block.parent.block_id, course_id))
+            if oo_id and not is_bcove_id(oo_id):
+                bcove_id = get_brightcove_video_id(oo_id, bcove_policy)
+                if is_bcove_id(bcove_id):
+                    updated = True
+                    oo_tag.attrs['content_id'] = bcove_id
+
+        if updated:
+            block.xml_content = str(soup)
+            store.update_item(xblock=block, user_id=user_id)
+            logger.info('Successfully transformed Ooyala embeds for block `{}` in course: `{}`'
+                        .format(block.parent.block_id, course_id))
+    else:
+        soup = BeautifulSoup(block.data, 'html.parser')
+        soup, bcove_ids, updated = cleanup_ooyala_tags(soup, bcove_policy)
+
+        # insert new embeds in the block
+        if bcove_ids:
+            soup = insert_bcove_embed(block.category, soup, bcove_ids)
+
+        # update back block's data
+        if updated:
+            block.data = str(soup)
+            store.update_item(xblock=block, user_id=user_id)
+            logger.info('Successfully transformed Ooyala embeds for block `{}` in course: `{}`'
+                        .format(block.parent.block_id, course_id))
 
 
 def cleanup_ooyala_tags(soup, bcove_policy):
