@@ -183,6 +183,7 @@ def cleanup_ooyala_tags(soup, bcove_policy):
                 parts = match.group().split(',')
                 if len(parts) > 1:
                     oo_id = parts[1].strip("'")
+                    print oo_id
 
                     if not is_bcove_id(oo_id):
                         bcove_id = get_brightcove_video_id(oo_id, bcove_policy)
