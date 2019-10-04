@@ -168,7 +168,7 @@ def cleanup_ooyala_tags(soup, bcove_policy):
     Remove any ooyala related scripts from given BeautifulSoup instance
     extract out associated bcove ids
     """
-    oo_reg = r"OO.Player.create\(['\"]\w+['\"],['\"]\w+['\"]"
+    oo_reg = r"OO.Player.create\(['\"]\w+['\"],['\"][\w+-]+['\"]"
     bcove_ids = []
     updated = False
 
