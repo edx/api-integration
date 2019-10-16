@@ -119,7 +119,16 @@ def convert_ooyala_embeds(staff_user_id, course_ids):
 
 
 def blocks_to_clean(course_key):
-    categories = ['html', 'image-explorer', 'adventure', 'pb-mcq', 'pb-tip', 'poll', 'survey',]
+    categories = [
+        'html',
+        'image-explorer',
+        'adventure',
+        'pb-mcq',
+        'pb-tip',
+        'poll',
+        'survey',
+        'gp-v2-video-resource',
+    ]
     for category in categories:
         yield store.get_items(course_key, qualifiers={"category": category})
 
@@ -144,6 +153,18 @@ def transform_ooyala_embeds(block, user_id, course_id, bcove_policy):
 
         if updated:
             block.xml_content = str(soup)
+            store.update_item(xblock=block, user_id=user_id)
+            logger.info('Successfully transformed Ooyala embeds for block `{}` in course: `{}`'
+                        .format(block.parent.block_id, course_id))
+    elif block.category == 'gp-v2-video-resource':
+        updated = False
+        oo_id = block.video_id
+        if oo_id and not is_bcove_id(oo_id):
+            bcove_id = get_brightcove_video_id(oo_id, bcove_policy)
+            if is_bcove_id(bcove_id):
+                updated = True
+                block.video_id = bcove_id
+        if updated:
             store.update_item(xblock=block, user_id=user_id)
             logger.info('Successfully transformed Ooyala embeds for block `{}` in course: `{}`'
                         .format(block.parent.block_id, course_id))
