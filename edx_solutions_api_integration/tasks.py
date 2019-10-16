@@ -119,7 +119,7 @@ def convert_ooyala_embeds(staff_user_id, course_ids):
 
 
 def blocks_to_clean(course_key):
-    categories = ['html', 'image-explorer','adventure',]
+    categories = ['html', 'image-explorer', 'adventure', 'pb-mcq', 'pb-tip', 'poll', 'survey',]
     for category in categories:
         yield store.get_items(course_key, qualifiers={"category": category})
 
@@ -148,7 +148,15 @@ def transform_ooyala_embeds(block, user_id, course_id, bcove_policy):
             logger.info('Successfully transformed Ooyala embeds for block `{}` in course: `{}`'
                         .format(block.parent.block_id, course_id))
     else:
-        soup = BeautifulSoup(block.data, 'html.parser')
+        if block.category in ('pb-mcq', 'poll'):
+            soup = BeautifulSoup(block.question, 'html.parser')
+        elif block.category == 'pb-tip':
+            soup = BeautifulSoup(block.content, 'html.parser')
+        elif block.category == 'survey':
+            soup = BeautifulSoup(block.feedback, 'html.parser')
+        else:
+            soup = BeautifulSoup(block.data, 'html.parser')
+
         soup, bcove_ids, updated = cleanup_ooyala_tags(soup, bcove_policy)
 
         # insert new embeds in the block
@@ -157,7 +165,15 @@ def transform_ooyala_embeds(block, user_id, course_id, bcove_policy):
 
         # update back block's data
         if updated:
-            block.data = str(soup)
+            if block.category in ('pb-mcq', 'poll'):
+                block.question = str(soup)
+            elif block.category == 'pb-tip':
+                block.content = str(soup)
+            elif block.category == 'survey':
+                block.feedback = str(soup)
+            else:
+                block.data = str(soup)
+
             store.update_item(xblock=block, user_id=user_id)
             logger.info('Successfully transformed Ooyala embeds for block `{}` in course: `{}`'
                         .format(block.parent.block_id, course_id))
@@ -204,7 +220,7 @@ def insert_bcove_embed(block_type, soup, bcove_ids):
     # any div with id starting with 'ooyala'
     oo_regex = re.compile('^ooyala')
 
-    if block_type == 'html':
+    if block_type in ('html', 'pb-mcq', 'pb-tip', 'poll', 'survey'):
         template = 'bcove_html_embed.html'
     elif block_type == 'image-explorer':
         template = 'bcove_ie_embed.html'
