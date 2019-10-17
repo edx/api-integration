@@ -27,9 +27,9 @@ class Command(BaseCommand):
             help="Staff User ID",
         ),
         make_option(
-            "--course-id",
-            dest="course_id",
-            help="Single Course ID to process Ooyala instances in",
+            "--course-ids",
+            dest="course_ids",
+            help="Course IDs to process Ooyala instances in",
         ),
         make_option(
             "--revert",
@@ -41,7 +41,7 @@ class Command(BaseCommand):
     )
 
     def handle(self, *args, **options):
-        course_id = options.get('course_id')
+        course_ids = options.get('course_ids')
         user_id = options.get('user_id')
         revert = options.get('revert')
 
@@ -53,9 +53,10 @@ class Command(BaseCommand):
             except User.DoesNotExist:
                 raise CommandError("Invalid user id: {}. Please provide a valid staff user id".format(user_id))
 
-        if course_id:
-            logger.info('Ooyala IDs update task queued for Course: {}'.format(course_id))
-            convert_ooyala_ids_to_bcove.delay(user_id, [course_id], revert)
+        if course_ids:
+            course_ids = course_ids.split(',')
+            logger.info('Ooyala IDs update task queued for Courses: {}'.format(course_ids))
+            convert_ooyala_ids_to_bcove.delay(user_id, course_ids, revert)
         else:
             # run on all open courses
             open_courses = CourseOverview.objects.filter(
