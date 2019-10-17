@@ -10,6 +10,7 @@ from django.conf import settings
 from django.template.loader import render_to_string
 
 from xmodule.modulestore.django import modulestore
+from xmodule.modulestore import ModuleStoreEnum
 from opaque_keys.edx.keys import CourseKey
 
 PLAYBACK_API_ENDPOINT = 'https://edge.api.brightcove.com/playback/v1/accounts/{account_id}/videos/ref:{reference_id}'
@@ -33,7 +34,8 @@ def convert_ooyala_ids_to_bcove(staff_user_id, course_ids, revert=False):
         course_key = CourseKey.from_string(course_id)
         oo_blocks = store.get_items(
             course_key,
-            qualifiers={"category": 'ooyala-player'}
+            qualifiers={"category": 'ooyala-player'},
+            revision=ModuleStoreEnum.RevisionOption.published_only
         )
 
         for block in oo_blocks:
@@ -130,7 +132,11 @@ def blocks_to_clean(course_key):
         'gp-v2-video-resource',
     ]
     for category in categories:
-        yield store.get_items(course_key, qualifiers={"category": category})
+        yield store.get_items(
+            course_key,
+            qualifiers={"category": category},
+            revision=ModuleStoreEnum.RevisionOption.published_only
+        )
 
 
 def transform_ooyala_embeds(block, user_id, course_id, bcove_policy):
