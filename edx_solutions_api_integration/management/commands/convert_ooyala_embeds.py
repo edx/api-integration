@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)  # pylint: disable=locally-disabled, invali
 
 class Command(BaseCommand):
     """
-    Command to update Ooyala Xblock Content IDs to corresponding Brightcove IDs
+    Command to update Ooyala Xblock embeds to corresponding Brightcove embeds
     """
-    help = 'Convert Ooyala IDs to corresponding Brightcove IDs'
+    help = 'Convert Ooyala embeds to corresponding Brightcove embeds'
     batch_size = 100
     option_list = BaseCommand.option_list + (
         make_option(
@@ -27,14 +27,14 @@ class Command(BaseCommand):
             help="Staff User ID",
         ),
         make_option(
-            "--course-id",
-            dest="course_id",
-            help="Single Course ID to process Ooyala instances in",
+            "--course-ids",
+            dest="course_ids",
+            help="Course IDs to process Ooyala instances in",
         ),
     )
 
     def handle(self, *args, **options):
-        course_id = options.get('course_id')
+        course_ids = options.get('course_ids')
         user_id = options.get('user_id')
 
         if not user_id:
@@ -45,9 +45,10 @@ class Command(BaseCommand):
             except User.DoesNotExist:
                 raise CommandError("Invalid user id: {}. Please provide a valid staff user id".format(user_id))
 
-        if course_id:
-            logger.info('Ooyala embeds update task queued for Course: {}'.format(course_id))
-            convert_ooyala_embeds.delay(user_id, [course_id])
+        if course_ids:
+            course_ids = course_ids.split(',')
+            logger.info('Ooyala embeds update task queued for Course: {}'.format(course_ids))
+            convert_ooyala_embeds.delay(user_id, course_ids)
         else:
             # run on all open courses
             open_courses = CourseOverview.objects.filter(

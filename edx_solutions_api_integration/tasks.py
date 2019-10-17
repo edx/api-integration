@@ -10,6 +10,7 @@ from django.conf import settings
 from django.template.loader import render_to_string
 
 from xmodule.modulestore.django import modulestore
+from xmodule.modulestore import ModuleStoreEnum
 from opaque_keys.edx.keys import CourseKey
 
 PLAYBACK_API_ENDPOINT = 'https://edge.api.brightcove.com/playback/v1/accounts/{account_id}/videos/ref:{reference_id}'
@@ -33,7 +34,8 @@ def convert_ooyala_ids_to_bcove(staff_user_id, course_ids, revert=False):
         course_key = CourseKey.from_string(course_id)
         oo_blocks = store.get_items(
             course_key,
-            qualifiers={"category": 'ooyala-player'}
+            qualifiers={"category": 'ooyala-player'},
+            revision=ModuleStoreEnum.RevisionOption.published_only
         )
 
         for block in oo_blocks:
@@ -119,9 +121,24 @@ def convert_ooyala_embeds(staff_user_id, course_ids):
 
 
 def blocks_to_clean(course_key):
-    categories = ['html', 'image-explorer', 'adventure', 'pb-mcq', 'pb-tip', 'poll', 'survey',]
+    categories = [
+        'html',
+        'image-explorer',
+        'adventure',
+        'pb-mcq',
+        'pb-mrq',
+        'pb-tip',
+        'pb-answer',
+        'poll',
+        'survey',
+        'gp-v2-video-resource',
+    ]
     for category in categories:
-        yield store.get_items(course_key, qualifiers={"category": category})
+        yield store.get_items(
+            course_key,
+            qualifiers={"category": category},
+            revision=ModuleStoreEnum.RevisionOption.published_only
+        )
 
 
 def transform_ooyala_embeds(block, user_id, course_id, bcove_policy):
@@ -147,8 +164,20 @@ def transform_ooyala_embeds(block, user_id, course_id, bcove_policy):
             store.update_item(xblock=block, user_id=user_id)
             logger.info('Successfully transformed Ooyala embeds for block `{}` in course: `{}`'
                         .format(block.parent.block_id, course_id))
+    elif block.category == 'gp-v2-video-resource':
+        updated = False
+        oo_id = block.video_id
+        if oo_id and not is_bcove_id(oo_id):
+            bcove_id = get_brightcove_video_id(oo_id, bcove_policy)
+            if is_bcove_id(bcove_id):
+                updated = True
+                block.video_id = bcove_id
+        if updated:
+            store.update_item(xblock=block, user_id=user_id)
+            logger.info('Successfully transformed Ooyala embeds for block `{}` in course: `{}`'
+                        .format(block.parent.block_id, course_id))
     else:
-        if block.category in ('pb-mcq', 'poll'):
+        if block.category in ('pb-mcq', 'poll', 'pb-mrq', 'pb-answer'):
             soup = BeautifulSoup(block.question, 'html.parser')
         elif block.category == 'pb-tip':
             soup = BeautifulSoup(block.content, 'html.parser')
@@ -165,7 +194,7 @@ def transform_ooyala_embeds(block, user_id, course_id, bcove_policy):
 
         # update back block's data
         if updated:
-            if block.category in ('pb-mcq', 'poll'):
+            if block.category in ('pb-mcq', 'poll', 'pb-mrq', 'pb-answer'):
                 block.question = str(soup)
             elif block.category == 'pb-tip':
                 block.content = str(soup)
@@ -220,7 +249,7 @@ def insert_bcove_embed(block_type, soup, bcove_ids):
     # any div with id starting with 'ooyala'
     oo_regex = re.compile('^ooyala')
 
-    if block_type in ('html', 'pb-mcq', 'pb-tip', 'poll', 'survey'):
+    if block_type in ('html', 'pb-mcq', 'pb-tip', 'poll', 'survey', 'pb-mrq', 'pb-answer'):
         template = 'bcove_html_embed.html'
     elif block_type == 'image-explorer':
         template = 'bcove_ie_embed.html'
