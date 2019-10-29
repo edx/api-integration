@@ -31,7 +31,7 @@ from courseware.courses import (
     get_course_info_section,
     get_course_info_section_module,
 )
-from courseware.models import StudentModule
+from lms.djangoapps.courseware.models import StudentModule
 from courseware.views.views import get_static_tab_fragment
 from django_comment_common.models import FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
@@ -42,8 +42,9 @@ from lms.lib.comment_client.utils import CommentClientMaintenanceError, CommentC
 from mobile_api.course_info.views import apply_wrappers_to_content
 from opaque_keys.edx.keys import UsageKey
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
-from openedx.core.djangoapps.content.course_structures.models import CourseStructure
+# ToDO: Find below 2's alternate as it is removed in ironwood.
+#from openedx.core.djangoapps.content.course_structures.models import CourseStructure
+#from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
 from openedx.core.djangoapps.course_groups.cohorts import get_cohort_user_ids
 from openedx.core.djangoapps.course_groups.models import CourseUserGroup
 from openedx.core.lib.courses import course_image_url
@@ -817,7 +818,7 @@ class CoursesDetail(MobileAPIView):
             resource_uri = '{}/users/'.format(base_uri_without_qs)
             response_data['resources'].append({'uri': resource_uri})
             return Response(response_data, status=status.HTTP_200_OK)
-        except (ItemNotFoundError, CourseStructureNotAvailableError) as exception:
+        except (ItemNotFoundError) as exception:  # ToDO: Find alternate as it is removed in ironwood.
             raise Http404("Block not found: {}".format(exception.message))
 
 
@@ -2656,24 +2657,26 @@ class CoursesTree(MobileListAPIView):
     def post(self, request):
         course_ids = request.data.get('course_ids')
         course_ids = [get_course_key(c) for c in course_ids]
-        course_structures = CourseStructure.objects.filter(course_id__in=course_ids)
+        # TODO: Find alternate as it is removed in ironwood.
+        #course_structures = CourseStructure.objects.filter(course_id__in=course_ids)
         response_data = []
-        for course_structure in course_structures:
-            blocks = course_structure.structure.get('blocks', {})
-
-            course = None
-            for block in blocks.values():
-                block['name'] = block.pop('display_name')
-                block['category'] = block.pop('block_type')
-                if course is None and block['category'] == 'course':
-                    course = block
-
-            self._update_blocks(course, blocks)
-            course_data = {
-                "id": str(course_structure.course_id),
-                "content": course['children']
-            }
-            response_data.append(course_data)
+        # for course_structure in course_structures:
+        #     for course_id in course_ids:
+        #         if course_structure.course_id != course_id:
+        #             continue
+        #
+        #         blocks = course_structure.structure.get('blocks', {}).copy()
+        #         for block in blocks.values():
+        #             block['name'] = block.pop('display_name')
+        #             block['category'] = block.pop('block_type')
+        #
+        #         course = [block for block_id, block in blocks.items() if block['category'] == 'course'][0]
+        #         self._update_blocks(course, blocks)
+        #         course_data = {
+        #             "id": str(course_id),
+        #             "content": course['children']
+        #         }
+        #         response_data.append(course_data)
         return Response(response_data, status=status.HTTP_200_OK)
 
     def _update_blocks(self, _block, _blocks):

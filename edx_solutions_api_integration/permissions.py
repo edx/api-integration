@@ -2,17 +2,16 @@
 import logging
 
 from django.conf import settings
+from django_filters.rest_framework import DjangoFilterBackend
 from student.models import CourseEnrollment
 from edx_solutions_api_integration.courseware_access import get_course_key
 from edx_solutions_api_integration.utils import get_client_ip_address, address_exists_in_network
 from rest_framework import permissions, generics, filters, pagination, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from edx_rest_framework_extensions.authentication import JwtAuthentication
-from openedx.core.lib.api.authentication import (
-    SessionAuthenticationAllowInactiveUser,
-    OAuth2AuthenticationAllowInactiveUser,
-)
+from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
+from edx_rest_framework_extensions.auth.session.authentication import SessionAuthenticationAllowInactiveUser
+from openedx.core.lib.api.authentication import OAuth2AuthenticationAllowInactiveUser
 from edx_solutions_api_integration.utils import str2bool
 from edx_solutions_api_integration.models import APIUser as User
 
@@ -186,7 +185,7 @@ class FilterBackendMixin(object):
     """
     Mixin to set custom filter_backends
     """
-    filter_backends = (filters.DjangoFilterBackend, IdsInFilterBackend,)
+    filter_backends = (DjangoFilterBackend, IdsInFilterBackend,)
 
 
 class CustomPagination(pagination.PageNumberPagination):

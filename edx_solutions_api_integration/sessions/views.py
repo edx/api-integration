@@ -9,9 +9,9 @@ from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth import SESSION_KEY, BACKEND_SESSION_KEY, HASH_SESSION_KEY, load_backend
 from django.contrib.auth.models import AnonymousUser, User
-from django.core.context_processors import csrf
+from django.template.context_processors import csrf
 from django.core.exceptions import ObjectDoesNotExist
-from django.utils.importlib import import_module
+from importlib import import_module
 from django.utils.translation import ugettext as _
 from edx_solutions_api_integration.permissions import SecureAPIView
 from rest_framework import status
@@ -20,13 +20,12 @@ from rest_framework.views import APIView
 from django.utils import timezone
 
 
-from util.bad_request_rate_limiter import BadRequestRateLimiter
+from util.request_rate_limiter import BadRequestRateLimiter
 from edx_solutions_api_integration.utils import generate_base_uri
 
 from edx_solutions_api_integration.users.serializers import SimpleUserSerializer
-from student.models import (
-    LoginFailures, PasswordHistory
-)
+# TODO: PasswordHistory is removed from openedx, remove it from here as well
+from student.models import LoginFailures  #, PasswordHistory
 AUDIT_LOG = logging.getLogger("audit")
 
 
@@ -97,8 +96,9 @@ class SessionsList(SecureAPIView):
                                              'Try again later.')
                 return Response(response_data, status=response_status)
 
+        # TODO: PasswordHistory is removed from openedx, remove it from here as well
         # see if the user must reset his/her password due to any policy settings
-        if existing_user and PasswordHistory.should_user_reset_password_now(existing_user):
+        if existing_user: # and PasswordHistory.should_user_reset_password_now(existing_user):
             response_status = status.HTTP_403_FORBIDDEN
             response_data['message'] = _(
                 'Your password has expired due to password policy on this account. '

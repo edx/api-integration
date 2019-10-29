@@ -9,7 +9,7 @@
         API: Top-level description of overall API (must live somewhere)
 """
 
-from django.conf.urls import include, patterns, url
+from django.conf.urls import include, url
 from django.db import transaction
 
 from rest_framework.routers import DefaultRouter
@@ -18,8 +18,7 @@ from edx_solutions_organizations import views as organization_views
 from edx_solutions_api_integration.system import views as system_views
 from edx_solutions_projects import views as project_views
 
-urlpatterns = patterns(
-    '',
+urlpatterns = [
     url(r'^$', system_views.ApiDetail.as_view()),
     url(r'^system$', system_views.SystemDetail.as_view()),
     url(r'^mobileapps/*', include('mobileapps.urls')),
@@ -43,7 +42,7 @@ urlpatterns = patterns(
         })),
         name='workgroup-users-detail'
     ),
-)
+]
 
 server_api_router = DefaultRouter()
 server_api_router.register(r'organizations', organization_views.OrganizationsViewSet)
