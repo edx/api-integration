@@ -28,23 +28,22 @@ class Command(BaseCommand):
     Command to migrate profile images from s3 bucket to open edx profile images storage
     """
     help = 'Migrates profile images from s3 bucket to open edx profile images storage'
-    option_list = BaseCommand.option_list + (
-        make_option(
+    def add_arguments(self, parser):
+        parser.add_argument(
             "--aws-access-key",
             dest="aws_access_key",
             help="AWS access key",
         ),
-        make_option(
+        parser.add_argument(
             "--aws-access-secret",
             dest="aws_access_secret",
             help="AWS access secret",
         ),
-        make_option(
+        parser.add_argument(
             "--bucket-name",
             dest="bucket_name",
             help="Name of source s3 bucket",
         ),
-    )
 
     @staticmethod
     def get_bucket_connection(aws_access_key, aws_access_secret, bucket_name):
