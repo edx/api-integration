@@ -1,13 +1,12 @@
 """
 URLs for edx-solutions mobile API
 """
-from django.conf.urls import patterns, url
+from django.conf.urls import url
 from edx_solutions_api_integration.courses.urls import COURSE_ID_PATTERN
 from edx_solutions_api_integration.mobile_api import views as mobile_views
 
 
-urlpatterns = patterns(
-    '',
+urlpatterns = [
     url(r'^users/organizations/',
         mobile_views.MobileUsersOrganizationsList.as_view(), name='mobile-users-orgs-list'),
     url(r'^users/courses/progress',
@@ -24,4 +23,4 @@ urlpatterns = patterns(
         mobile_views.MobileUsersDiscussionMetrics.as_view(), name='mobile-users-discussion-metrics'),
     url(r'^users/courses/grades',
         mobile_views.MobileUsersCoursesGrades.as_view(), name='mobile-users-courses-grades'),
-)
+]

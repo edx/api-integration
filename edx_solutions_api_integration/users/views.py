@@ -8,14 +8,15 @@ from datetime import datetime
 from functools import reduce
 
 from django.contrib.auth.models import Group
-from django.core.exceptions import ObjectDoesNotExist
-from django.core.validators import validate_email, validate_slug, ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.core.validators import validate_email, validate_slug
 from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from django.db.models import Count, Q
 from django.conf import settings
 from django.http import Http404
 from django.utils.translation import get_language, ugettext_lazy as _
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from rest_framework.response import Response
 from rest_framework import status
@@ -28,7 +29,7 @@ from gradebook.utils import generate_user_gradebook
 from social_engagement.models import StudentSocialEngagementScore
 from instructor.access import revoke_access, update_forum_role
 from openedx.core.djangoapps.lang_pref import LANGUAGE_KEY
-from notification_prefs.views import enable_notifications
+from lms.djangoapps.notification_prefs.views import enable_notifications
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import UsageKey, CourseKey
 from opaque_keys.edx.locations import Location, SlashSeparatedCourseKey
@@ -46,7 +47,8 @@ from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from openedx.core.djangoapps.user_api.accounts.image_helpers import get_profile_image_names, get_profile_image_storage
 from edx_notifications.lib.consumer import mark_notification_read
 from completion_aggregator.models import Aggregator
-from student.models import CourseEnrollment, CourseEnrollmentException, PasswordHistory, UserProfile, LoginFailures
+# TODO: PasswordHistory is removed from openedx, remove it from here as well
+from student.models import CourseEnrollment, CourseEnrollmentException, UserProfile, LoginFailures  #, PasswordHistory
 from student.roles import (
     CourseAccessRole,
     CourseInstructorRole,
@@ -55,11 +57,8 @@ from student.roles import (
     CourseAssistantRole,
     UserBasedRole,
 )
-from util.bad_request_rate_limiter import BadRequestRateLimiter
-from util.password_policy_validators import (
-    validate_password_length, validate_password_complexity,
-    validate_password_dictionary
-)
+from util.request_rate_limiter import BadRequestRateLimiter
+from util.password_policy_validators import validate_password
 from xmodule.modulestore import InvalidLocationError
 
 from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
@@ -340,7 +339,7 @@ class UsersList(SecureListAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     course_key = None
-    filter_backends = (filters.DjangoFilterBackend, IdsInFilterBackend, HasOrgsFilterBackend)
+    filter_backends = (DjangoFilterBackend, IdsInFilterBackend, HasOrgsFilterBackend)
 
     def get_queryset(self):
         """
@@ -479,9 +478,7 @@ class UsersList(SecureListAPIView):
         # enforce password complexity as an optional feature
         if settings.FEATURES.get('ENFORCE_PASSWORD_POLICY', False):
             try:
-                validate_password_length(password)
-                validate_password_complexity(password)
-                validate_password_dictionary(password)
+                validate_password(password)
             except ValidationError, err:
                 response_data['message'] = _('Password: ') + '; '.join(err.messages)
                 return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
@@ -559,10 +556,11 @@ class UsersList(SecureListAPIView):
         if settings.FEATURES.get('ENABLE_DISCUSSION_EMAIL_DIGEST'):
             enable_notifications(user)
 
+        # TODO: PasswordHistory is removed from openedx, remove it from here as well
         # add this account creation to password history
         # NOTE, this will be a NOP unless the feature has been turned on in configuration
-        password_history_entry = PasswordHistory()
-        password_history_entry.create(user)
+        # password_history_entry = PasswordHistory()
+        # password_history_entry.create(user)
 
         # add to audit log
         AUDIT_LOG.info(u"API::New account created with user-id - {0}".format(user.id))  # pylint: disable=W1202
@@ -787,22 +785,23 @@ class UsersDetail(SecureAPIView):
                     return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
             # also, check the password reuse policy
             err_msg = None
-            if not PasswordHistory.is_allowable_password_reuse(existing_user, password):
-                if existing_user.is_staff:
-                    num_distinct = settings.ADVANCED_SECURITY_CONFIG['MIN_DIFFERENT_STAFF_PASSWORDS_BEFORE_REUSE']
-                else:
-                    num_distinct = settings.ADVANCED_SECURITY_CONFIG['MIN_DIFFERENT_STUDENT_PASSWORDS_BEFORE_REUSE']
-                err_msg = _(  # pylint: disable=E1101
-                    "You are re-using a password that you have used recently. You must "
-                    "have {0} distinct password(s) before reusing a previous password."
-                ).format(num_distinct)  # pylint: disable=E1101
-            # also, check to see if passwords are getting reset too frequent
-            if PasswordHistory.is_password_reset_too_soon(existing_user):
-                num_days = settings.ADVANCED_SECURITY_CONFIG['MIN_TIME_IN_DAYS_BETWEEN_ALLOWED_RESETS']
-                err_msg = _(  # pylint: disable=E1101
-                    "You are resetting passwords too frequently. Due to security policies, "
-                    "{0} day(s) must elapse between password resets"
-                ).format(num_days)  # pylint: disable=E1101
+            # TODO: PasswordHistory is removed from openedx, remove it from here as well
+            # if not PasswordHistory.is_allowable_password_reuse(existing_user, password):
+            #     if existing_user.is_staff:
+            #         num_distinct = settings.ADVANCED_SECURITY_CONFIG['MIN_DIFFERENT_STAFF_PASSWORDS_BEFORE_REUSE']
+            #     else:
+            #         num_distinct = settings.ADVANCED_SECURITY_CONFIG['MIN_DIFFERENT_STUDENT_PASSWORDS_BEFORE_REUSE']
+            #     err_msg = _(  # pylint: disable=E1101
+            #         "You are re-using a password that you have used recently. You must "
+            #         "have {0} distinct password(s) before reusing a previous password."
+            #     ).format(num_distinct)  # pylint: disable=E1101
+            # # also, check to see if passwords are getting reset too frequent
+            # if PasswordHistory.is_password_reset_too_soon(existing_user):
+            #     num_days = settings.ADVANCED_SECURITY_CONFIG['MIN_TIME_IN_DAYS_BETWEEN_ALLOWED_RESETS']
+            #     err_msg = _(  # pylint: disable=E1101
+            #         "You are resetting passwords too frequently. Due to security policies, "
+            #         "{0} day(s) must elapse between password resets"
+            #     ).format(num_days)  # pylint: disable=E1101
 
             if err_msg:
                 # We have an password reset attempt which violates some security policy,
@@ -818,12 +817,12 @@ class UsersDetail(SecureAPIView):
             # clear failed login attempts counters, if applicable
             if LoginFailures.is_feature_enabled():
                 LoginFailures.clear_lockout_counter(existing_user)
-
-            if update_user_password_hash != old_password_hash:
+            # TODO: PasswordHistory is removed from openedx, remove it from here as well
+            # if update_user_password_hash != old_password_hash:
                 # add this account creation to password history
                 # NOTE, this will be a NOP unless the feature has been turned on in configuration
-                password_history_entry = PasswordHistory()
-                password_history_entry.create(existing_user)
+                # password_history_entry = PasswordHistory()
+                # password_history_entry.create(existing_user)
 
         # Also update the UserProfile record for this User
         existing_user_profile = UserProfile.objects.get(user_id=user_id)
