@@ -20,18 +20,17 @@ class Command(BaseCommand):
     """
     help = 'Convert Ooyala embeds to corresponding Brightcove embeds'
     batch_size = 100
-    option_list = BaseCommand.option_list + (
-        make_option(
+    def add_arguments(self, parser):
+        parser.add_argument(
             "--user-id",
             dest="user_id",
             help="Staff User ID",
         ),
-        make_option(
+        parser.add_argument(
             "--course-ids",
             dest="course_ids",
             help="Course IDs to process Ooyala instances in",
         ),
-    )
 
     def handle(self, *args, **options):
         course_ids = options.get('course_ids')

@@ -20,25 +20,24 @@ class Command(BaseCommand):
     """
     help = 'Convert Ooyala IDs to corresponding Brightcove IDs'
     batch_size = 100
-    option_list = BaseCommand.option_list + (
-        make_option(
+    def add_arguments(self, parser):
+        parser.add_argument(
             "--user-id",
             dest="user_id",
             help="Staff User ID",
         ),
-        make_option(
+        parser.add_argument(
             "--course-ids",
             dest="course_ids",
             help="Course IDs to process Ooyala instances in",
         ),
-        make_option(
+        parser.add_argument(
             "--revert",
             dest="revert",
             action="store_true",
             default=False,
             help="Revert all the converted Ids back to previous state"
         ),
-    )
 
     def handle(self, *args, **options):
         course_ids = options.get('course_ids')
