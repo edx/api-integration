@@ -1,6 +1,6 @@
 """ Groups API URI specification """
 from django.conf import settings
-from django.conf.urls import patterns, url
+from django.conf.urls import url
 
 from rest_framework.urlpatterns import format_suffix_patterns
 
@@ -9,8 +9,7 @@ from edx_solutions_api_integration.groups import views as groups_views
 COURSE_ID_PATTERN = settings.COURSE_ID_PATTERN
 GROUP_ID_PATTERN = r'(?P<group_id>[0-9]+)'
 
-urlpatterns = patterns(
-    '',
+urlpatterns = [
     url(r'/*$^', groups_views.GroupsList.as_view()),
     url(r'^{0}/courses/{1}$'.format(GROUP_ID_PATTERN, COURSE_ID_PATTERN), groups_views.GroupsCoursesDetail.as_view()),
     url(r'^{0}/courses/*$'.format(GROUP_ID_PATTERN), groups_views.GroupsCoursesList.as_view()),
@@ -22,6 +21,6 @@ urlpatterns = patterns(
     url(r'^{0}/groups/(?P<related_group_id>[0-9]+)$'.format(GROUP_ID_PATTERN),
         groups_views.GroupsGroupsDetail.as_view()),
     url(r'^{0}$'.format(GROUP_ID_PATTERN), groups_views.GroupsDetail.as_view()),
-)
+]
 
 urlpatterns = format_suffix_patterns(urlpatterns)

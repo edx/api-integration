@@ -17,9 +17,10 @@ from xmodule.modulestore.django import modulestore
 from edx_solutions_api_integration.models import CourseGroupRelationship, CourseContentGroupRelationship
 from openedx.core.djangoapps.course_groups.models import CourseCohortsSettings, CourseUserGroup
 from course_metadata.models import CourseAggregatedMetaData
-from openedx.core.djangoapps.content.course_structures.models import CourseStructure
+# ToDO: Find its alternate as it is removed in ironwood.
+#from openedx.core.djangoapps.content.course_structures.models import CourseStructure
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from courseware.models import StudentModule
+from lms.djangoapps.courseware.models import StudentModule
 from completion_aggregator.models import Aggregator
 from gradebook.models import StudentGradebook, StudentGradebookHistory
 from student.models import CourseAccessRole, CourseEnrollment
@@ -56,7 +57,8 @@ class Command(BaseCommand):
         CourseCohortsSettings.objects.filter(course_id=course_key).delete()
         CourseUserGroup.objects.filter(course_id=course_key).delete()
         CourseAggregatedMetaData.objects.filter(id=course_key).delete()
-        CourseStructure.objects.filter(course_id=course_key).delete()
+        # ToDO: Find alternate as it is removed in ironwood.
+        #CourseStructure.objects.filter(course_id=course_key).delete()
         CourseOverview.objects.filter(id=course_key).delete()
         StudentModule.objects.filter(course_id=course_key).delete()
         BlockCompletion.objects.filter(course_key=course_key).delete()
