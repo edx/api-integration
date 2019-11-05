@@ -20,7 +20,6 @@ TEST_API_KEY = str(uuid.uuid4())
 
 @override_settings(EDX_API_KEY=TEST_API_KEY)
 @patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': True})
-@patch.dict("django.conf.settings.FEATURES", {'ADVANCED_SECURITY': True})
 @override_settings(PASSWORD_MIN_LENGTH=4, PASSWORD_MAX_LENGTH=12,
                    PASSWORD_COMPLEXITY={'UPPER': 2, 'LOWER': 2, 'PUNCTUATION': 2, 'DIGITS': 2})
 class UserPasswordResetTest(CacheIsolationTestCase):
