@@ -7,7 +7,7 @@ import mock
 import pytz
 from completion.waffle import ENABLE_COMPLETION_TRACKING, WAFFLE_NAMESPACE
 from completion_aggregator.models import Aggregator
-from lms.djangoapps.courseware.models import StudentModule
+from courseware.models import StudentModule
 from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import CommandError
