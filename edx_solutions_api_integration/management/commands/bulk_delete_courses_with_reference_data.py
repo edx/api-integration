@@ -20,7 +20,7 @@ from course_metadata.models import CourseAggregatedMetaData
 # ToDO: Find its alternate as it is removed in ironwood.
 #from openedx.core.djangoapps.content.course_structures.models import CourseStructure
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from lms.djangoapps.courseware.models import StudentModule
+from courseware.models import StudentModule
 from completion_aggregator.models import Aggregator
 from gradebook.models import StudentGradebook, StudentGradebookHistory
 from student.models import CourseAccessRole, CourseEnrollment
