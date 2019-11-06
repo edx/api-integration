@@ -31,7 +31,7 @@ from courseware.courses import (
     get_course_info_section,
     get_course_info_section_module,
 )
-from lms.djangoapps.courseware.models import StudentModule
+from courseware.models import StudentModule
 from courseware.views.views import get_static_tab_fragment
 from django_comment_common.models import FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
