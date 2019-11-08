@@ -12,6 +12,7 @@ from django.template.loader import render_to_string
 from xmodule.modulestore.django import modulestore
 from xmodule.modulestore import ModuleStoreEnum
 from opaque_keys.edx.keys import CourseKey
+from openedx.core.djangoapps.content.block_structure.api import clear_course_from_cache
 
 PLAYBACK_API_ENDPOINT = 'https://edge.api.brightcove.com/playback/v1/accounts/{account_id}/videos/ref:{reference_id}'
 BRIGHTCOVE_ACCOUNT_ID = '6057949416001'
@@ -62,6 +63,15 @@ def convert_ooyala_ids_to_bcove(staff_user_id, course_ids, revert=False):
 
                     logger.info('Successfully Updated Ooyala ID for block `{}` in course: `{}`'
                                 .format(block.parent.block_id, course_id))
+
+        flush_course_cache(course_key)
+
+
+def flush_course_cache(course_key):
+    """
+    Clears course cache so API returns updated data
+    """
+    clear_course_from_cache(course_key)
 
 
 def is_bcove_id(video_id):
@@ -118,6 +128,8 @@ def convert_ooyala_embeds(staff_user_id, course_ids):
         for blocks in blocks_to_clean(course_key):
             for block in blocks:
                 transform_ooyala_embeds(block, staff_user_id, course_id, bcove_policy)
+
+        flush_course_cache(course_key)
 
 
 def blocks_to_clean(course_key):
