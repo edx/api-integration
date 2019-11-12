@@ -81,7 +81,7 @@ def is_bcove_id(video_id):
     """
     try:
         int(video_id)
-    except ValueError:
+    except (ValueError, TypeError):
         return False
     else:
         return True
