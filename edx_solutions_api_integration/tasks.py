@@ -144,6 +144,7 @@ def blocks_to_clean(course_key):
         'poll',
         'survey',
         'gp-v2-video-resource',
+        'static_tab',
     ]
     for category in categories:
         yield store.get_items(
@@ -261,7 +262,7 @@ def insert_bcove_embed(block_type, soup, bcove_ids):
     # any div with id starting with 'ooyala'
     oo_regex = re.compile('^ooyala')
 
-    if block_type in ('html', 'pb-mcq', 'pb-tip', 'poll', 'survey', 'pb-mrq', 'pb-answer'):
+    if block_type in ('html', 'pb-mcq', 'pb-tip', 'poll', 'survey', 'pb-mrq', 'pb-answer', 'static_tab',):
         template = 'bcove_html_embed.html'
     elif block_type == 'image-explorer':
         template = 'bcove_ie_embed.html'
