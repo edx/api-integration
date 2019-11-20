@@ -217,8 +217,14 @@ def transform_ooyala_embeds(block, user_id, course_id, bcove_policy):
                 block.data = str(soup)
 
             store.update_item(xblock=block, user_id=user_id)
+
+            if hasattr(block.parent, 'block_id'):
+                block_loc = block.parent.block_id
+            else:
+                block_loc = block.location
+
             logger.info('Successfully transformed Ooyala embeds for block `{}` in course: `{}`'
-                        .format(block.parent.block_id, course_id))
+                        .format(block_loc, course_id))
 
 
 def cleanup_ooyala_tags(soup, bcove_policy):
