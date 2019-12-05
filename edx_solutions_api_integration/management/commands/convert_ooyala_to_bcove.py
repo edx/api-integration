@@ -9,7 +9,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from edx_solutions_api_integration.tasks import convert_ooyala_ids_to_bcove
+from edx_solutions_api_integration.tasks import convert_ooyala_to_bcove
 
 logger = logging.getLogger(__name__)  # pylint: disable=locally-disabled, invalid-name
 
@@ -18,7 +18,7 @@ class Command(BaseCommand):
     """
     Command to update Ooyala Xblock Content IDs to corresponding Brightcove IDs
     """
-    help = 'Convert Ooyala IDs to corresponding Brightcove IDs'
+    help = 'Convert Ooyala IDs to corresponding Brightcove IDs in Xblock and embeds'
     batch_size = 100
     option_list = BaseCommand.option_list + (
         make_option(
@@ -56,7 +56,12 @@ class Command(BaseCommand):
         if course_ids:
             course_ids = course_ids.split(',')
             logger.info('Ooyala IDs update task queued for Courses: {}'.format(course_ids))
-            convert_ooyala_ids_to_bcove.delay(user_id, course_ids, revert)
+            convert_ooyala_to_bcove.delay(
+                staff_user_id=user_id,
+                course_ids=course_ids,
+                revert=revert,
+                callback="conversion_script_success_callback",
+            )
         else:
             # run on all open courses
             open_courses = CourseOverview.objects.filter(
@@ -67,7 +72,12 @@ class Command(BaseCommand):
             logger.info('Ooyala IDs update command: queuing task for {} Open Courses'.format(len(open_courses)))
 
             for course_ids in self.chunks(open_courses, self.batch_size):
-                convert_ooyala_ids_to_bcove.delay(user_id, course_ids, revert)
+                convert_ooyala_to_bcove.delay(
+                    staff_user_id=user_id,
+                    course_ids=course_ids,
+                    revert=revert,
+                    callback="conversion_script_success_callback",
+                )
 
     def chunks(self, l, n):
         """Yield successive n-sized chunks from l."""

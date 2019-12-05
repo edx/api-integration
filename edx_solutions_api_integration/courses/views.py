@@ -22,6 +22,7 @@ from multiprocessing.pool import ThreadPool
 from requests.exceptions import ConnectionError
 from rest_framework import status
 from rest_framework.response import Response
+from celery.result import AsyncResult
 
 from completion.models import BlockCompletion
 from completion_aggregator.models import Aggregator
@@ -120,6 +121,11 @@ from edx_solutions_projects.serializers import (
     BasicWorkgroupSerializer,
     ProjectSerializer,
 )
+from edx_solutions_api_integration.tasks import (
+    convert_ooyala_to_bcove,
+    get_modules_with_video_embeds,
+)
+
 
 BLOCK_DATA_FIELDS = ['children', 'display_name', 'type', 'due', 'start']
 log = logging.getLogger(__name__)
@@ -2681,3 +2687,41 @@ class CoursesTree(MobileListAPIView):
         _block['children'] = children
         for b in _block['children']:
             self._update_blocks(b, _blocks)
+
+
+class OoyalaToBcoveConversion(MobileListAPIView):
+    """
+    Controls a background task to convert the Ooyala Xblock's
+    instances in given courses to Brightcove
+    """
+    def post(self, request):
+        course_ids = request.data.get('course_ids')
+        staff_user_id = request.data.get('staff_user_id')
+        company_name = request.data.get('company_name')
+        revert = bool(request.data.get('revert'))
+
+        if None in (course_ids, staff_user_id):
+            return Response(status.HTTP_400_BAD_REQUEST)
+
+        try:
+            User.objects.get(id=staff_user_id)
+        except User.DoesNotExist:
+            return Response(status.HTTP_400_BAD_REQUEST)
+
+        task = convert_ooyala_to_bcove.delay(
+            staff_user_id=staff_user_id,
+            course_ids=course_ids,
+            revert=revert,
+            company_name=company_name,
+            callback="conversion_script_success_callback",
+        )
+
+        return Response({'task_id': task.task_id}, status=status.HTTP_200_OK)
+
+    def get(self, request):
+        staff_user_id = request.data.get('staff_user_id')
+        task = get_modules_with_video_embeds.delay(
+            staff_user_id=staff_user_id,
+            callback="module_list_success_callback",
+        )
+        return Response({'result': task.task_id}, status=status.HTTP_200_OK)
