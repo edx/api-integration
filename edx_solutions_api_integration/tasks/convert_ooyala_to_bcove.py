@@ -399,7 +399,7 @@ def module_list_success_callback(result, kwargs):
         send_mail(subject, text, settings.DEFAULT_FROM_EMAIL, [user.email])
 
 
-@task(name=u'lms.djangoapps.api_integration.tasks.get_modules_with_video_embeds', bind=True, base=ConversionScriptTask)
+@task(name=u'lms.djangoapps.api_integration.tasks.get_modules_with_video_embeds',bind=True, base=ConversionScriptTask)
 def get_modules_with_video_embeds(self, staff_user_id, callback=None):
     course_ids = CourseOverview.objects.filter(
         Q(end__gte=datetime.datetime.today().replace(tzinfo=UTC)) |
@@ -407,31 +407,21 @@ def get_modules_with_video_embeds(self, staff_user_id, callback=None):
     ).values_list('id', flat=True)
 
     # create studio url of module
-    block_url = '/container/i4x://{}/vertical/{}'
+    block_url = '/container/{}'
     block_locs = defaultdict(list)
 
     for course_id in course_ids:
         course_key = CourseKey.from_string(course_id)
-
-        course_key_split = course_id.split('/')
-        if len(course_key_split) == 3:
-            course_id = '{}/{}'.format(course_key_split[0], course_key_split[1])
-
         for blocks in non_html_ie_blocks(course_key):
             for block in blocks:
-                if hasattr(block.parent, 'block_id'):
-                    block_loc = block.parent.block_id
-                else:
-                    block_loc = block.location
-
                 if block.category == 'adventure':
                     soup = BeautifulSoup(block.xml_content, 'html.parser')
                     if soup.find_all('ooyala-player'):
-                        module_url = block_url.format(course_id, block_loc)
+                        module_url = block_url.format(block.location)
                         block_locs[block.category].append(module_url)
                 elif block.category == 'gp-v2-video-resource':
                     if block.video_id:
-                        module_url = block_url.format(course_id, block_loc)
+                        module_url = block_url.format(block.location)
                         block_locs[block.category].append(module_url)
                 else:
                     if block.category in ('pb-mcq', 'poll', 'pb-mrq', 'pb-answer'):
@@ -446,7 +436,7 @@ def get_modules_with_video_embeds(self, staff_user_id, callback=None):
                     for script in soup.find_all('script'):
                         script_text = script.get_text().strip().replace(' ', '')
                         if 'OO.Player.create' in script_text:
-                            module_url = block_url.format(course_id, block_loc)
+                            module_url = block_url.format(block.location)
                             block_locs[block.category].append(module_url)
 
     return block_locs
