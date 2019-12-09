@@ -19,7 +19,7 @@ from xmodule.modulestore.django import modulestore
 from xmodule.modulestore import ModuleStoreEnum
 from opaque_keys.edx.keys import CourseKey
 
-from openedx.core.djangoapps.content.block_structure.api import clear_course_from_cache
+from openedx.core.djangoapps.content.block_structure.api import update_course_in_cache
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 
 
@@ -85,7 +85,7 @@ def convert_ooyala_to_bcove(
     convert_ooyala_ids_to_bcove(staff_user_id, course_ids, self.request.id, bcove_policy, revert)
     convert_ooyala_embeds(staff_user_id, course_ids, self.request.id, bcove_policy)
 
-    flush_courses_cache(course_ids)
+    update_courses_cache(course_ids)
 
     result = cache.get(cache_key)
 
@@ -129,13 +129,13 @@ def convert_ooyala_ids_to_bcove(staff_user_id, course_ids, task_id, bcove_policy
                                 .format(block.parent.block_id, course_id))
 
 
-def flush_courses_cache(course_ids):
+def update_courses_cache(course_ids):
     """
-    Clears course cache so API returns updated data
+    Updates course cache so API returns updated data
     """
     for course_id in course_ids:
         course_key = CourseKey.from_string(course_id)
-        clear_course_from_cache(course_key)
+        update_course_in_cache(course_key)
 
 
 def is_bcove_id(video_id):

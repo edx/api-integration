@@ -2689,7 +2689,7 @@ class CoursesTree(MobileListAPIView):
             self._update_blocks(b, _blocks)
 
 
-class OoyalaToBcoveConversion(MobileListAPIView):
+class OoyalaToBcoveConversion(MobileAPIView, IsStaffView):
     """
     Controls a background task to convert the Ooyala Xblock's
     instances in given courses to Brightcove
@@ -2698,7 +2698,7 @@ class OoyalaToBcoveConversion(MobileListAPIView):
         course_ids = request.data.get('course_ids')
         staff_user_id = request.data.get('staff_user_id')
         company_name = request.data.get('company_name')
-        revert = bool(request.data.get('revert'))
+        revert = str2bool(request.data.get('revert'))
 
         if None in (course_ids, staff_user_id):
             return Response(status.HTTP_400_BAD_REQUEST)
