@@ -2719,9 +2719,13 @@ class OoyalaToBcoveConversion(MobileListAPIView):
         return Response({'task_id': task.task_id}, status=status.HTTP_200_OK)
 
     def get(self, request):
-        staff_user_id = request.data.get('staff_user_id')
+        email_ids = request.data.get('email_ids')
+
+        if not email_ids:
+            return Response(status.HTTP_400_BAD_REQUEST)
+
         task = get_modules_with_video_embeds.delay(
-            staff_user_id=staff_user_id,
+            email_ids=email_ids,
             callback="module_list_success_callback",
         )
         return Response({'result': task.task_id}, status=status.HTTP_200_OK)

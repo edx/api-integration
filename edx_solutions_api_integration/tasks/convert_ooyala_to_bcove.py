@@ -379,28 +379,22 @@ def non_html_ie_blocks(course_key):
 
 
 def module_list_success_callback(result, kwargs):
-    user_id = kwargs.get('staff_user_id')
+    email_ids = kwargs.get('email_ids')
 
     results = ''
     if result:
         for category, modules in result.items():
             results += '''\n\n{}: {} module \n {}'''.format(category, len(modules), '\n'.join(modules))
 
-    try:
-        user = User.objects.get(id=user_id)
-    except User.DoesNotExist:
-        logger.warning('Brightcove get modules list task:: User `{}` does not exist. Could not send success email.'
-                       .format(user_id))
-    else:
-        subject = 'Brightcove get module list task completed'
+    subject = 'Brightcove get module list task completed'
 
-        text = '''Following is the list of modules where Video embeds exist: \n\n\n{}'''.format(results)
+    text = '''Following is the list of modules where Video embeds exist: \n\n\n{}'''.format(results)
 
-        send_mail(subject, text, settings.DEFAULT_FROM_EMAIL, [user.email])
+    send_mail(subject, text, settings.DEFAULT_FROM_EMAIL, email_ids)
 
 
 @task(name=u'lms.djangoapps.api_integration.tasks.get_modules_with_video_embeds',bind=True, base=ConversionScriptTask)
-def get_modules_with_video_embeds(self, staff_user_id, callback=None):
+def get_modules_with_video_embeds(self, email_ids, callback=None):
     course_ids = CourseOverview.objects.filter(
         Q(end__gte=datetime.datetime.today().replace(tzinfo=UTC)) |
         Q(end__isnull=True)
