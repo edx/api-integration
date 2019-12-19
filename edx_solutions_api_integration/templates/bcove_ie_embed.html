@@ -1,18 +1,1 @@
-<video-js
-    id="{{dom_id}}"
-    data-account="{{account_id}}"
-    data-player="default"
-    data-embed="default"
-    data-video-id="{{video_id}}"
-    controls=""
-    playsinline=""
-    style="width:320px; height:180px">
-</video-js>
-<script src="https://players.brightcove.net/{{account_id}}/default_default/index.min.js"></script>
-<script>
-    $("#{{dom_id}}").closest('.image-explorer-hotspot').on('feedback:close', function(evt) {
-     videojs.getPlayer("{{dom_id}}").ready(function () {
-         this.pause();
-     });
- });
-</script>
+<brightcove video_id="{{video_id}}" account_id="{{account_id}}" width="320px" height="180px" />
