@@ -171,7 +171,7 @@ class SessionsList(SecureAPIView):
                 else:
                     response_status = status.HTTP_403_FORBIDDEN
             else:
-                limiter.tick_bad_request_counter(request)
+                limiter.tick_request_counter(request)
 
                 # tick the failed login counters if the user exists in the database
                 if LoginFailures.is_feature_enabled():

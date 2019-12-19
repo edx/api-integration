@@ -275,7 +275,7 @@ class UserPasswordResetTest(CacheIsolationTestCase):
             self.user_url, 'test3', password, email='test3@edx.org',
             first_name='John3', last_name='Doe3', secure=True
         )
-        message = _('Password: Must be more complex (must contain 2 or more digits)')
+        message = _('This password must contain at least 2 numbers.')
         self._assert_response(response, status=400, message=message)
 
         # test will not meet the minimum password complexity criteria

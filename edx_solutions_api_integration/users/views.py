@@ -692,7 +692,7 @@ class UsersDetail(SecureAPIView):
         try:
             existing_user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
-            limiter.tick_bad_request_counter(request)
+            limiter.tick_request_counter(request)
             existing_user = None
         if existing_user is None:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
@@ -772,9 +772,7 @@ class UsersDetail(SecureAPIView):
             _serialize_user(response_data, existing_user)
             if settings.FEATURES.get('ENFORCE_PASSWORD_POLICY', False):
                 try:
-                    validate_password_length(password)
-                    validate_password_complexity(password)
-                    validate_password_dictionary(password)
+                    validate_password(password)
                 except ValidationError, err:
                     # bad user? tick the rate limiter counter
                     AUDIT_LOG.warning("API::Bad password in password_reset.")

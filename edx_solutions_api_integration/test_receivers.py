@@ -22,6 +22,7 @@ MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 @override_settings(MODULESTORE=MODULESTORE_CONFIG)
 class ApiManagerReceiversTests(ModuleStoreTestCase):
     """ Test suite for signal receivers """
+    ENABLED_SIGNALS = ['course_deleted']
 
     def setUp(self):
         super(ApiManagerReceiversTests, self).setUp()
