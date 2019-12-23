@@ -32,7 +32,6 @@ store = modulestore()
 
 
 def conversion_script_success_callback(errors, kwargs):
-    logger.info(kwargs)
     course_ids = kwargs.get('course_ids')
     company_name = kwargs.get('company_name')
     email_ids = kwargs.get('email_ids')
