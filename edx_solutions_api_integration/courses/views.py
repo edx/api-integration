@@ -6,7 +6,7 @@ import warnings
 import sys
 from StringIO import StringIO
 from collections import OrderedDict
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from django.conf import settings
 from django.contrib.auth.models import Group, User
@@ -17,12 +17,12 @@ from django.http import Http404
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 
+from pytz import UTC
 from lxml import etree
 from multiprocessing.pool import ThreadPool
 from requests.exceptions import ConnectionError
 from rest_framework import status
 from rest_framework.response import Response
-from celery.result import AsyncResult
 
 from completion.models import BlockCompletion
 from completion_aggregator.models import Aggregator
@@ -2694,13 +2694,19 @@ class OoyalaToBcoveConversion(MobileAPIView, IsStaffView):
     Controls a background task to convert the Ooyala Xblock's
     instances in given courses to Brightcove
     """
+    batch_size = 100
+
     def post(self, request):
         course_ids = request.data.get('course_ids')
         staff_user_id = request.data.get('staff_user_id')
         company_name = request.data.get('company_name')
         revert = str2bool(request.data.get('revert'))
+        run_on_all = str2bool(request.data.get('run_on_all'))
+        exclude_course_ids = request.data.get('exclude_course_ids', [])
+        email_ids = request.data.get('email_ids')
+        task_ids = []
 
-        if None in (course_ids, staff_user_id):
+        if None in (course_ids or run_on_all, staff_user_id):
             return Response(status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -2708,15 +2714,40 @@ class OoyalaToBcoveConversion(MobileAPIView, IsStaffView):
         except User.DoesNotExist:
             return Response(status.HTTP_400_BAD_REQUEST)
 
-        task = convert_ooyala_to_bcove.delay(
-            staff_user_id=staff_user_id,
-            course_ids=course_ids,
-            revert=revert,
-            company_name=company_name,
-            callback="conversion_script_success_callback",
-        )
+        # run on all open courses
+        if run_on_all:
+            if not isinstance(exclude_course_ids, list):
+                return Response(status.HTTP_400_BAD_REQUEST)
+            else:
+                try:
+                    exclude_course_ids = [CourseKey.from_string(course_id) for course_id in exclude_course_ids]
+                except Exception as e:
+                    return Response(status.HTTP_400_BAD_REQUEST)
 
-        return Response({'task_id': task.task_id}, status=status.HTTP_200_OK)
+                course_ids = CourseOverview.objects.filter(
+                    Q(end__gte=datetime.today().replace(tzinfo=UTC)) |
+                    Q(end__isnull=True)
+                ).exclude(id__in=exclude_course_ids).values_list('id', flat=True)
+
+        for course_ids in self.chunks(course_ids, self.batch_size):
+            task = convert_ooyala_to_bcove.delay(
+                staff_user_id=staff_user_id,
+                course_ids=course_ids,
+                revert=revert,
+                company_name=company_name,
+                email_ids=email_ids,
+                callback="conversion_script_success_callback",
+            )
+
+            task_ids.append(task.task_id)
+
+        return Response({'task_ids': task_ids}, status=status.HTTP_200_OK)
+
+    @staticmethod
+    def chunks(l, n):
+        """Yield successive n-sized chunks from l."""
+        for i in range(0, len(l), n):
+            yield l[i:i + n]
 
     def get(self, request):
         email_ids = request.data.get('email_ids')
