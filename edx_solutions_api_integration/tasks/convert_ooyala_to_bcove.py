@@ -32,21 +32,16 @@ store = modulestore()
 
 
 def conversion_script_success_callback(errors, kwargs):
-    user_id = kwargs.get('staff_user_id')
     course_ids = kwargs.get('course_ids')
     company_name = kwargs.get('company_name')
+    email_ids = kwargs.get('email_ids')
 
     if not errors:
         errors = 'No errors.'
     else:
         errors = '\n'.join(errors)
 
-    try:
-        user = User.objects.get(id=user_id)
-    except User.DoesNotExist:
-        logger.warning('Brightcove conversion task:: User `{}` does not exist. Could not send success email.'
-                       .format(user_id))
-    else:
+    if email_ids:
         subject = 'Ooyala to Brightcove conversion task completed'
         if company_name:
             subject += ' for {}'.format(company_name)
@@ -55,7 +50,7 @@ def conversion_script_success_callback(errors, kwargs):
                 Errors:\n
                 {}'''.format('\n'.join(course_ids), errors)
 
-        send_mail(subject, text, settings.DEFAULT_FROM_EMAIL, [user.email])
+        send_mail(subject, text, settings.DEFAULT_FROM_EMAIL, email_ids)
 
 
 class ConversionScriptTask(Task):
@@ -69,7 +64,7 @@ class ConversionScriptTask(Task):
 def convert_ooyala_to_bcove(
         self, staff_user_id, course_ids,
         company_name=None, callback=None,
-        revert=False
+        revert=False, email_ids=None,
     ):
     xblock_settings = settings.XBLOCK_SETTINGS if hasattr(settings, "XBLOCK_SETTINGS") else {}
     bcove_policy = xblock_settings.get('OoyalaPlayerBlock', {}).get('BCOVE_POLICY')
