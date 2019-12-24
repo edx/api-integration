@@ -2706,7 +2706,8 @@ class OoyalaToBcoveConversion(MobileAPIView, IsStaffView):
         email_ids = request.data.get('email_ids')
         task_ids = []
 
-        if None in (course_ids or run_on_all, staff_user_id):
+        if None in (course_ids or run_on_all, staff_user_id) \
+                or not isinstance(exclude_course_ids, list):
             return Response(status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -2716,18 +2717,15 @@ class OoyalaToBcoveConversion(MobileAPIView, IsStaffView):
 
         # run on all open courses
         if run_on_all:
-            if not isinstance(exclude_course_ids, list):
+            try:
+                exclude_course_ids = [CourseKey.from_string(course_id) for course_id in exclude_course_ids]
+            except Exception as e:
                 return Response(status.HTTP_400_BAD_REQUEST)
-            else:
-                try:
-                    exclude_course_ids = [CourseKey.from_string(course_id) for course_id in exclude_course_ids]
-                except Exception as e:
-                    return Response(status.HTTP_400_BAD_REQUEST)
 
-                course_ids = CourseOverview.objects.filter(
-                    Q(end__gte=datetime.today().replace(tzinfo=UTC)) |
-                    Q(end__isnull=True)
-                ).exclude(id__in=exclude_course_ids).values_list('id', flat=True)
+            course_ids = CourseOverview.objects.filter(
+                Q(end__gte=datetime.today().replace(tzinfo=UTC)) |
+                Q(end__isnull=True)
+            ).exclude(id__in=exclude_course_ids).values_list('id', flat=True)
 
         for course_ids in self.chunks(course_ids, self.batch_size):
             task = convert_ooyala_to_bcove.delay(
