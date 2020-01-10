@@ -19,6 +19,7 @@ from django.utils.translation import ugettext_lazy as _
 
 from lxml import etree
 from multiprocessing.pool import ThreadPool
+from six import text_type
 from requests.exceptions import ConnectionError
 from rest_framework import status
 from rest_framework.response import Response
@@ -690,10 +691,33 @@ class CoursesList(SecureListAPIView):
         course_ids = css_param_to_list(self.request, 'course_id')
         if course_ids:
             course_keys = [get_course_key(course_id) for course_id in course_ids]
-            results = CourseOverview.get_select_courses(course_keys)
+            results = self.get_select_courses(course_keys)
         else:
             results = CourseOverview.get_all_courses()
         return results
+
+    def get_select_courses(self, course_keys):
+        """
+        Returns CourseOverview objects for the given course_keys.
+        """
+        course_overviews = []
+
+        log.info('Generating course overview for %d courses.', len(course_keys))
+        log.debug('Generating course overview(s) for the following courses: %s', course_keys)
+
+        for course_key in course_keys:
+            try:
+                course_overviews.append(CourseOverview.get_from_id(course_key))
+            except Exception as ex:  # pylint: disable=broad-except
+                log.exception(
+                    'An error occurred while generating course overview for %s: %s',
+                    unicode(course_key),
+                    text_type(ex),
+                )
+
+        log.info('Finished generating course overviews.')
+
+        return course_overviews
 
 
 class CoursesDetail(MobileAPIView):
