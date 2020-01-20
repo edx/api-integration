@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='api-integration',
-    version='3.1.25',
+    version='3.1.13',
     description='RESTful api integration for edX platform',
     long_description=open('README.rst').read(),
     author='edX',
@@ -16,11 +16,4 @@ setup(
         'django>=1.8',
         'six',
     ],
-    entry_points={
-        "lms.djangoapp": [
-            "edx_solutions_api_integration = edx_solutions_api_integration.apps:SolutionsAppApiIntegrationConfig",
-        ],
-        "cms.djangoapp": [
-        ],
-    }
 )
