@@ -394,7 +394,7 @@ class UsersList(SecureListAPIView):
                     queryset = queryset.filter(courseenrollment__course_id__in=courses, courseenrollment__is_active=True).distinct()
                 else:
                     courses_filter_list = [
-                        Q(courseenrollment__course_id__icontains=course) & Q(courseenrollment__is_active=True) for
+                        Q(courseenrollment__course_id__id__icontains=course) & Q(courseenrollment__is_active=True) for
                         course in courses]
                     courses_filter_list = reduce(lambda a, b: a | b, courses_filter_list)
                     queryset = queryset.filter(courses_filter_list)
@@ -692,7 +692,7 @@ class UsersDetail(SecureAPIView):
         try:
             existing_user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
-            limiter.tick_bad_request_counter(request)
+            limiter.tick_request_counter(request)
             existing_user = None
         if existing_user is None:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
@@ -772,9 +772,7 @@ class UsersDetail(SecureAPIView):
             _serialize_user(response_data, existing_user)
             if settings.FEATURES.get('ENFORCE_PASSWORD_POLICY', False):
                 try:
-                    validate_password_length(password)
-                    validate_password_complexity(password)
-                    validate_password_dictionary(password)
+                    validate_password(password)
                 except ValidationError, err:
                     # bad user? tick the rate limiter counter
                     AUDIT_LOG.warning("API::Bad password in password_reset.")
@@ -1762,17 +1760,17 @@ class UsersCourseProgressList(SecureListAPIView):
                 filtered_courses = CourseOverview.objects.filter(Q(end__gt=datetime.today()) | Q(end__isnull=True)).values_list('id', flat=True)
             else:
                 filtered_courses = CourseOverview.objects.filter(end__lte=datetime.today()).values_list('id', flat=True)
-            enrollments = enrollments.filter(course_id__in=[CourseKey.from_string(key) for key in filtered_courses])
+            enrollments = enrollments.filter(course_id__in=[key for key in filtered_courses])
 
         enrollments = enrollments.values('course_id', 'created', 'is_active')
         course_keys = []
         for course_enrollment in enrollments:
-            course_keys.append(CourseKey.from_string(course_enrollment['course_id']))
+            course_keys.append(course_enrollment['course_id'])
 
         user_grades = StudentGradebook.objects.filter(course_id__in=course_keys, user_id=user.id)\
             .values('course_id', 'grade')
         student_progress = {
-            str(progress['course_key']): progress
+            progress['course_key']: progress
             for progress in Aggregator.objects.filter(
                 course_key__in=course_keys,
                 user=user,

@@ -110,7 +110,6 @@ def _fake_get_service_unavailability(user_id, course_id, end_date=None):
     active=True,
 )
 @override_settings(DEBUG=True)
-@override_settings(PASSWORD_MIN_LENGTH=4)
 @mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': True})
 @ddt.ddt
 class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolationTestCase, APIClientMixin):
@@ -2723,6 +2722,7 @@ class UsersProgressApiTests(
             start=cls.course_start_date,
             end=cls.course_end_date,
             language=cls.language,
+            mobile_available=False,
         )
         cls.test_data = '<html>{}</html>'.format(str(uuid.uuid4()))
 
