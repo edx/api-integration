@@ -14,14 +14,13 @@ from django.utils.translation import ugettext as _
 from django.core.cache import cache
 
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
+from util.password_policy_validators import create_validator_config
 
 TEST_API_KEY = str(uuid.uuid4())
 
 
 @override_settings(EDX_API_KEY=TEST_API_KEY)
 @patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': True})
-@override_settings(PASSWORD_MIN_LENGTH=4, PASSWORD_MAX_LENGTH=12,
-                   PASSWORD_COMPLEXITY={'UPPER': 2, 'LOWER': 2, 'PUNCTUATION': 2, 'DIGITS': 2})
 class UserPasswordResetTest(CacheIsolationTestCase):
     """
     Test edx_solutions_api_integration.session.session_list view
@@ -223,18 +222,22 @@ class UserPasswordResetTest(CacheIsolationTestCase):
             )
             self._assert_response(response, status=200)
 
-    @override_settings(MINIMUM_PASSWORD_COMPLEXITY_SCORE=4, PASSWORD_MIN_LENGTH=8,
-                       PASSWORD_COMPLEXITY={
-                           'UPPER': 2, 'LOWER': 2, 'PUNCTUATION': 2, 'DIGITS': 2,
-                           'UPPER_SCORE': 1, 'LOWER_SCORE': 1,
-                           'PUNCTUATION_SCORE': 2, 'DIGITS_SCORE': 2
-                       })
+    @override_settings(AUTH_PASSWORD_VALIDATORS=[
+        create_validator_config('util.password_policy_validators.NumericValidator', {'min_numeric': 2}),
+        create_validator_config('util.password_policy_validators.LowercaseValidator', {'min_lower': 2}),
+        create_validator_config('util.password_policy_validators.UppercaseValidator', {'min_upper': 2}),
+        create_validator_config('util.password_policy_validators.PunctuationValidator', {'min_punctuation': 2}),
+        create_validator_config('util.password_policy_validators.MinimumLengthValidator', {'min_length': 11}),
+        create_validator_config('util.password_policy_validators.SymbolValidator', {'min_symbol': 1}),
+        create_validator_config('util.password_policy_validators.AlphabeticValidator', {'min_alphabetic': 5})
+
+    ])
     def test_minimum_password_complexity_scenarios(self):
         """
         Test Password complexity using complex passwords scenarios
         """
         # test meet the minimum password criteria
-        password = 'TESTPass12'
+        password = 'TESTPass12.,$'
         response = self._do_post_request(
             self.user_url, 'test', password, email='test@edx.org',
             first_name='John', last_name='Doe', secure=True
@@ -242,8 +245,7 @@ class UserPasswordResetTest(CacheIsolationTestCase):
         self._assert_response(response, status=201)
 
         # test meet the minimum password criteria
-        # min_password_complexity_score <= password_complexity_score i.e (4 <= 4)
-        password = 'AaaaAaaa12'
+        password = '$Aaaa.Aaaa12!'
         response = self._do_post_request(
             self.user_url, 'test_user', password, email='test_user@edx.org',
             first_name='John', last_name='Doe', secure=True
@@ -251,258 +253,66 @@ class UserPasswordResetTest(CacheIsolationTestCase):
         self._assert_response(response, status=201)
 
         # test meet the minimum password criteria
-        # min_password_complexity_score <= password_complexity_score i.e (4 <= 4)
-        password = '345Aa@$$12'
+        password = '345Aa@$$12bcD.'
         response = self._do_post_request(
             self.user_url, 'test1', password, email='test1@edx.org',
             first_name='John1', last_name='Doe1', secure=True
         )
         self._assert_response(response, status=201)
 
-        # test meet the minimum password complexity criteria
-        # min_password_complexity_score <= password_complexity_score i.e (4 <= 6)
-        password = 'ASwe!@543^'
+        # test meet the minimum password criteria
+        password = "TEs\xc2t 23P.!$$"
         response = self._do_post_request(
             self.user_url, 'test2', password, email='test2@edx.org',
             first_name='John2', last_name='Doe2', secure=True
         )
         self._assert_response(response, status=201)
 
-        # test will not meet the minimum password complexity criteria
-        # min_password_complexity_score <= password_complexity_score i.e (4 <= 2)
-        password = 'TEstFAIL1'
+        # test will not meet the minimum password criteria
+        password = '$AAbdd12.,'
         response = self._do_post_request(
             self.user_url, 'test3', password, email='test3@edx.org',
             first_name='John3', last_name='Doe3', secure=True
         )
-        message = _('Password: Must be more complex (must contain 2 or more digits)')
+        message = _('Password: This password is too short. It must contain at least 11 characters.')
         self._assert_response(response, status=400, message=message)
 
-        # test will not meet the minimum password complexity criteria
-        # min_password_complexity_score <= password_complexity_score i.e (4 <= 2)
-        password = '2314562334s'
+        # test will not meet the minimum password criteria
+        password = 'TEstFAIL1'
         response = self._do_post_request(
             self.user_url, 'test4', password, email='test4@edx.org',
             first_name='John4', last_name='Doe4', secure=True
         )
-        message = _('Password: Must be more complex (must contain 2 or more uppercase characters,'
-                    ' must contain 2 or more lowercase characters)')
+        message = _('Password: This password must contain at least 2 numbers.')
         self._assert_response(response, status=400, message=message)
-
-    @override_settings(MINIMUM_PASSWORD_COMPLEXITY_SCORE=8, PASSWORD_MIN_LENGTH=8, PASSWORD_MAX_LENGTH=None,
-                       PASSWORD_COMPLEXITY={
-                           'UPPER': 2, 'LOWER': 2, 'PUNCTUATION': 2, 'DIGITS': 2, 'NON ASCII': 1, 'WORDS': 2,
-                           'UPPER_SCORE': 1, 'LOWER_SCORE': 1, 'NON_ASCII_SCORE': 2,
-                           'WORDS_SCORE': 2, 'PUNCTUATION_SCORE': 2, 'DIGITS_SCORE': 2
-                       })
-    def test_password_minimum_complexity_with_all_password_complex_levels(self):
-        """
-        Test Password Complexity using all password complex scenarios
-        """
-
-        # test meet the minimum password criteria
-        # min_password_complexity_score <= password_complexity_score i.e (8 <= 8)
-        password = "TEs\xc2t P@$$"
-        response = self._do_post_request(
-            self.user_url, 'test', password, email='test@edx.org',
-            first_name='John', last_name='Doe', secure=True
-        )
-        self._assert_response(response, status=201)
 
         # test will not meet the minimum password criteria
-        # min_password_complexity_score <= password_complexity_score i.e (8 <= 4)
-        password = "TEs\xc2tFA1L"
-        response = self._do_post_request(
-            self.user_url, 'test1', password, email='test1@edx.org',
-            first_name='John1', last_name='Doe1', secure=True
-        )
-        message = _('Password: Must be more complex (must contain 2 or more digits,'
-                    ' must contain 2 or more punctuation characters)')
-        self._assert_response(response, status=400, message=message)
-
-        # test meet the minimum password criteria
-        # min_password_complexity_score <= password_complexity_score i.e (8 <= 10)
-        password = "TEs\xc2t P@$$123"
-        response = self._do_post_request(
-            self.user_url, 'test2', password, email='test2@edx.org',
-            first_name='John2', last_name='Doe2', secure=True
-        )
-        self._assert_response(response, status=201)
-
-        # test will not meet the minimum password criteria
-        # min_password_complexity_score <= password_complexity_score i.e (8 <= 6)
-        password = "TEstP@$$123"
-        response = self._do_post_request(
-            self.user_url, 'test3', password, email='test3@edx.org',
-            first_name='John3', last_name='Doe3', secure=True
-        )
-        message = _('Password: Must be more complex (must contain 1 or more non ascii characters)')
-        self._assert_response(response, status=400, message=message)
-
-    @override_settings(
-        MINIMUM_PASSWORD_COMPLEXITY_SCORE=10, PASSWORD_MIN_LENGTH=8, PASSWORD_MAX_LENGTH=None,
-        PASSWORD_COMPLEXITY={
-            'UPPER': 2, 'LOWER': 2, 'PUNCTUATION': 2, 'DIGITS': 2,
-            'UPPER_SCORE': 1, 'LOWER_SCORE': 1, 'PUNCTUATION_SCORE': 2, 'DIGITS_SCORE': 2
-        })
-    def test_minimum_password_complexity_score_greater_than_password_complexity_levels_total_score(self):
-        """Test to set the minimum score of password complexity > all the complexity
-        level scores. Total score of the password complexity levels is 6 and minimum password
-        complexity score is 10
-        """
-
-        # test will not meet the minimum password criteria
-        # min_password_complexity_score <= password_complexity_score i.e (10 <= 4)
-        password = "TEstP@$$"
-        response = self._do_post_request(
-            self.user_url, 'test', password, email='test@edx.org',
-            first_name='John', last_name='Doe', secure=True
-        )
-        message = _('Password: Must be more complex (must contain 2 or more digits)')
-        self._assert_response(response, status=400, message=message)
-
-        # test meet the minimum password criteria
-        # min_password_complexity_score <= password_complexity_score i.e (10 <= 6)
-        # (10 <= 6 ) is false but the password meet all the complex levels that is enabled in the
-        # settings and the error dictionary is empty and simply it validates the password because we
-        # have set the minimum score of password greater that all the complex levels that are enabled
-        password = "TEstP@$$12"
-        response = self._do_post_request(
-            self.user_url, 'test1', password, email='test1@edx.org',
-            first_name='John1', last_name='Doe1', secure=True
-        )
-        self._assert_response(response, status=201)
-
-    @override_settings(
-        MINIMUM_PASSWORD_COMPLEXITY_SCORE=2, PASSWORD_MIN_LENGTH=8, PASSWORD_MAX_LENGTH=None,
-        PASSWORD_COMPLEXITY={
-            'UPPER': 2, 'LOWER': 2, 'PUNCTUATION': 2, 'DIGITS': 2,
-            'UPPER_SCORE': 1, 'LOWER_SCORE': 1, 'PUNCTUATION_SCORE': 2, 'DIGITS_SCORE': 2
-        })
-    def test_password_complexity_score_less_than_password_complexity_levels_total_score(self):
-        """Test to set the minimum score of password complexity < all the complexity
-        level scores. Total score of the password complexity levels is 6 and minimum password
-        complexity score is 2
-        """
-
-        # test meet the minimum password criteria
-        # min_password_complexity_score <= password_complexity_score i.e (2 <= 4)
-        password = "TEstP@$$"
-        response = self._do_post_request(
-            self.user_url, 'test', password, email='test@edx.org',
-            first_name='John', last_name='Doe', secure=True
-        )
-        self._assert_response(response, status=201)
-
-    @override_settings(
-        MINIMUM_PASSWORD_COMPLEXITY_SCORE=5, PASSWORD_MIN_LENGTH=8, PASSWORD_MAX_LENGTH=None,
-        PASSWORD_COMPLEXITY={
-            'UPPER': 1, 'LOWER': 1, 'PUNCTUATION': 1, 'DIGITS': 1,
-            'UPPER_SCORE': 2, 'LOWER_SCORE': 2, 'PUNCTUATION_SCORE': 1, 'DIGITS_SCORE': 1
-        })
-    def test_password_complexity_score_less_than_password_complexity_levels_total_score2(self):
-        """Test to set (a different set of weightings) the minimum score of password complexity < all the complexity
-        level scores. Total score of the password complexity levels is 6 and minimum password
-        complexity score is 5
-        """
-
-        # try a few successful combinations
-        password = "Testpassw0rd"
-        response = self._do_post_request(
-            self.user_url, 'test', password, email='test@edx.org',
-            first_name='John', last_name='Doe', secure=True
-        )
-        self._assert_response(response, status=201)
-
-        password = "tESTPASSW0RD"
-        response = self._do_post_request(
-            self.user_url, 'test2', password, email='test2@edx.org',
-            first_name='John', last_name='Doe', secure=True
-        )
-        self._assert_response(response, status=201)
-
-        password = "tESTPA$SWORD"
-        response = self._do_post_request(
-            self.user_url, 'test3', password, email='test3@edx.org',
-            first_name='John', last_name='Doe', secure=True
-        )
-        self._assert_response(response, status=201)
-
-        # test failure cases
-        password = "testpassword"
-        response = self._do_post_request(
-            self.user_url, 'test4', password, email='test4@edx.org',
-            first_name='John', last_name='Doe', secure=True
-        )
-        self._assert_response(response, status=400)
-
-        password = "t1234%^&*"
+        password = '2314562334s'
         response = self._do_post_request(
             self.user_url, 'test5', password, email='test5@edx.org',
-            first_name='John', last_name='Doe', secure=True
+            first_name='John5', last_name='Doe5', secure=True
         )
-        self._assert_response(response, status=400)
+        message = _('Password: This password must contain at least 2 lowercase letters.; '
+                    'This password must contain at least 2 uppercase letters.; '
+                    'This password must contain at least 2 punctuation marks.')
+        self._assert_response(response, status=400, message=message)
 
-        password = "T1234%^&*"
+        # test will not meet the minimum password criteria
+        password = 'AAbb$!!1234'
         response = self._do_post_request(
             self.user_url, 'test6', password, email='test6@edx.org',
-            first_name='John', last_name='Doe', secure=True
+            first_name='John6', last_name='Doe6', secure=True
         )
-        self._assert_response(response, status=400)
-
-    @override_settings(
-        MINIMUM_PASSWORD_COMPLEXITY_SCORE=4, PASSWORD_MIN_LENGTH=8, PASSWORD_MAX_LENGTH=None,
-        PASSWORD_COMPLEXITY={
-            'UPPER': 2, 'LOWER': 2, 'PUNCTUATION': 2, 'DIGITS': 2,
-            'UPPER_SCORE': 2, 'LOWER_SCORE': 2, 'PUNCTUATION_SCORE': 1, 'DIGITS_SCORE': 1
-        })
-    def test_password_complexity_setting_different_score_values(self):
-        """
-        Test password complexity using different score values
-        """
-
-        # test will not  meet the minimum password criteria
-        # min_password_complexity_score <= password_complexity_score i.e (4 <= 2)
-        password = "ASDSADASDSAD"
-        response = self._do_post_request(
-            self.user_url, 'test', password, email='test@edx.org',
-            first_name='John', last_name='Doe', secure=True
-        )
-        message = _('Password: Must be more complex (must contain 2 or more digits,'
-                    ' must contain 2 or more punctuation characters)')
+        message = _('Password: This password must contain at least 5 letters.')
         self._assert_response(response, status=400, message=message)
 
-        # test will not  meet the minimum password criteria
-        # min_password_complexity_score <= password_complexity_score i.e (4 <= 1)
-        password = "1234565778"
+        # test will not meet the minimum password criteria
+        password = 'AAbb!!1234c'
         response = self._do_post_request(
-            self.user_url, 'test1', password, email='test1@edx.org',
-            first_name='John', last_name='Doe', secure=True
+            self.user_url, 'test7', password, email='test7@edx.org',
+            first_name='John7', last_name='Doe7', secure=True
         )
-        message = _('Password: Must be more complex (must contain 2 or more punctuation characters,'
-                    ' must contain 2 or more uppercase characters)')
-        self._assert_response(response, status=400, message=message)
-
-        # test will not  meet the minimum password criteria
-        # min_password_complexity_score <= password_complexity_score i.e (4 <= 1)
-        password = "@$@%%!@%^^#@$"
-        response = self._do_post_request(
-            self.user_url, 'test2', password, email='test2@edx.org',
-            first_name='John', last_name='Doe', secure=True
-        )
-        message = _('Password: Must be more complex (must contain 2 or more digits,'
-                    ' must contain 2 or more uppercase characters)')
-        self._assert_response(response, status=400, message=message)
-
-        # test will not  meet the minimum password criteria
-        # min_password_complexity_score <= password_complexity_score i.e (4 <= 2)
-        password = "asdsadasdsadsadsadsdasdasad"
-        response = self._do_post_request(
-            self.user_url, 'test2', password, email='test2@edx.org',
-            first_name='John', last_name='Doe', secure=True
-        )
-        message = _('Password: Must be more complex (must contain 2 or more digits,'
-                    ' must contain 2 or more punctuation characters)')
+        message = _('Password: This password must contain at least 1 symbol.')
         self._assert_response(response, status=400, message=message)
 
     def _do_post_request(self, url, username, password, **kwargs):

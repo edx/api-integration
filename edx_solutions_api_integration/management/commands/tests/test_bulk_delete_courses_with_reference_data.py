@@ -77,7 +77,7 @@ class BulkCourseDeleteTests(ModuleStoreTestCase):
             grade_summary='test',
             grading_policy='test',
         ).save()
-        CourseEnrollment(user=user, course_id=course_key).save()
+        CourseEnrollment.get_or_create_enrollment(user, course_key)
         CourseAccessRole(user=user, course_id=course_key, org='test', role='TA').save()
         handouts_usage_key = course_key.make_usage_key('course_info', 'handouts')
         StudentModule(student=user, course_id=course_key, module_state_key=handouts_usage_key).save()
