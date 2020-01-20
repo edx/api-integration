@@ -192,11 +192,12 @@ class CourseProgressSerializer(serializers.Serializer):
     def get_course(self, enrollment):
         course_overview = next(
             (
-                course_overview
+                course_overview.copy()
                 for course_overview in self.context['course_overview']
                 if course_overview['id'] == enrollment['course_id']
             ), None
         )
+        course_overview['id'] = unicode(course_overview['id'])
         return course_overview
 
     def get_proficiency(self, enrollment):

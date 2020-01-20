@@ -2722,6 +2722,7 @@ class UsersProgressApiTests(
             start=cls.course_start_date,
             end=cls.course_end_date,
             language=cls.language,
+            mobile_available=False,
         )
         cls.test_data = '<html>{}</html>'.format(str(uuid.uuid4()))
 

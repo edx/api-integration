@@ -386,7 +386,7 @@ def strip_xblock_wrapper_div(html):
     Removes xblock wrapper div from given html
     """
     match = re.search(
-        r'^<div class=\"xblock xblock-student_view(.+?)</script>(?:\n?)(.+?)(?:\n?)</div>$', html, re.DOTALL
+        r'<div class=\"xblock xblock-student_view(.+?)</script>(?:\n?)(.+?)(?:\n?)</div>$', html, re.DOTALL
     )
     if match:
         return match.group(2).strip(' ')
