@@ -388,32 +388,24 @@ def get_modules_with_video_embeds(self, course_ids, email_ids, report, callback=
             Q(end__isnull=True)
         ).values_list('id', flat=True)
 
-    if report == 'non_ie_html_videos':
-        block_types  = [
-            'adventure',
-            'pb-mcq',
-            'pb-mrq',
-            'pb-tip',
-            'pb-answer',
-            'poll',
-            'survey',
-            'gp-v2-video-resource',
-        ]
-    else:
-        block_types = [
+    block_types = [
+        'adventure',
+        'pb-mcq',
+        'pb-mrq',
+        'pb-tip',
+        'pb-answer',
+        'poll',
+        'survey',
+        'gp-v2-video-resource',
+    ]
+
+    if report == 'all_videos':
+        block_types.extend([
             'ooyala-player',
             'html',
             'image-explorer',
-            'adventure',
-            'pb-mcq',
-            'pb-mrq',
-            'pb-tip',
-            'pb-answer',
-            'poll',
-            'survey',
-            'gp-v2-video-resource',
             'static_tab',
-        ]
+        ])
 
     # create apros url of modules
     block_url = '/courses/{}/lessons/jump_to_page/{}'
