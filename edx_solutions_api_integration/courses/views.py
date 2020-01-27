@@ -2748,13 +2748,21 @@ class OoyalaToBcoveConversion(MobileAPIView, IsStaffView):
             yield l[i:i + n]
 
     def get(self, request):
+        course_ids = request.data.get('course_ids')
         email_ids = request.data.get('email_ids')
+        report = request.data.get('report')
 
         if not email_ids:
             return Response(status.HTTP_400_BAD_REQUEST)
 
+        if report not in ('non_ie_html_videos', 'all_videos'):
+            return Response(status.HTTP_400_BAD_REQUEST)
+
         task = get_modules_with_video_embeds.delay(
+            course_ids=course_ids,
             email_ids=email_ids,
+            report=report,
             callback="module_list_success_callback",
         )
+
         return Response({'result': task.task_id}, status=status.HTTP_200_OK)
