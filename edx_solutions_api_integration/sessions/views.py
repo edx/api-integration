@@ -181,7 +181,6 @@ class SessionsList(SecureAPIView):
                 AUDIT_LOG.warn(u"API::User authentication failed with user-id - {0}".format(existing_user.id))  # pylint: disable=W1202
         else:
             AUDIT_LOG.warn(u"API::Failed login attempt with unknown email/username")
-            limiter.tick_bad_request_counter(request)
             response_status = status.HTTP_404_NOT_FOUND
         return Response(response_data, status=response_status)
 
