@@ -410,6 +410,7 @@ def get_modules_with_video_embeds(self, course_ids, email_ids, report, callback=
     # create apros url of modules
     block_url = '/courses/{}/lessons/jump_to_page/{}'
     gp_url = '/courses/{}/group_work'
+    resources_url = '/courses/{}/resources'
     modules_with_videos = dict()
 
     for course_id in course_ids:
@@ -431,6 +432,11 @@ def get_modules_with_video_embeds(self, course_ids, email_ids, report, callback=
                         module_url = gp_url.format(course_id)
                         block_locs[block.category].append(module_url)
                 else:
+                    if hasattr(block.parent, 'block_id'):
+                        block_loc = block.parent.block_id
+                    else:
+                        block_loc = block.location
+
                     if block.category in ('pb-mcq', 'poll', 'pb-mrq', 'pb-answer'):
                         soup = BeautifulSoup(block.question, 'html.parser')
                     elif block.category == 'pb-tip':
@@ -443,8 +449,12 @@ def get_modules_with_video_embeds(self, course_ids, email_ids, report, callback=
                     for script in soup.find_all('script'):
                         script_text = script.get_text().strip().replace(' ', '')
                         if 'OO.Player.create' in script_text:
-                            module_url = block_url.format(course_id, block.parent.block_id)
-                            block_locs[block.category].append(module_url)
+                            if block.category == 'static_tab':
+                                module_url = resources_url.format(course_id)
+                                block_locs[block.category].append(module_url)
+                            else:
+                                module_url = block_url.format(course_id, block_loc)
+                                block_locs[block.category].append(module_url)
 
         modules_with_videos[course_id] = block_locs
 
