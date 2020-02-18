@@ -124,6 +124,7 @@ from edx_solutions_projects.serializers import (
 from edx_solutions_api_integration.tasks import (
     convert_ooyala_to_bcove,
     get_modules_with_video_embeds,
+    get_assets_with_incorrect_urls,
 )
 
 
@@ -2766,3 +2767,21 @@ class OoyalaToBcoveConversion(MobileAPIView, IsStaffView):
         )
 
         return Response({'result': task.task_id}, status=status.HTTP_200_OK)
+
+
+class AssetURLs(MobileAPIView, IsStaffView):
+    def get(self, request):
+        course_ids = request.data.get('course_ids')
+        email_ids = request.data.get('email_ids')
+        environment = request.data.get('env')
+
+        if None in (email_ids, environment):
+            return Response(status.HTTP_400_BAD_REQUEST)
+
+        task = get_assets_with_incorrect_urls.delay(
+            course_ids=course_ids,
+            email_ids=email_ids,
+            environment=environment,
+        )
+
+        return Response({'task_id': task.task_id}, status=status.HTTP_200_OK)
