@@ -258,7 +258,7 @@ class SessionsDetail(SecureAPIView):
 class AssetsToken(APIView):
     """
     Assets token can be used to request locked LMS assets by passing them in request param
-    e.g; /c4x/ToolsORG/Tools101/asset/Getting_started.pdf?auth_token={asset_token}
+    e.g; /c4x/ToolsORG/Tools101/asset/Getting_started.pdf?access_token={asset_token}
 
     It is created by encrypting a valid user session id.
     """
@@ -274,7 +274,8 @@ class AssetsToken(APIView):
         except KeyError:
             user = AnonymousUser()
         if user.is_authenticated():
-            response_data['assets_token'] = Fernet(settings.ASSET_AUTH_SECRET_KEY).encrypt(bytes(session.session_key))
+            response_data['assets_token'] = Fernet(settings.ASSETS_TOKEN_ENCRYPTION_KEY)\
+                .encrypt(bytes(session.session_key))
             return Response(response_data, status=status.HTTP_200_OK)
         else:
             return Response(response_data, status=status.HTTP_404_NOT_FOUND)
