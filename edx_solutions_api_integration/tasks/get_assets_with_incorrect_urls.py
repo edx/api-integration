@@ -2,7 +2,7 @@ import logging
 import pymongo
 import re
 import datetime
-from urlparse import urlparse
+from urlparse import urlparse, urljoin
 from pytz import UTC
 
 from bson.son import SON
@@ -11,10 +11,15 @@ from celery.task import task, Task
 from django.db.models import Q
 from django.core.mail import send_mail
 from django.conf import settings
+
 from opaque_keys.edx.keys import CourseKey
 from xmodule.modulestore.django import modulestore
 from xmodule.contentstore.content import StaticContent
-
+from xmodule.modulestore import InvalidLocationError
+from xmodule.modulestore.exceptions import ItemNotFoundError
+from xmodule.exceptions import NotFoundError
+from xmodule.assetstore.assetmgr import AssetManager
+from opaque_keys import InvalidKeyError
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 
 log = logging.getLogger(__name__)
@@ -45,7 +50,8 @@ class AssetURLsTask(Task):
     bind=True,
     base=AssetURLsTask
 )
-def get_assets_with_incorrect_urls(self, course_ids, email_ids, environment):
+def get_assets_with_incorrect_urls(self, course_ids, email_ids, environment, staff_user_id, update):
+    task_id = self.request.id
     if not course_ids:
         course_ids = CourseOverview.objects.filter(
             Q(end__gte=datetime.datetime.today().replace(tzinfo=UTC)) |
@@ -54,14 +60,14 @@ def get_assets_with_incorrect_urls(self, course_ids, email_ids, environment):
 
     course_asset_blocks = dict()
     for course_id in course_ids:
-        asset_blocks = find_asset_urls_in_course(course_id, environment)
+        asset_blocks = find_asset_urls_in_course(task_id, course_id, environment, staff_user_id, update)
         if asset_blocks:
             course_asset_blocks[course_id] = asset_blocks
 
     return course_asset_blocks
 
 
-def find_asset_urls_in_course(course_id, environment):
+def find_asset_urls_in_course(task_id, course_id, environment, staff_user_id, update):
     block_url = '/courses/{}/lessons/jump_to_page/{}'
     course_key = CourseKey.from_string(course_id)
     query = SON([
@@ -79,18 +85,31 @@ def find_asset_urls_in_course(course_id, environment):
     asset_blocks = []
     for block in blocks:
         asset_urls = []
-        _find_asset_urls_in_block(block, asset_urls, course_key, environment)
-        if asset_urls:
+        block_loc = block_url.format(course_key, block.get('_id', {}).get('name'))
+        _find_asset_urls_in_block(task_id, block, block_loc, asset_urls, course_key, environment, staff_user_id, update)
+        if asset_urls and update:
+            asset_blocks.append(block)
+        elif asset_urls:
             loc = block.get('_id', {}).get('name')
             asset_blocks.append(block_url.format(course_id, loc))
+
+    if asset_blocks and update:
+        for module in _store._load_items(course_key, asset_blocks):
+            store.update_item(xblock=module, user_id=staff_user_id)
+
+        return []
 
     return asset_blocks
 
 
-def _find_asset_urls_in_block(block, asset_urls, course_key, environment):
+def _find_asset_urls_in_block(task_id, block, block_loc, asset_urls, course_key, environment, staff_user_id, update):
     for key, value in block.items():
         if type(value) == dict:
-            _find_asset_urls_in_block(value, asset_urls, course_key, environment)
+            _find_asset_urls_in_block(
+                task_id, value, block_loc, asset_urls,
+                course_key, environment, staff_user_id,
+                update
+            )
         if type(value) == str or type(value) == unicode:
             urls = re.findall(URL_RE, value)
             for url in urls:
@@ -101,4 +120,36 @@ def _find_asset_urls_in_block(block, asset_urls, course_key, environment):
                     # check if asset URL belongs to some other server or course
                     if parsed_url.hostname != environment or \
                                     asset_url.groupdict().get('course') != course_key.course:
-                        asset_urls.append(url)
+
+                        if update:
+                            # check if asset exists in this course
+                            asset_path = '{}{}'.format(
+                                StaticContent.get_base_url_path_for_course_assets(course_key),
+                                asset_url.groupdict().get('name')
+                            )
+
+                            try:
+                                loc = StaticContent.get_location_from_path(asset_path)
+                            except (InvalidLocationError, InvalidKeyError):
+                                log.warning(
+                                    '[{}] Could not find asset `{}` in module `{}`. Asset `{}` could not be updated.'
+                                        .format(task_id, asset_path, block_loc, url)
+                                )
+                            else:
+                                try:
+                                    AssetManager.find(loc, as_stream=True)
+                                except (ItemNotFoundError, NotFoundError):
+                                    log.warning(
+                                        '[{}] Could not find asset `{}` in module `{}`. Asset `{}` could not be updated.'
+                                            .format(task_id, asset_path, block_loc, url)
+                                    )
+                                else:
+                                    # replace url with the `asset_path`
+                                    full_asset_path = urljoin('https://{}'.format(environment), asset_path)
+                                    block[key] = value.replace(url, full_asset_path)
+                                    asset_urls.append(block)
+
+                                    log.info('[{}] Replacing `{}` with new path `{}` in module `{}`'
+                                                .format(task_id, url, full_asset_path, block_loc))
+                        else:
+                            asset_urls.append(url)
