@@ -3,6 +3,8 @@
 """ API implementation for session-oriented interactions. """
 import logging
 
+from cryptography.fernet import Fernet
+
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth import SESSION_KEY, BACKEND_SESSION_KEY, HASH_SESSION_KEY, load_backend
@@ -14,8 +16,8 @@ from django.utils.translation import ugettext as _
 from edx_solutions_api_integration.permissions import SecureAPIView
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from django.utils import timezone
-from django.template import RequestContext
 
 
 from util.bad_request_rate_limiter import BadRequestRateLimiter
@@ -251,3 +253,29 @@ class SessionsDetail(SecureAPIView):
 
         AUDIT_LOG.info(u"API::User session terminated for user-id - {0}".format(user_id))  # pylint: disable=W1202
         return Response({}, status=status.HTTP_204_NO_CONTENT)
+
+
+class AssetsToken(APIView):
+    """
+    Assets token can be used to request locked LMS assets by passing them in request param
+    e.g; /c4x/ToolsORG/Tools101/asset/Getting_started.pdf?access_token={asset_token}
+
+    It is created by encrypting a valid user session id.
+    """
+    def get(self, request, session_id):
+        response_data = {}
+        engine = import_module(settings.SESSION_ENGINE)
+        session = engine.SessionStore(session_id)
+        try:
+            user_id = session[SESSION_KEY]
+            backend_path = session[BACKEND_SESSION_KEY]
+            backend = load_backend(backend_path)
+            user = backend.get_user(user_id) or AnonymousUser()
+        except KeyError:
+            user = AnonymousUser()
+        if user.is_authenticated():
+            response_data['assets_token'] = Fernet(settings.ASSETS_TOKEN_ENCRYPTION_KEY)\
+                .encrypt(bytes(session.session_key))
+            return Response(response_data, status=status.HTTP_200_OK)
+        else:
+            return Response(response_data, status=status.HTTP_404_NOT_FOUND)
