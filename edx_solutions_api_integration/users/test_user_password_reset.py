@@ -20,7 +20,6 @@ TEST_API_KEY = str(uuid.uuid4())
 
 
 @override_settings(EDX_API_KEY=TEST_API_KEY)
-@patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': True})
 class UserPasswordResetTest(CacheIsolationTestCase):
     """
     Test edx_solutions_api_integration.session.session_list view

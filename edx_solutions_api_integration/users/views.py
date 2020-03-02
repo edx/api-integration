@@ -330,7 +330,6 @@ class UsersList(SecureListAPIView):
         DELETE /api/users?username=edx
 
     ### Use Cases/Notes:
-    * Password formatting policies can be enabled through the "ENFORCE_PASSWORD_POLICY" feature flag
     * The first_name and last_name fields are additionally concatenated and stored in the 'name' field of UserProfile
     * Values for level_of_education can be found in the LEVEL_OF_EDUCATION_CHOICES enum, located
         in common/student/models.py
@@ -456,7 +455,7 @@ class UsersList(SecureListAPIView):
             return Response({'message': _('username is missing')}, status.HTTP_400_BAD_REQUEST)
 
         password = request.data.get('password')
-        if settings.FEATURES.get('ENFORCE_PASSWORD_POLICY', True) and password is None:
+        if password is None:
             return Response({'message': _('password is missing')}, status.HTTP_400_BAD_REQUEST)
 
         first_name = request.data.get('first_name', '')
@@ -475,12 +474,11 @@ class UsersList(SecureListAPIView):
         attribute_values = css_data_to_list(request, 'attribute_values')
 
         # enforce password complexity as an optional feature
-        if settings.FEATURES.get('ENFORCE_PASSWORD_POLICY', False):
-            try:
-                validate_password(password)
-            except ValidationError, err:
-                response_data['message'] = _('Password: ') + '; '.join(err.messages)
-                return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            validate_password(password)
+        except ValidationError, err:
+            response_data['message'] = _('Password: ') + '; '.join(err.messages)
+            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
         try:
             validate_email(email)
         except ValidationError:
@@ -770,15 +768,14 @@ class UsersDetail(SecureAPIView):
         if password:
             old_password_hash = existing_user.password
             _serialize_user(response_data, existing_user)
-            if settings.FEATURES.get('ENFORCE_PASSWORD_POLICY', False):
-                try:
-                    validate_password(password)
-                except ValidationError, err:
-                    # bad user? tick the rate limiter counter
-                    AUDIT_LOG.warning("API::Bad password in password_reset.")
-                    response_data['message'] = _('Password: ') + '; '.join(err.messages)
-                    response_data['code'] = _('invalid_password')
-                    return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                validate_password(password)
+            except ValidationError, err:
+                # bad user? tick the rate limiter counter
+                AUDIT_LOG.warning("API::Bad password in password_reset.")
+                response_data['message'] = _('Password: ') + '; '.join(err.messages)
+                response_data['code'] = _('invalid_password')
+                return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
             # also, check the password reuse policy
             err_msg = None
             if not PasswordHistory.is_allowable_password_reuse(existing_user, password):
