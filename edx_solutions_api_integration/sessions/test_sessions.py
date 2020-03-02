@@ -16,8 +16,7 @@ from django.test import TestCase
 from edx_solutions_api_integration.test_utils import APIClientMixin
 
 
-@mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': False,
-                                                   'ADVANCED_SECURITY': False,
+@mock.patch.dict("django.conf.settings.FEATURES", {'ADVANCED_SECURITY': False,
                                                    'PREVENT_CONCURRENT_LOGINS': False})
 class SessionsApiTests(TestCase, APIClientMixin):
     """ Test suite for Sessions API views """
