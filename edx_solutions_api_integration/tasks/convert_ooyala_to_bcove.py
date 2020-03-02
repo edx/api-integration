@@ -26,6 +26,7 @@ from openedx.core.djangoapps.content.course_overviews.models import CourseOvervi
 PLAYBACK_API_ENDPOINT = 'https://edge.api.brightcove.com/playback/v1/accounts/{account_id}/videos/ref:{reference_id}'
 BRIGHTCOVE_ACCOUNT_ID = '6057949416001'
 RESULTS_CACHE_KEY = 'bcove-task-{}'
+RESULTS_CACHE_TTL = (60 * 60) * 2 # 2 Hours
 
 logger = logging.getLogger('edx.celery.task')
 store = modulestore()
@@ -70,7 +71,7 @@ def convert_ooyala_to_bcove(
     bcove_policy = xblock_settings.get('OoyalaPlayerBlock', {}).get('BCOVE_POLICY')
     cache_key = RESULTS_CACHE_KEY.format(self.request.id)
 
-    cache.set(cache_key, [])
+    cache.set(cache_key, [], RESULTS_CACHE_TTL)
 
     if not bcove_policy:
         error = 'BCOVE POLICY value not found in settings. Exiting.'
@@ -96,6 +97,11 @@ def convert_ooyala_ids_to_bcove(staff_user_id, course_ids, task_id, bcove_policy
         )
 
         for block in oo_blocks:
+            if hasattr(block.parent, 'block_id'):
+                block_loc = block.parent.block_id
+            else:
+                block_loc = block.location
+
             content_id = block.content_id
 
             if content_id and revert:
@@ -107,10 +113,10 @@ def convert_ooyala_ids_to_bcove(staff_user_id, course_ids, task_id, bcove_policy
                     store.update_item(xblock=block, user_id=staff_user_id)
 
                     logger.info('Successfully reverted Brightcove ID for block `{}` in course: `{}`'
-                                .format(block.parent.block_id, course_id))
+                                .format(block_loc, course_id))
             elif content_id and not is_bcove_id(content_id):
                 bcove_video_id = get_brightcove_video_id(
-                    content_id, block.parent.block_id,
+                    content_id, block_loc,
                     course_id, task_id, bcove_policy
                 )
 
@@ -121,7 +127,7 @@ def convert_ooyala_ids_to_bcove(staff_user_id, course_ids, task_id, bcove_policy
                     store.update_item(xblock=block, user_id=staff_user_id)
 
                     logger.info('Successfully Updated Ooyala ID for block `{}` in course: `{}`'
-                                .format(block.parent.block_id, course_id))
+                                .format(block_loc, course_id))
 
 
 def update_courses_cache(course_ids):
@@ -130,7 +136,10 @@ def update_courses_cache(course_ids):
     """
     for course_id in course_ids:
         course_key = CourseKey.from_string(course_id)
-        update_course_in_cache(course_key)
+        try:
+            update_course_in_cache(course_key)
+        except:
+            continue
 
 
 def is_bcove_id(video_id):
@@ -169,7 +178,7 @@ def get_brightcove_video_id(reference_id, block_id, course_id, task_id, bcove_po
         if errors is not None:
             errors.append('Video `{}` not found on Video Cloud. '
                       'Could not convert block `{}` in course `{}`'.format(reference_id, block_id, course_id))
-            cache.set(cache_key, errors)
+            cache.set(cache_key, errors, RESULTS_CACHE_TTL)
     else:
         logger.info('Successful retrieval of Brightcove ID against reference ID: `{}`'.format(reference_id))
         bc_video_id = video_data.get('id')
@@ -418,25 +427,27 @@ def get_modules_with_video_embeds(self, course_ids, email_ids, report, callback=
         course_key = CourseKey.from_string(course_id)
         for blocks in get_blocks(block_types, course_key):
             for block in blocks:
+                if hasattr(block.parent, 'block_id'):
+                    block_loc = block.parent.block_id
+                else:
+                    block_loc = block.location
+
                 if block.category == 'ooyala-player':
                     if not is_bcove_id(block.content_id):
-                        module_url = block_url.format(course_id, block.parent.block_id)
+                        module_url = block_url.format(course_id, block_loc)
                         block_locs[block.category].append(module_url)
                 elif block.category == 'adventure':
                     soup = BeautifulSoup(block.xml_content, 'html.parser')
-                    if soup.find_all('ooyala-player'):
-                        module_url = block_url.format(course_id, block.parent.block_id)
-                        block_locs[block.category].append(module_url)
+                    for oo_tag in soup.find_all('ooyala-player'):
+                        oo_id = oo_tag.attrs.get('content_id', '')
+                        if oo_id and not is_bcove_id(oo_id):
+                            module_url = block_url.format(course_id, block_loc)
+                            block_locs[block.category].append(module_url)
                 elif block.category == 'gp-v2-video-resource':
-                    if block.video_id:
+                    if block.video_id and not is_bcove_id(block.video_id):
                         module_url = gp_url.format(course_id)
                         block_locs[block.category].append(module_url)
                 else:
-                    if hasattr(block.parent, 'block_id'):
-                        block_loc = block.parent.block_id
-                    else:
-                        block_loc = block.location
-
                     if block.category in ('pb-mcq', 'poll', 'pb-mrq', 'pb-answer'):
                         soup = BeautifulSoup(block.question, 'html.parser')
                     elif block.category == 'pb-tip':
