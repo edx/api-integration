@@ -26,8 +26,7 @@ from student.tests.factories import GroupFactory
 
 
 
-@mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': False,
-                                                   'ADVANCED_SECURITY': False,
+@mock.patch.dict("django.conf.settings.FEATURES", {'ADVANCED_SECURITY': False,
                                                    'PREVENT_CONCURRENT_LOGINS': False})
 class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
     """ Test suite for Groups API views """

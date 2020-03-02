@@ -110,7 +110,6 @@ def _fake_get_service_unavailability(user_id, course_id, end_date=None):
     active=True,
 )
 @override_settings(DEBUG=True)
-@mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': True})
 @ddt.ddt
 class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolationTestCase, APIClientMixin):
     """ Test suite for Users API views """
@@ -866,8 +865,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['is_active'], False)
         self.assertIsNotNone(response.data['created'])
 
-    @patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': True,
-                                                  'ENABLE_MAX_FAILED_LOGIN_ATTEMPTS': True,
+    @patch.dict("django.conf.settings.FEATURES", {'ENABLE_MAX_FAILED_LOGIN_ATTEMPTS': True,
                                                   'PREVENT_CONCURRENT_LOGINS': False})
     @override_settings(MAX_FAILED_LOGIN_ATTEMPTS_ALLOWED=3)
     def test_user_detail_post_locked_out(self):
