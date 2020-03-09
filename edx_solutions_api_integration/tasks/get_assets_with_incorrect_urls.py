@@ -21,6 +21,7 @@ from xmodule.exceptions import NotFoundError
 from xmodule.assetstore.assetmgr import AssetManager
 from opaque_keys import InvalidKeyError
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from openedx.core.djangoapps.content.block_structure.api import update_course_in_cache
 
 log = logging.getLogger(__name__)
 store = modulestore()
@@ -31,6 +32,7 @@ URL_RE = 'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-
 class AssetURLsTask(Task):
     def on_success(self, result, task_id, args, kwargs):
         email_ids = kwargs.get('email_ids')
+        update_script = kwargs.get('update')
 
         results = ''
         if result:
@@ -39,10 +41,26 @@ class AssetURLsTask(Task):
                     results += '''\n\n {}:'''.format(course)
                     results += '''\n\n{}'''.format('\n'.join(blocks))
 
-        subject = 'Get assets with incorrect urls task completed'
-        text = '''Following is the list of modules where incorrect asset links exist:{}'''.format(results)
+        subject = '{} assets with incorrect urls task completed'.format('Update' if update_script else 'Get')
+        if update_script:
+            text = '''Following modules could not be updated because one or more
+            assets could not be found in the course:{}'''.format(results)
+        else:
+            text = '''Following is the list of modules where incorrect asset links exist:{}'''.format(results)
 
         send_mail(subject, text, settings.DEFAULT_FROM_EMAIL, email_ids)
+
+
+def update_courses_cache(course_ids):
+    """
+    Updates course cache so API returns updated data
+    """
+    for course_id in course_ids:
+        course_key = CourseKey.from_string(course_id)
+        try:
+            update_course_in_cache(course_key)
+        except:
+            continue
 
 
 @task(
@@ -64,6 +82,9 @@ def get_assets_with_incorrect_urls(self, course_ids, email_ids, environment, sta
         if asset_blocks:
             course_asset_blocks[course_id] = asset_blocks
 
+    if update:
+        update_courses_cache(course_ids)
+
     return course_asset_blocks
 
 
@@ -83,21 +104,29 @@ def find_asset_urls_in_course(task_id, course_id, environment, staff_user_id, up
     ))
 
     asset_blocks = []
+    failure_blocks = []
     for block in blocks:
-        asset_urls = []
+        asset_urls = dict(success=[], failure=[])
         block_loc = block_url.format(course_key, block.get('_id', {}).get('name'))
         _find_asset_urls_in_block(task_id, block, block_loc, asset_urls, course_key, environment, staff_user_id, update)
-        if asset_urls and update:
-            asset_blocks.append(block)
-        elif asset_urls:
+        if update:
+            if asset_urls['success']:
+                asset_blocks.append(block)
+            if asset_urls['failure']:
+                loc = block.get('_id', {}).get('name')
+                failure_blocks.append(block_url.format(course_id, loc))
+        elif asset_urls['success']:
             loc = block.get('_id', {}).get('name')
             asset_blocks.append(block_url.format(course_id, loc))
 
-    if asset_blocks and update:
-        for module in _store._load_items(course_key, asset_blocks):
-            store.update_item(xblock=module, user_id=staff_user_id)
-
-        return []
+    if update:
+        if asset_blocks:
+            for module in _store._load_items(course_key, asset_blocks):
+                store.update_item(xblock=module, user_id=staff_user_id)
+        if failure_blocks:
+            return failure_blocks
+        else:
+            return []
 
     return asset_blocks
 
@@ -131,6 +160,7 @@ def _find_asset_urls_in_block(task_id, block, block_loc, asset_urls, course_key,
                             try:
                                 loc = StaticContent.get_location_from_path(asset_path)
                             except (InvalidLocationError, InvalidKeyError):
+                                asset_urls['failure'].append(block)
                                 log.warning(
                                     '[{}] Could not find asset `{}` in module `{}`. Asset `{}` could not be updated.'
                                         .format(task_id, asset_path, block_loc, url)
@@ -139,6 +169,7 @@ def _find_asset_urls_in_block(task_id, block, block_loc, asset_urls, course_key,
                                 try:
                                     AssetManager.find(loc, as_stream=True)
                                 except (ItemNotFoundError, NotFoundError):
+                                    asset_urls['failure'].append(block)
                                     log.warning(
                                         '[{}] Could not find asset `{}` in module `{}`. Asset `{}` could not be updated.'
                                             .format(task_id, asset_path, block_loc, url)
@@ -147,9 +178,9 @@ def _find_asset_urls_in_block(task_id, block, block_loc, asset_urls, course_key,
                                     # replace url with the `asset_path`
                                     full_asset_path = urljoin('https://{}'.format(environment), asset_path)
                                     block[key] = value.replace(url, full_asset_path)
-                                    asset_urls.append(block)
+                                    asset_urls['success'].append(block)
 
                                     log.info('[{}] Replacing `{}` with new path `{}` in module `{}`'
                                                 .format(task_id, url, full_asset_path, block_loc))
                         else:
-                            asset_urls.append(url)
+                            asset_urls['success'].append(url)
