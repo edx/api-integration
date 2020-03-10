@@ -274,7 +274,7 @@ class AssetsToken(APIView):
         except KeyError:
             user = AnonymousUser()
         if user.is_authenticated():
-            response_data['assets_token'] = Fernet(settings.ASSETS_TOKEN_ENCRYPTION_KEY)\
+            response_data['assets_token'] = Fernet(bytes(settings.ASSETS_TOKEN_ENCRYPTION_KEY))\
                 .encrypt(bytes(session.session_key))
             return Response(response_data, status=status.HTTP_200_OK)
         else:
