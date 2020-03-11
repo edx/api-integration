@@ -106,18 +106,19 @@ def find_asset_urls_in_course(task_id, course_id, environment, staff_user_id, up
     asset_blocks = []
     failure_blocks = []
     for block in blocks:
-        asset_urls = dict(success=[], failure=[])
-        block_loc = block_url.format(course_key, block.get('_id', {}).get('name'))
-        _find_asset_urls_in_block(task_id, block, block_loc, asset_urls, course_key, environment, staff_user_id, update)
+        block_loc = block_url.format(course_id, block.get('_id', {}).get('name'))
+        asset_urls = dict(success=0, failure=0)
+        _find_asset_urls_in_block(
+            task_id, block, block_loc, asset_urls, course_key,
+            environment, staff_user_id, update
+        )
         if update:
             if asset_urls['success']:
                 asset_blocks.append(block)
             if asset_urls['failure']:
-                loc = block.get('_id', {}).get('name')
-                failure_blocks.append(block_url.format(course_id, loc))
+                failure_blocks.append(block_loc)
         elif asset_urls['success']:
-            loc = block.get('_id', {}).get('name')
-            asset_blocks.append(block_url.format(course_id, loc))
+            asset_blocks.append(block_loc)
 
     if update:
         if asset_blocks:
@@ -131,56 +132,76 @@ def find_asset_urls_in_course(task_id, course_id, environment, staff_user_id, up
     return asset_blocks
 
 
-def _find_asset_urls_in_block(task_id, block, block_loc, asset_urls, course_key, environment, staff_user_id, update):
-    for key, value in block.items():
-        if type(value) == dict:
+def _find_asset_urls_in_block(
+        task_id, value, block_loc,
+        asset_urls, course_key,
+        environment, staff_user_id,
+        update,
+        dictionary=None,
+        value_key=None,
+    ):
+
+    if type(value) == dict:
+        for key, val in value.items():
             _find_asset_urls_in_block(
-                task_id, value, block_loc, asset_urls,
-                course_key, environment, staff_user_id,
-                update
+                task_id, val, block_loc, asset_urls,
+                course_key, environment, staff_user_id, update,
+                dictionary=value, value_key=key
             )
-        if type(value) == str or type(value) == unicode:
-            urls = re.findall(URL_RE, value)
-            for url in urls:
-                parsed_url = urlparse(url)
-                asset_url = StaticContent.ASSET_URL_RE.match(parsed_url.path)
+    elif type(value) == list:
+        for item in value:
+            _find_asset_urls_in_block(
+                task_id, item, block_loc, asset_urls,
+                course_key, environment, staff_user_id, update,
+                dictionary=dictionary, value_key=value_key
+            )
+    elif type(value) in (str, unicode):
+        save_updated = False
+        urls = re.findall(URL_RE, value)
+        for url in urls:
+            parsed_url = urlparse(url)
+            asset_url = StaticContent.ASSET_URL_RE.match(parsed_url.path)
 
-                if asset_url is not None:
-                    # check if asset URL belongs to some other server or course
-                    if parsed_url.hostname != environment or \
-                                    asset_url.groupdict().get('course') != course_key.course:
+            if asset_url is not None:
+                # check if asset URL belongs to some other server or course
+                if parsed_url.hostname != environment or \
+                                asset_url.groupdict().get('course') != course_key.course:
 
-                        if update:
-                            # check if asset exists in this course
-                            asset_path = '{}{}'.format(
-                                StaticContent.get_base_url_path_for_course_assets(course_key),
-                                asset_url.groupdict().get('name')
+                    if update:
+                        # check if asset exists in this course
+                        asset_path = '{}{}'.format(
+                            StaticContent.get_base_url_path_for_course_assets(course_key),
+                            asset_url.groupdict().get('name')
+                        )
+
+                        try:
+                            loc = StaticContent.get_location_from_path(asset_path)
+                        except (InvalidLocationError, InvalidKeyError):
+                            asset_urls['failure'] += 1
+                            log.warning(
+                                '[{}] Could not find asset `{}` in module `{}`. Asset `{}` could not be updated.'
+                                    .format(task_id, asset_path, block_loc, url)
                             )
-
+                        else:
                             try:
-                                loc = StaticContent.get_location_from_path(asset_path)
-                            except (InvalidLocationError, InvalidKeyError):
-                                asset_urls['failure'].append(block)
+                                AssetManager.find(loc, as_stream=True)
+                            except (ItemNotFoundError, NotFoundError):
+                                asset_urls['failure'] += 1
                                 log.warning(
                                     '[{}] Could not find asset `{}` in module `{}`. Asset `{}` could not be updated.'
                                         .format(task_id, asset_path, block_loc, url)
                                 )
                             else:
-                                try:
-                                    AssetManager.find(loc, as_stream=True)
-                                except (ItemNotFoundError, NotFoundError):
-                                    asset_urls['failure'].append(block)
-                                    log.warning(
-                                        '[{}] Could not find asset `{}` in module `{}`. Asset `{}` could not be updated.'
-                                            .format(task_id, asset_path, block_loc, url)
-                                    )
-                                else:
-                                    # replace url with the `asset_path`
-                                    full_asset_path = urljoin('https://{}'.format(environment), asset_path)
-                                    block[key] = value.replace(url, full_asset_path)
-                                    asset_urls['success'].append(block)
+                                # replace url with the `asset_path`
+                                full_asset_path = urljoin('https://{}'.format(environment), asset_path)
+                                value = value.replace(url, full_asset_path, 1)
+                                save_updated = True
+                                asset_urls['success'] += 1
 
-                                    log.info('[{}] Replacing `{}` with new path `{}` in module `{}`'
-                                                .format(task_id, url, full_asset_path, block_loc))
-                        else:
-                            asset_urls['success'].append(url)
+                                log.info('[{}] Replacing `{}` with new path `{}` in module `{}`'
+                                            .format(task_id, url, full_asset_path, block_loc))
+                    else:
+                        asset_urls['success'] += 1
+
+        if urls and save_updated and update:
+            dictionary[value_key] = value
