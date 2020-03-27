@@ -2775,6 +2775,8 @@ class AssetURLs(MobileAPIView, IsStaffView):
         course_ids = request.data.get('course_ids')
         email_ids = request.data.get('email_ids')
         environment = request.data.get('env')
+        studio_url = request.data.get('studio_url')
+        course_type = request.data.get('course_type', 'open')
         staff_user_id = request.data.get('staff_user_id')
         update = request.data.get('update', False)
 
@@ -2783,8 +2785,10 @@ class AssetURLs(MobileAPIView, IsStaffView):
 
         task = get_assets_with_incorrect_urls.delay(
             course_ids=course_ids,
+            course_type=course_type,
             email_ids=email_ids,
             environment=environment,
+            studio_url=studio_url,
             staff_user_id=staff_user_id,
             update=update,
         )
