@@ -13,6 +13,7 @@ from edx_solutions_api_integration.permissions import (
     MobilePermissionMixin
 )
 from django.shortcuts import get_object_or_404
+from django.core.cache import cache
 from rest_framework import status
 from rest_framework.response import Response
 
@@ -172,6 +173,14 @@ class MobileUsersCoursesGrades(MobileListAPIView):
         Note: For performance reasons, we use the cached gradebook data here.
         Once persistent grades are enabled on the solutions fork, we'll use CourseGradeFactory instead.
         """
-        return StudentGradebook.course_grade_avg(
-            course_key
-        )
+        cache_key = 'course_grade_avg_{}'.format(course_key)
+        cache_ttl = 60 * 30  # 30 minutes
+
+        course_avg = cache.get(cache_key)
+        if course_avg is not None:
+            return course_avg
+
+        course_avg = StudentGradebook.course_grade_avg(course_key)
+        cache.set(cache_key, course_avg, cache_ttl)
+
+        return course_avg
