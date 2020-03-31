@@ -2659,11 +2659,14 @@ class CoursesTree(MobileListAPIView):
         response_data = []
         for course_structure in course_structures:
             blocks = course_structure.structure.get('blocks', {})
+
+            course = None
             for block in blocks.values():
                 block['name'] = block.pop('display_name')
                 block['category'] = block.pop('block_type')
+                if block['category'] == 'course' and course is None:
+                    course = block
 
-            course = self._get_course(blocks)
             self._update_blocks(course, blocks)
             course_data = {
                 "id": str(course_structure.course_id),
@@ -2671,11 +2674,6 @@ class CoursesTree(MobileListAPIView):
             }
             response_data.append(course_data)
         return Response(response_data, status=status.HTTP_200_OK)
-
-    def _get_course(self, blocks):
-        for block in blocks.values():
-            if block['category'] == 'course':
-                return block
 
     def _update_blocks(self, _block, _blocks):
         # add actual blocks from _blocks instead of block ids in the _block
