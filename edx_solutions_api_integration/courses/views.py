@@ -2664,7 +2664,7 @@ class CoursesTree(MobileListAPIView):
             for block in blocks.values():
                 block['name'] = block.pop('display_name')
                 block['category'] = block.pop('block_type')
-                if block['category'] == 'course' and course is None:
+                if course is None and block['category'] == 'course':
                     course = block
 
             self._update_blocks(course, blocks)
