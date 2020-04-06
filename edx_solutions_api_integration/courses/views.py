@@ -352,7 +352,7 @@ def _get_course_progress_metrics(course_key, **kwargs):
     """
     course_avg = 0
     data = {'course_avg': course_avg}
-    total_actual_completions, total_possible_completions = get_total_completions(course_key, **kwargs)
+    total_actual_or_percent_completions, total_possible_completions = get_total_completions(course_key, **kwargs)
     if kwargs.get('user_id'):
         data.update(get_user_position(course_key, **kwargs))
     total_users_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=kwargs.get('exclude_users'))
@@ -363,9 +363,10 @@ def _get_course_progress_metrics(course_key, **kwargs):
     if kwargs.get('cohort_user_ids'):
         total_users_qs = total_users_qs.filter(id__in=kwargs.get('cohort_user_ids'))
     total_users = total_users_qs.count()
-    if total_users and total_actual_completions and total_possible_completions:
-        course_avg = total_actual_completions / float(total_users)
-        course_avg = min(100 * (course_avg / total_possible_completions), 100)  # avg in percentage
+    if total_users and total_actual_or_percent_completions and total_possible_completions:
+        course_avg = total_actual_or_percent_completions / float(total_users)
+        if not kwargs.get('percent_completion'):
+            course_avg = min(100 * (course_avg / total_possible_completions), 100)  # avg in percentage
     data['course_avg'] = course_avg
     data['total_users'] = total_users
     data['total_possible_completions'] = total_possible_completions
@@ -1938,6 +1939,7 @@ class CoursesMetrics(SecureAPIView):
                 org_ids=org_ids,
                 group_ids=group_ids,
                 cohort_user_ids=cohort_user_ids,
+                percent_completion=True,
             )
             data['avg_progress'] = progress_metrics['course_avg']
 
