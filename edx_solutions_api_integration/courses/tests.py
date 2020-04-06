@@ -215,15 +215,17 @@ class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
         uri = "{}?user_id={}&metrics_required=avg_progress".format(api_endpoint, self.users[-1].id)
         response = self.do_get(uri)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['avg_progress'], self.progress_avg)
-
+        self.assertEqual(
+            response.data['avg_progress'],
+            sum([round(score) for score in self.progress_scores]) / len(self.progress_scores)
+        )
         # Test progress average with cohorts
         with mock.patch('edx_solutions_api_integration.courses.views.get_cohort_user_ids', self._get_cohort_user_ids):
             for i, score in enumerate(self.progress_scores):
                 uri = "{}?user_id={}&metrics_required=avg_progress".format(api_endpoint, self.users[i].id)
                 response = self.do_get(uri)
                 self.assertEqual(response.status_code, 200)
-                self.assertAlmostEqual(response.data['avg_progress'], score)
+                self.assertEqual(response.data['avg_progress'], round(score))
 
             # Test progress average when groupworks is present
             project_mock = mock.MagicMock()
@@ -236,7 +238,10 @@ class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
                     uri = "{}?user_id={}&metrics_required=avg_progress".format(api_endpoint, self.users[i].id)
                     response = self.do_get(uri)
                     self.assertEqual(response.status_code, 200)
-                    self.assertAlmostEqual(response.data['avg_progress'], self.progress_avg)
+                    self.assertAlmostEqual(
+                        response.data['avg_progress'],
+                        sum([round(score) for score in self.progress_scores]) / len(self.progress_scores)
+                    )
 
     @unittest.skip
     def test_metrics_leaders(self, url_name='course-metrics-leaders'):
