@@ -13,7 +13,6 @@ from edx_solutions_api_integration.permissions import (
     MobilePermissionMixin
 )
 from django.shortcuts import get_object_or_404
-from django.core.cache import cache
 from rest_framework import status
 from rest_framework.response import Response
 
