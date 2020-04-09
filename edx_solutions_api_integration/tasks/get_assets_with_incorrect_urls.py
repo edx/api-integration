@@ -116,6 +116,11 @@ def find_asset_urls_in_course(task_id, course_id, environment, studio_url, staff
     ])
 
     _store = store._get_modulestore_for_courselike(course_key)
+
+    # split_mongo based courses are not supported
+    if not hasattr(_store, 'collection'):
+        return []
+
     blocks = list(_store.collection.find(
         query,
         sort=[('_id.revision', pymongo.DESCENDING)],
