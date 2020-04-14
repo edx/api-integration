@@ -150,7 +150,17 @@ def find_asset_urls_in_course(task_id, course_id, environment, studio_url, staff
     if update:
         if blocks_to_update:
             for module in _store._load_items(course_key, blocks_to_update):
-                store.update_item(xblock=module, user_id=staff_user_id)
+                if hasattr(module.parent, 'block_id'):
+                    block_loc = module.parent.block_id
+                else:
+                    block_loc = module.location
+
+                try:
+                    store.update_item(xblock=module, user_id=staff_user_id)
+                except:
+                    log.info('[{}] Error updating module `{}` in course `{}`. Skipping..'
+                             .format(task_id, block_loc, course_id))
+                    continue
 
     return course_assets
 
