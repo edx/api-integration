@@ -113,6 +113,7 @@ from edx_solutions_api_integration.utils import (
     is_cohort_available,
     str2bool,
     strip_xblock_wrapper_div,
+    exclude_non_actual_company_users,
     Round,
 )
 from edx_solutions_organizations.models import Organization
@@ -1317,6 +1318,7 @@ class CoursesUsersList(MobileListAPIView):
         exclude_groups = get_ids_from_list_param(self.request, 'exclude_groups')
         additional_fields = self.request.query_params.get('additional_fields', [])
         order_by_field = self.request.query_params.get('order_by', 'id')
+        exclude_type = self.request.query_params.get('exclude_type')
         if orgs:
             user_qs = user_qs.filter(organizations__in=orgs)
         if groups:
@@ -1327,6 +1329,9 @@ class CoursesUsersList(MobileListAPIView):
             user_qs = user_qs.filter(workgroups__in=workgroups).distinct()
         if exclude_groups:
             user_qs = user_qs.exclude(groups__in=exclude_groups)
+        if exclude_type and orgs:
+            actual_organizations = orgs
+            user_qs = exclude_non_actual_company_users(user_qs, exclude_type, actual_organizations)
         if 'organizations' in additional_fields:
             user_qs = user_qs.prefetch_related('organizations')
         if 'roles' in additional_fields:
@@ -1836,6 +1841,7 @@ class CoursesMetrics(SecureAPIView):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         course_descriptor, course_key, course_content = get_course(request, request.user, course_id)  # pylint: disable=W0612
         slash_course_id = get_course_key(course_id, slashseparated=True)
+        exclude_type = request.query_params.get('exclude_type', None)
         organization = request.query_params.get('organization', None)
         org_ids = [organization] if organization else None
         group_ids = get_ids_from_list_param(self.request, 'groups')
@@ -1847,7 +1853,13 @@ class CoursesMetrics(SecureAPIView):
         if cached_enrollments_data and not len(request.query_params):
             enrollment_count = cached_enrollments_data.get('enrollment_count')
         else:
-            users_enrolled_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users)
+            if exclude_type:
+                exclude_roles = [CourseInstructorRole.ROLE, CourseStaffRole.ROLE,
+                                 CourseObserverRole.ROLE, CourseAssistantRole.ROLE]
+                exc_users = get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles)
+                users_enrolled_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exc_users)
+            else:
+                users_enrolled_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users)
 
             if organization:
                 users_enrolled_qs = users_enrolled_qs.filter(organizations=organization).distinct()
@@ -1857,6 +1869,11 @@ class CoursesMetrics(SecureAPIView):
 
             if cohort_user_ids:
                 users_enrolled_qs = users_enrolled_qs.filter(id__in=cohort_user_ids)
+            if exclude_type and organization:
+                actual_organizations = [int(organization)]
+                users_enrolled_qs = exclude_non_actual_company_users(
+                    users_enrolled_qs, exclude_type, actual_organizations
+                )
 
             enrollment_count = users_enrolled_qs.count()
             if not len(request.query_params):

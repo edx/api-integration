@@ -485,6 +485,15 @@ def get_image_dimensions(image_url):
         return img.size
 
 
+def exclude_non_actual_company_users(users_queryset, exclude_type, actual_organizations=[]):
+    """
+    excludes users which are not part of an actual organization
+    """
+    admin_users = list(users_queryset.filter(groups__groupprofile__name=exclude_type))
+    exc_users = [user.id for user in admin_users if user.organizations.all()[0].id not in actual_organizations]
+    return users_queryset.exclude(id__in=exc_users)
+
+
 class Round(Func):
     function = 'ROUND'
     template = '%(function)s(%(expressions)s, 0)'
