@@ -20,6 +20,9 @@ from django.shortcuts import get_object_or_404
 from lms.djangoapps.notification_prefs.views import UsernameCipher
 from rest_framework.exceptions import ParseError
 
+from edx_solutions_organizations.models import Organization
+from django.contrib.auth.models import User
+
 from openedx.core.djangoapps.user_api.accounts.image_helpers import (
     _get_profile_image_urls,
     _make_profile_image_name,
@@ -485,13 +488,25 @@ def get_image_dimensions(image_url):
         return img.size
 
 
-def exclude_non_actual_company_users(users_queryset, exclude_type, actual_organizations=[]):
+def get_non_actual_company_users(exclude_type, organization_id):
     """
     excludes users which are not part of an actual organization
     """
-    admin_users = list(users_queryset.filter(groups__groupprofile__name=exclude_type))
-    exc_users = [user.id for user in admin_users if user.organizations.all()[0].id not in actual_organizations]
-    return users_queryset.exclude(id__in=exc_users)
+    cache_key = u"edx_solutions_api_integration.{category}.{category_type}.{organization_id}".format(
+        category='exclude_users',
+        category_type=exclude_type,
+        organization_id=str(organization_id),
+    )
+    cached_data = cache.get(cache_key)
+    if cached_data is not None:
+        return cached_data
+    admin_users = User.objects.filter(id__in=list(Organization.objects.filter(
+        id=organization_id, users__groups__groupprofile__name=exclude_type
+    ).distinct().values_list('users', flat=True)))
+
+    exclude_user_ids = [user.id for user in admin_users if user.organizations.all()[0].id != int(organization_id)]
+    cache.set(cache_key, exclude_user_ids, 60 * 60)
+    return exclude_user_ids
 
 
 class Round(Func):

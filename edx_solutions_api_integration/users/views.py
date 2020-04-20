@@ -87,7 +87,7 @@ from edx_solutions_api_integration.utils import (
     cache_course_data,
     cache_course_user_data,
     get_cached_data,
-    exclude_non_actual_company_users,
+    get_non_actual_company_users,
 )
 from edx_solutions_projects.serializers import BasicWorkgroupSerializer
 from edx_solutions_api_integration.users.serializers import (
@@ -371,8 +371,8 @@ class UsersList(SecureListAPIView):
             queryset = queryset.filter(organizations__id__in=org_ids).distinct()
 
         if exclude_type and org_ids:
-            actual_organizations = org_ids
-            queryset = exclude_non_actual_company_users(queryset, exclude_type, actual_organizations)
+            non_company_users = get_non_actual_company_users(exclude_type, org_ids[0])
+            queryset.exclude(id__in=non_company_users)
 
         if match == 'partial':
             # filter users by name, email or organizations

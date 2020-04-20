@@ -113,7 +113,7 @@ from edx_solutions_api_integration.utils import (
     is_cohort_available,
     str2bool,
     strip_xblock_wrapper_div,
-    exclude_non_actual_company_users,
+    get_non_actual_company_users,
     Round,
 )
 from edx_solutions_organizations.models import Organization
@@ -1321,6 +1321,9 @@ class CoursesUsersList(MobileListAPIView):
         exclude_type = self.request.query_params.get('exclude_type')
         if orgs:
             user_qs = user_qs.filter(organizations__in=orgs)
+            if exclude_type:
+                non_company_users = get_non_actual_company_users(exclude_type, orgs[0])
+                user_qs.exclude(id__in=non_company_users)
         if groups:
             user_qs = user_qs.filter(groups__in=groups).distinct()
         if users:
@@ -1329,9 +1332,6 @@ class CoursesUsersList(MobileListAPIView):
             user_qs = user_qs.filter(workgroups__in=workgroups).distinct()
         if exclude_groups:
             user_qs = user_qs.exclude(groups__in=exclude_groups)
-        if exclude_type and orgs:
-            actual_organizations = orgs
-            user_qs = exclude_non_actual_company_users(user_qs, exclude_type, actual_organizations)
         if 'organizations' in additional_fields:
             user_qs = user_qs.prefetch_related('organizations')
         if 'roles' in additional_fields:
@@ -1863,17 +1863,15 @@ class CoursesMetrics(SecureAPIView):
 
             if organization:
                 users_enrolled_qs = users_enrolled_qs.filter(organizations=organization).distinct()
+                if exclude_type:
+                    non_company_users = get_non_actual_company_users(exclude_type, organization)
+                    users_enrolled_qs.exclude(id__in=non_company_users)
 
             if group_ids:
                 users_enrolled_qs = users_enrolled_qs.filter(groups__in=group_ids).distinct()
 
             if cohort_user_ids:
                 users_enrolled_qs = users_enrolled_qs.filter(id__in=cohort_user_ids)
-            if exclude_type and organization:
-                actual_organizations = [int(organization)]
-                users_enrolled_qs = exclude_non_actual_company_users(
-                    users_enrolled_qs, exclude_type, actual_organizations
-                )
 
             enrollment_count = users_enrolled_qs.count()
             if not len(request.query_params):
