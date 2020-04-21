@@ -492,11 +492,7 @@ def get_non_actual_company_users(exclude_type, organization_id):
     """
     excludes users which are not part of an actual organization
     """
-    cache_key = u"edx_solutions_api_integration.{category}.{category_type}.{organization_id}".format(
-        category='exclude_users',
-        category_type=exclude_type,
-        organization_id=str(organization_id),
-    )
+    cache_key = get_cache_key('exclude_users', exclude_type, str(organization_id))
     cached_data = cache.get(cache_key)
     if cached_data is not None:
         return cached_data

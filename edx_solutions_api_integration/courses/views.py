@@ -1853,13 +1853,7 @@ class CoursesMetrics(SecureAPIView):
         if cached_enrollments_data and not len(request.query_params):
             enrollment_count = cached_enrollments_data.get('enrollment_count')
         else:
-            if exclude_type:
-                exclude_roles = [CourseInstructorRole.ROLE, CourseStaffRole.ROLE,
-                                 CourseObserverRole.ROLE, CourseAssistantRole.ROLE]
-                exc_users = get_aggregate_exclusion_user_ids(course_key, roles=exclude_roles)
-                users_enrolled_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exc_users)
-            else:
-                users_enrolled_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users)
+            users_enrolled_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users)
 
             if organization:
                 users_enrolled_qs = users_enrolled_qs.filter(organizations=organization).distinct()
