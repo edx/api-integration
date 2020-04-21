@@ -20,6 +20,9 @@ from django.shortcuts import get_object_or_404
 from lms.djangoapps.notification_prefs.views import UsernameCipher
 from rest_framework.exceptions import ParseError
 
+from edx_solutions_organizations.models import Organization
+from django.contrib.auth.models import User
+
 from openedx.core.djangoapps.user_api.accounts.image_helpers import (
     _get_profile_image_urls,
     _make_profile_image_name,
@@ -483,6 +486,23 @@ def get_image_dimensions(image_url):
         return None
     else:
         return img.size
+
+
+def get_non_actual_company_users(exclude_type, organization_id):
+    """
+    This helper method will return users which are not part of an actual organization
+    """
+    cache_key = get_cache_key('exclude_users', exclude_type, str(organization_id))
+    cached_data = cache.get(cache_key)
+    if cached_data is not None:
+        return cached_data
+    admin_users = User.objects.filter(id__in=list(Organization.objects.filter(
+        id=organization_id, users__groups__groupprofile__name=exclude_type
+    ).distinct().values_list('users', flat=True)))
+
+    exclude_user_ids = [user.id for user in admin_users if user.organizations.all()[0].id != int(organization_id)]
+    cache.set(cache_key, exclude_user_ids, 60 * 60)
+    return exclude_user_ids
 
 
 class Round(Func):

@@ -87,6 +87,7 @@ from edx_solutions_api_integration.utils import (
     cache_course_data,
     cache_course_user_data,
     get_cached_data,
+    get_non_actual_company_users,
 )
 from edx_solutions_projects.serializers import BasicWorkgroupSerializer
 from edx_solutions_api_integration.users.serializers import (
@@ -357,6 +358,7 @@ class UsersList(SecureListAPIView):
         usernames = css_param_to_list(self.request, 'username')
         organization_display_name = self.request.query_params.get('organization_display_name', None)
         internal_admin_flag = self.request.query_params.get('internal_admin_flag', None)
+        exclude_type = self.request.query_params.get('exclude_type', None)
 
         # filter internal admin course ids
         if internal_admin_flag:
@@ -367,6 +369,10 @@ class UsersList(SecureListAPIView):
         if org_ids:
             org_ids = map(int, org_ids.split(','))
             queryset = queryset.filter(organizations__id__in=org_ids).distinct()
+
+        if exclude_type and org_ids:
+            non_company_users = get_non_actual_company_users(exclude_type, org_ids[0])
+            queryset.exclude(id__in=non_company_users)
 
         if match == 'partial':
             # filter users by name, email or organizations
