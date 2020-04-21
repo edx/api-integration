@@ -490,7 +490,7 @@ def get_image_dimensions(image_url):
 
 def get_non_actual_company_users(exclude_type, organization_id):
     """
-    excludes users which are not part of an actual organization
+    This helper method will return users which are not part of an actual organization
     """
     cache_key = get_cache_key('exclude_users', exclude_type, str(organization_id))
     cached_data = cache.get(cache_key)
