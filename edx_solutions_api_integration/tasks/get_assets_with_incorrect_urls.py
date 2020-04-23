@@ -13,6 +13,7 @@ from celery.task import task, Task
 from django.db.models import Q
 from django.core.mail import EmailMessage
 from django.conf import settings
+from django.utils.html import strip_tags
 
 from opaque_keys.edx.keys import CourseKey
 from xmodule.modulestore.django import modulestore
@@ -56,7 +57,7 @@ class AssetURLsTask(Task):
 
         subject = '{} assets with incorrect urls task completed'.format('Update' if update_script else 'Get')
         email = EmailMessage(subject, '', settings.DEFAULT_FROM_EMAIL, email_ids)
-        email.attach('assets_report.csv', assets_report.getvalue(), 'text/csv')
+        email.attach('platform_assets_report.csv', assets_report.getvalue(), 'text/csv')
         email.send(fail_silently=False)
 
 
@@ -70,6 +71,40 @@ def update_courses_cache(course_ids):
             update_course_in_cache(course_key)
         except:
             continue
+
+
+def get_block_location(studio_url, course_id, block):
+    """
+    Create appropriate studio urls
+    """
+    category = block.get('_id', {}).get('category')
+    name = block.get('_id', {}).get('name')
+
+    if category == 'about' and name == 'overview':
+        block_url = '{domain}/settings/details/{course_id}'.format(
+            domain=studio_url,
+            course_id=course_id
+        )
+    elif category == 'static_tab':
+        block_url = '{domain}/tabs/{course_id}'.format(
+            domain=studio_url,
+            course_id=course_id
+        )
+    elif category == 'course_info' and name == 'updates':
+        block_url = '{domain}/course_info/{course_id}'.format(
+            domain=studio_url,
+            course_id=course_id
+        )
+    else:
+        block_url = '{domain}/container/i4x://{org}/{course}/{category}/{name}'.format(
+            domain=studio_url,
+            org=block.get('_id', {}).get('org'),
+            course=block.get('_id', {}).get('course'),
+            category=category,
+            name=name
+        )
+
+    return block_url
 
 
 @task(
@@ -107,7 +142,6 @@ def get_assets_with_incorrect_urls(
 
 
 def find_asset_urls_in_course(task_id, course_id, environment, studio_url, staff_user_id, update):
-    block_url = '{domain}/container/i4x://{org}/{course}/{category}/{name}'
     course_key = CourseKey.from_string(course_id)
     query = SON([
         ('_id.tag', 'i4x'),
@@ -130,12 +164,10 @@ def find_asset_urls_in_course(task_id, course_id, environment, studio_url, staff
     blocks_to_update = []
 
     for block in blocks:
-        block_loc = block_url.format(
-            domain=studio_url,
-            org=block.get('_id', {}).get('org'),
-            course=block.get('_id', {}).get('course'),
-            category=block.get('_id', {}).get('category'),
-            name=block.get('_id', {}).get('name')
+        block_loc = get_block_location(
+            studio_url=studio_url,
+            course_id=course_id,
+            block=block
         )
         block_assets = list()
         _find_asset_urls_in_block(
@@ -193,6 +225,7 @@ def _find_asset_urls_in_block(
         urls = re.findall(URL_RE, value)
 
         for url in urls:
+            url = strip_tags(url)
             parsed_url = urlparse(url)
             asset_url = StaticContent.ASSET_URL_RE.match(parsed_url.path)
 
