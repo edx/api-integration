@@ -20,6 +20,7 @@ from xmodule.modulestore.django import modulestore
 from xmodule.contentstore.content import StaticContent
 from xmodule.modulestore import InvalidLocationError
 from xmodule.modulestore.exceptions import ItemNotFoundError
+from xmodule.modulestore.mongo.base import MongoRevisionKey
 from xmodule.exceptions import NotFoundError
 from xmodule.assetstore.assetmgr import AssetManager
 from opaque_keys import InvalidKeyError
@@ -147,6 +148,7 @@ def find_asset_urls_in_course(task_id, course_id, environment, studio_url, staff
         ('_id.tag', 'i4x'),
         ('_id.org', course_key.org),
         ('_id.course', course_key.course),
+        ('_id.revision', MongoRevisionKey.published),
     ])
 
     _store = store._get_modulestore_for_courselike(course_key)
