@@ -1985,7 +1985,7 @@ class CoursesMetrics(SecureAPIView):
         user_id = request.query_params.get('user_id', None)
         cohort_user_ids = _get_users_in_cohort(user_id, course_key, ignore_groupwork=True)
 
-        if None in (group_ids, cohort_user_ids):
+        if not any([group_ids, cohort_user_ids]):
             enrollment_count = CoursesMetrics.get_course_enrollment_count(
                 course_id=course_id,
                 org_id=organization,
@@ -2035,7 +2035,7 @@ class CoursesMetrics(SecureAPIView):
             data['modules_completed'] = modules_completed
 
         if 'users_completed' in metrics_required:
-            if None in (group_ids, cohort_user_ids):
+            if not any([group_ids, cohort_user_ids]):
                 users_completed = CoursesMetrics.get_course_completed_users_count(
                     course_id=course_id,
                     org_id=organization
@@ -2051,7 +2051,7 @@ class CoursesMetrics(SecureAPIView):
             data['users_completed'] = users_completed
 
         if 'users_passed' in metrics_required:
-            if None in (group_ids, cohort_user_ids):
+            if not any([group_ids, cohort_user_ids]):
                 users_passed = CoursesMetrics.get_course_passed_users_count(
                     course_id=course_id,
                     org_id=organization
@@ -2068,7 +2068,7 @@ class CoursesMetrics(SecureAPIView):
             data['users_passed'] = users_passed
 
         if 'avg_progress' in metrics_required:
-            if None in (group_ids, cohort_user_ids):
+            if not any([group_ids, cohort_user_ids]):
                 avg_progress = CoursesMetrics.get_course_avg_progress(
                     course_id=course_id,
                     org_id=organization,
@@ -2088,7 +2088,7 @@ class CoursesMetrics(SecureAPIView):
             data['avg_progress'] = avg_progress
 
         if 'avg_grade' in metrics_required:
-            if None in (group_ids, cohort_user_ids):
+            if not any([group_ids, cohort_user_ids]):
                 avg_grade = CoursesMetrics.get_course_avg_grade(
                     course_id=course_id,
                     org_id=organization
