@@ -969,6 +969,35 @@ class CoursesGroupsDetail(SecureAPIView):
         return Response(response_data, status=status.HTTP_204_NO_CONTENT)
 
 
+class CoursesEnrollmentCount(SecureAPIView):
+    """
+    **Use Case**
+
+        CoursesEnrollmentCount returns count of users enrolled in course.
+
+    **Example Request**
+
+          GET /api/courses/{course_id}/enrollment_count
+
+
+    **Response Values**
+
+        * enrollment_count: Count of users enrolled in course.
+
+    """
+
+    def get(self, request, course_id):  # pylint: disable=W0613
+        """
+        GET /api/courses/{course_id}/enrollment_count
+        """
+        if not course_exists(course_id):
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+        response_data = {}
+        enrollment_count = CoursesMetrics.get_course_enrollment_count(course_id)
+        response_data['enrollment_count'] =  enrollment_count
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
 class CoursesOverview(SecureAPIView):
     """
     **Use Case**
