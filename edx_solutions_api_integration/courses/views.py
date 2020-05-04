@@ -113,6 +113,7 @@ from edx_solutions_api_integration.utils import (
     is_cohort_available,
     str2bool,
     strip_xblock_wrapper_div,
+    get_non_actual_company_users,
     Round,
 )
 from edx_solutions_organizations.models import Organization
@@ -351,7 +352,7 @@ def _get_course_progress_metrics(course_key, **kwargs):
     """
     course_avg = 0
     data = {'course_avg': course_avg}
-    total_actual_completions, total_possible_completions = get_total_completions(course_key, **kwargs)
+    total_actual_or_percent_completions, total_possible_completions = get_total_completions(course_key, **kwargs)
     if kwargs.get('user_id'):
         data.update(get_user_position(course_key, **kwargs))
     total_users_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=kwargs.get('exclude_users'))
@@ -362,9 +363,10 @@ def _get_course_progress_metrics(course_key, **kwargs):
     if kwargs.get('cohort_user_ids'):
         total_users_qs = total_users_qs.filter(id__in=kwargs.get('cohort_user_ids'))
     total_users = total_users_qs.count()
-    if total_users and total_actual_completions and total_possible_completions:
-        course_avg = total_actual_completions / float(total_users)
-        course_avg = min(100 * (course_avg / total_possible_completions), 100)  # avg in percentage
+    if total_users and total_actual_or_percent_completions and total_possible_completions:
+        course_avg = total_actual_or_percent_completions / float(total_users)
+        if not kwargs.get('percent_completion'):
+            course_avg = min(100 * (course_avg / total_possible_completions), 100)  # avg in percentage
     data['course_avg'] = course_avg
     data['total_users'] = total_users
     data['total_possible_completions'] = total_possible_completions
@@ -1316,8 +1318,12 @@ class CoursesUsersList(MobileListAPIView):
         exclude_groups = get_ids_from_list_param(self.request, 'exclude_groups')
         additional_fields = self.request.query_params.get('additional_fields', [])
         order_by_field = self.request.query_params.get('order_by', 'id')
+        exclude_type = self.request.query_params.get('exclude_type')
         if orgs:
             user_qs = user_qs.filter(organizations__in=orgs)
+            if exclude_type:
+                non_company_users = get_non_actual_company_users(exclude_type, orgs[0])
+                user_qs.exclude(id__in=non_company_users)
         if groups:
             user_qs = user_qs.filter(groups__in=groups).distinct()
         if users:
@@ -1826,6 +1832,141 @@ class CoursesMetrics(SecureAPIView):
     ### Use Cases/Notes:
     * Example: Display number of users enrolled in a given course
     """
+    @staticmethod
+    def get_course_enrollment_count(course_id, org_id=None, exclude_org_admins=False):
+        """
+        Get enrollment count of a course
+        if org_id is passed then count is limited to that org's users
+        """
+        cache_category = 'course_enrollments'
+        if org_id:
+            cache_category = '{}_{}'.format(cache_category, org_id)
+            if exclude_org_admins:
+                cache_category = '{}_exclude_admins'.format(cache_category)
+
+        enrollment_count = get_cached_data(cache_category, course_id)
+        if enrollment_count is not None:
+            return enrollment_count.get('enrollment_count')
+
+        course_key = get_course_key(course_id)
+        exclude_user_ids = get_aggregate_exclusion_user_ids(course_key)
+        users_enrolled_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_user_ids)
+
+        if org_id:
+            users_enrolled_qs = users_enrolled_qs.filter(organizations=org_id).distinct()
+            if exclude_org_admins:
+                non_company_users = get_non_actual_company_users('mcka_role_company_admin', org_id)
+                users_enrolled_qs.exclude(id__in=non_company_users)
+
+        enrollment_count = users_enrolled_qs.count()
+        cache_course_data(cache_category, course_id, {'enrollment_count': enrollment_count})
+
+        return enrollment_count
+
+    @staticmethod
+    def get_course_avg_grade(course_id, org_id=None):
+        """
+        Get average grade socre of a course
+        If org_id is passed then score is limited to that org's users
+        """
+        cache_category = 'grade'
+        if org_id:
+            cache_category = '{}_{}'.format(cache_category, org_id)
+
+        data = get_cached_data(cache_category, course_id)
+        if data is not None:
+            return data.get('course_avg')
+
+        course_key = get_course_key(course_id)
+        exclude_user_ids = get_aggregate_exclusion_user_ids(course_key)
+
+        avg_grade = StudentGradebook.course_grade_avg(
+            course_key,
+            exclude_users=exclude_user_ids,
+            org_ids=[org_id] if org_id else None
+        )
+        cache_course_data(cache_category, course_id, {'course_avg': avg_grade})
+
+        return avg_grade
+
+    @staticmethod
+    def get_course_avg_progress(course_id, org_id=None, percent_completion=True):
+        """
+        Get average progress score of a course
+        If org_id is passed then score is limited to that org's users
+        """
+        cache_category = 'progress'
+        if org_id:
+            cache_category = '{}_{}'.format(cache_category, org_id)
+
+        data = get_cached_data(cache_category, course_id)
+        if data is not None:
+            return data.get('course_avg')
+
+        course_key = get_course_key(course_id)
+        exclude_user_ids = get_aggregate_exclusion_user_ids(course_key)
+
+        data = _get_course_progress_metrics(
+            course_key,
+            exclude_users=exclude_user_ids,
+            org_ids=[org_id] if org_id else None,
+            percent_completion=percent_completion,
+        )
+        cache_course_data(cache_category, course_id, data)
+
+        return data.get('course_avg')
+
+    @staticmethod
+    def get_course_passed_users_count(course_id, org_id=None):
+        """
+        Get passed users count of a course
+        if org_id is passed then count is limited to that org's users
+        """
+        cache_category = 'passed_count'
+        if org_id:
+            cache_category = '{}_{}'.format(cache_category, org_id)
+
+        passed_count = get_cached_data(cache_category, course_id)
+        if passed_count is not None:
+            return passed_count
+
+        course_key = get_course_key(course_id)
+        exclude_user_ids = get_aggregate_exclusion_user_ids(course_key)
+
+        passed_count = StudentGradebook.get_passed_users_gradebook(
+            course_key,
+            exclude_users=exclude_user_ids,
+            org_ids=[org_id] if org_id else None
+        ).count()
+        cache_course_data(cache_category, course_id, passed_count)
+
+        return passed_count
+
+    @staticmethod
+    def get_course_completed_users_count(course_id, org_id=None):
+        """
+        Get completed users count of a course
+        if org_id is passed then count is limited to that org's users
+        """
+        cache_category = 'completed_count'
+        if org_id:
+            cache_category = '{}_{}'.format(cache_category, org_id)
+
+        completed_count = get_cached_data(cache_category, course_id)
+        if completed_count is not None:
+            return completed_count
+
+        course_key = get_course_key(course_id)
+        exclude_user_ids = get_aggregate_exclusion_user_ids(course_key)
+
+        completed_count = StudentGradebook.get_num_users_completed(
+            course_key,
+            exclude_users=exclude_user_ids,
+            org_ids=[org_id] if org_id else None
+        )
+        cache_course_data(cache_category, course_id, completed_count)
+
+        return completed_count
 
     def get(self, request, course_id):  # pylint: disable=W0613
         """
@@ -1835,6 +1976,7 @@ class CoursesMetrics(SecureAPIView):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         course_descriptor, course_key, course_content = get_course(request, request.user, course_id)  # pylint: disable=W0612
         slash_course_id = get_course_key(course_id, slashseparated=True)
+        exclude_type = request.query_params.get('exclude_type', None)
         organization = request.query_params.get('organization', None)
         org_ids = [organization] if organization else None
         group_ids = get_ids_from_list_param(self.request, 'groups')
@@ -1842,14 +1984,21 @@ class CoursesMetrics(SecureAPIView):
         exclude_users = get_aggregate_exclusion_user_ids(course_key)
         user_id = request.query_params.get('user_id', None)
         cohort_user_ids = _get_users_in_cohort(user_id, course_key, ignore_groupwork=True)
-        cached_enrollments_data = get_cached_data('course_enrollments', course_id)
-        if cached_enrollments_data and not len(request.query_params):
-            enrollment_count = cached_enrollments_data.get('enrollment_count')
+
+        if not any([group_ids, cohort_user_ids]):
+            enrollment_count = CoursesMetrics.get_course_enrollment_count(
+                course_id=course_id,
+                org_id=organization,
+                exclude_org_admins=bool(exclude_type),
+            )
         else:
             users_enrolled_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users)
 
             if organization:
                 users_enrolled_qs = users_enrolled_qs.filter(organizations=organization).distinct()
+                if exclude_type:
+                    non_company_users = get_non_actual_company_users(exclude_type, organization)
+                    users_enrolled_qs.exclude(id__in=non_company_users)
 
             if group_ids:
                 users_enrolled_qs = users_enrolled_qs.filter(groups__in=group_ids).distinct()
@@ -1858,8 +2007,6 @@ class CoursesMetrics(SecureAPIView):
                 users_enrolled_qs = users_enrolled_qs.filter(id__in=cohort_user_ids)
 
             enrollment_count = users_enrolled_qs.count()
-            if not len(request.query_params):
-                cache_course_data('course_enrollments', course_id, {'enrollment_count': enrollment_count})
 
         data = {
             'grade_cutoffs': course_descriptor.grading_policy['GRADE_CUTOFFS'],
@@ -1888,43 +2035,74 @@ class CoursesMetrics(SecureAPIView):
             data['modules_completed'] = modules_completed
 
         if 'users_completed' in metrics_required:
-            users_completed = StudentGradebook.get_num_users_completed(
-                course_key,
-                exclude_users=exclude_users,
-                org_ids=org_ids,
-                group_ids=group_ids,
-                cohort_user_ids=cohort_user_ids,
-            )
+            if not any([group_ids, cohort_user_ids]):
+                users_completed = CoursesMetrics.get_course_completed_users_count(
+                    course_id=course_id,
+                    org_id=organization
+                )
+            else:
+                users_completed = StudentGradebook.get_num_users_completed(
+                    course_key,
+                    exclude_users=exclude_users,
+                    org_ids=org_ids,
+                    group_ids=group_ids,
+                    cohort_user_ids=cohort_user_ids,
+                )
             data['users_completed'] = users_completed
 
         if 'users_passed' in metrics_required:
-            users_passed = StudentGradebook.get_passed_users_gradebook(
-                course_key,
-                exclude_users=exclude_users,
-                org_ids=org_ids,
-                group_ids=group_ids,
-                cohort_user_ids=cohort_user_ids,
-            ).count()
+            if not any([group_ids, cohort_user_ids]):
+                users_passed = CoursesMetrics.get_course_passed_users_count(
+                    course_id=course_id,
+                    org_id=organization
+                )
+            else:
+                users_passed = StudentGradebook.get_passed_users_gradebook(
+                    course_key,
+                    exclude_users=exclude_users,
+                    org_ids=org_ids,
+                    group_ids=group_ids,
+                    cohort_user_ids=cohort_user_ids,
+                ).count()
+
             data['users_passed'] = users_passed
 
         if 'avg_progress' in metrics_required:
-            progress_metrics = _get_course_progress_metrics(
-                course_key,
-                exclude_users=exclude_users,
-                org_ids=org_ids,
-                group_ids=group_ids,
-                cohort_user_ids=cohort_user_ids,
-            )
-            data['avg_progress'] = progress_metrics['course_avg']
+            if not any([group_ids, cohort_user_ids]):
+                avg_progress = CoursesMetrics.get_course_avg_progress(
+                    course_id=course_id,
+                    org_id=organization,
+                    percent_completion=True
+                )
+            else:
+                progress_metrics = _get_course_progress_metrics(
+                    course_key,
+                    exclude_users=exclude_users,
+                    org_ids=org_ids,
+                    group_ids=group_ids,
+                    cohort_user_ids=cohort_user_ids,
+                    percent_completion=True,
+                )
+                avg_progress = progress_metrics.get('course_avg')
+
+            data['avg_progress'] = avg_progress
 
         if 'avg_grade' in metrics_required:
-            data['avg_grade'] = StudentGradebook.course_grade_avg(
-                course_key,
-                exclude_users=exclude_users,
-                org_ids=org_ids,
-                group_ids=group_ids,
-                cohort_user_ids=cohort_user_ids,
-            )
+            if not any([group_ids, cohort_user_ids]):
+                avg_grade = CoursesMetrics.get_course_avg_grade(
+                    course_id=course_id,
+                    org_id=organization
+                )
+            else:
+                avg_grade = StudentGradebook.course_grade_avg(
+                    course_key,
+                    exclude_users=exclude_users,
+                    org_ids=org_ids,
+                    group_ids=group_ids,
+                    cohort_user_ids=cohort_user_ids,
+                )
+
+            data['avg_grade'] = avg_grade
 
         if 'thread_stats' in metrics_required:
             try:
