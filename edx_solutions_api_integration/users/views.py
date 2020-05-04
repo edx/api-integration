@@ -12,7 +12,7 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.validators import validate_email, validate_slug
 from django.core.files.base import ContentFile
 from django.db import IntegrityError
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Case, When, Value, BooleanField
 from django.conf import settings
 from django.http import Http404
 from django.utils.translation import get_language, ugettext_lazy as _
@@ -90,6 +90,7 @@ from edx_solutions_api_integration.utils import (
 from edx_solutions_projects.serializers import BasicWorkgroupSerializer
 from edx_solutions_api_integration.users.serializers import (
     UserSerializer,
+    MassUsersDetailsSerializer,
     UserCountByCitySerializer,
     UserRolesSerializer,
     CourseProgressSerializer,
@@ -585,6 +586,28 @@ class UsersList(SecureListAPIView):
             })
 
         return serializer_context
+
+
+class MassUsersDetailsList(SecureListAPIView):
+    queryset = User.objects.all()
+    serializer_class = MassUsersDetailsSerializer
+
+    def get_queryset(self):
+        emails = css_data_to_list(self.request, 'email')
+        courses = css_data_to_list(self.request, 'courses')
+        courses = map(CourseKey.from_string, courses)
+
+        return self.queryset.filter(email__in=emails).annotate(
+            is_enrolled=Case(
+                When(courseenrollment__course_id__in=courses, then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField()
+            )
+        )
+
+    def post(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
 
 class TokenBasedUserDetails(TokenBasedAPIView):
     """

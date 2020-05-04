@@ -1756,7 +1756,6 @@ class CourseContentUsersList(SecureAPIView):
         return Response(serializer.data)  # pylint: disable=E1101
 
 
-
 class CoursesMetricsGradesList(SecureListAPIView):
     """
     ### The CoursesMetricsGradesList view allows clients to retrieve a list of grades for the specified Course

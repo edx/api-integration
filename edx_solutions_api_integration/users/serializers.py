@@ -165,6 +165,16 @@ class SimpleUserSerializer(DynamicFieldsModelSerializer):
         read_only_fields = ("id", "email", "username")
 
 
+class MassUsersDetailsSerializer(DynamicFieldsModelSerializer):
+    """ Serializer for user model """
+    is_enrolled = serializers.BooleanField()
+
+    class Meta(object):
+        """ Serializer/field specification """
+        model = APIUser
+        fields = ("email", "is_active", "last_login", 'is_enrolled')
+
+
 class UserCountByCitySerializer(serializers.Serializer):
     """ Serializer for user count by city """
     city = serializers.CharField(source='profile__city')
