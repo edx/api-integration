@@ -26,6 +26,7 @@ urlpatterns = [
     url(r'^{0}/content/*$'.format(COURSE_ID_PATTERN), courses_views.CourseContentList.as_view()),
     url(r'^{0}/groups/(?P<group_id>[0-9]+)$'.format(COURSE_ID_PATTERN), courses_views.CoursesGroupsDetail.as_view()),
     url(r'^{0}/groups/*$'.format(COURSE_ID_PATTERN), courses_views.CoursesGroupsList.as_view()),
+    url(r'^{0}/enrollment_count/*$'.format(COURSE_ID_PATTERN), courses_views.CoursesEnrollmentCount.as_view()),
     url(r'^{0}/overview/*$'.format(COURSE_ID_PATTERN), courses_views.CoursesOverview.as_view()),
     url(r'^{0}/completions/*$'.format(COURSE_ID_PATTERN),
         courses_views.CompletionList.as_view(), name='completion-list'),
