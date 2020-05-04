@@ -1838,7 +1838,7 @@ class CoursesMetrics(SecureAPIView):
         Get enrollment count of a course
         if org_id is passed then count is limited to that org's users
         """
-        cache_category = 'course_enrollment_count'
+        cache_category = 'course_enrollments'
         if org_id:
             cache_category = '{}_{}'.format(cache_category, org_id)
             if exclude_org_admins:
@@ -1846,7 +1846,7 @@ class CoursesMetrics(SecureAPIView):
 
         enrollment_count = get_cached_data(cache_category, course_id)
         if enrollment_count is not None:
-            return enrollment_count
+            return enrollment_count.get('enrollment_count')
 
         course_key = get_course_key(course_id)
         exclude_user_ids = get_aggregate_exclusion_user_ids(course_key)
@@ -1859,7 +1859,7 @@ class CoursesMetrics(SecureAPIView):
                 users_enrolled_qs.exclude(id__in=non_company_users)
 
         enrollment_count = users_enrolled_qs.count()
-        cache_course_data(cache_category, course_id, enrollment_count)
+        cache_course_data(cache_category, course_id, {'enrollment_count': enrollment_count})
 
         return enrollment_count
 
