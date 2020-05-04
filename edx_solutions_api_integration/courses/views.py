@@ -993,15 +993,7 @@ class CoursesEnrollmentCount(SecureAPIView):
         if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         response_data = {}
-        cached_enrollments_data = get_cached_data('course_enrollments', course_id)
-        if cached_enrollments_data:
-            enrollment_count = cached_enrollments_data.get('enrollment_count')
-        else:
-            course_key = get_course_key(course_id)
-            exclude_users = get_aggregate_exclusion_user_ids(course_key)
-            enrollment_count = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_users).count()
-            cache_course_data('course_enrollments', course_id, {'enrollment_count': enrollment_count})
-
+        enrollment_count = CoursesMetrics.get_course_enrollment_count(course_id)
         response_data['enrollment_count'] =  enrollment_count
         return Response(response_data, status=status.HTTP_200_OK)
 
