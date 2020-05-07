@@ -45,6 +45,7 @@ from openedx.core.djangoapps.user_api.accounts.api import delete_users
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from openedx.core.djangoapps.user_api.accounts.image_helpers import get_profile_image_names, get_profile_image_storage
 from edx_notifications.lib.consumer import mark_notification_read
+from course_metadata.models import CourseAggregatedMetaData, CourseSetting
 from completion_aggregator.models import Aggregator
 from student.models import CourseEnrollment, CourseEnrollmentException, PasswordHistory, UserProfile, LoginFailures
 from student.roles import (
@@ -1121,7 +1122,7 @@ class UsersCoursesList(SecureAPIView):
                     "start": enrollment.course_overview.start,
                     "end": enrollment.course_overview.end,
                     "effort": enrollment.course_overview.effort,
-                    "course_image_urls": enrollment.course_overview.image_urls,
+                    "course_image_url": enrollment.course_overview.course_image_url,
                 }
                 response_data.append(course_data)
 
@@ -1811,6 +1812,8 @@ class UsersCourseProgressList(SecureListAPIView):
                 aggregation_name='course'
             ).values('course_key', 'earned', 'possible', 'percent')
         }
+        course_meta_data = CourseAggregatedMetaData.objects.filter(id__in=course_keys)\
+            .values('id', 'total_assessments')
         course_overview = CourseOverview.objects.filter(id__in=course_keys)
         if str2bool(mobile_only):
             course_overview = course_overview.filter(mobile_available=True)
@@ -1829,6 +1832,7 @@ class UsersCourseProgressList(SecureListAPIView):
         serializer = CourseProgressSerializer(enrollments, many=True, context={
             'student_progress': student_progress,
             'course_overview': course_overview,
+            'course_metadata': course_meta_data,
             'user_grades': user_grades,
         })
 
