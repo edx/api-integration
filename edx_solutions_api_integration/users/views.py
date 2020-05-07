@@ -604,11 +604,10 @@ class MassUsersDetailsList(SecureListAPIView):
         courses = map(CourseKey.from_string, courses)
 
         return self.queryset.filter(email__in=emails).annotate(
-            is_enrolled=Case(
-                When(courseenrollment__course_id__in=courses, then=Value(True)),
-                default=Value(False),
+            is_enrolled=Count(Case(
+                When(courseenrollment__course_id__in=courses, then=1),
                 output_field=BooleanField()
-            )
+            ))
         )
 
     def post(self, request, *args, **kwargs):
