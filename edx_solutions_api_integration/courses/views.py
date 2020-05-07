@@ -19,7 +19,6 @@ from django.utils.translation import ugettext_lazy as _
 
 from pytz import UTC
 from lxml import etree
-from multiprocessing.pool import ThreadPool
 from six import text_type
 from requests.exceptions import ConnectionError
 from rest_framework import status
@@ -2595,14 +2594,11 @@ class CourseMetricsLeaders(SecureAPIView):
         if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
 
-        pool = ThreadPool(3)
         data = {
-            'grades': pool.apply_async(_get_courses_metrics_grades_leaders_list, (course_key,), params),
-            'completions': pool.apply_async(_get_courses_metrics_completions_leaders_list, (course_key,), params),
-            'social': pool.apply_async(_get_courses_metrics_social_leaders_list, (course_key,), params),
+            'grades': _get_courses_metrics_grades_leaders_list(course_key, **params),
+            'completions': _get_courses_metrics_completions_leaders_list(course_key, **params),
+            'social': _get_courses_metrics_social_leaders_list(course_key, **params),
         }
-        for key in data.keys():
-            data[key] = data[key].get()
 
         return Response(data, status=status.HTTP_200_OK)
 
