@@ -234,7 +234,8 @@ def _find_asset_urls_in_block(
             if asset_url is not None:
                 # check if asset URL belongs to some other server or course
                 if parsed_url.hostname != environment or \
-                                asset_url.groupdict().get('course') != course_key.course:
+                                asset_url.groupdict().get('course') != course_key.course or \
+                                asset_url.groupdict().get('org') != course_key.org:
 
                     asset_info = {'name':  asset_url.groupdict().get('name'), 'module':block_loc, 'available': False}
                     asset_path = '{}{}'.format(
