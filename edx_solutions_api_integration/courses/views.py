@@ -2495,6 +2495,30 @@ class CoursesMetricsCompletionsLeadersList(SecureAPIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
+class CourseAverageScores(SecureAPIView):
+    """
+    Returns average scores of users in a course
+    """
+    def get(self, request, course_id, score_type):  # pylint: disable=W0613
+        """
+        GET /api/courses/{course_id}/average_scores/{score_type}
+        """
+        supported_scores = ['progress', 'proficiency',]
+
+        if not course_exists(course_id):
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
+
+        if score_type not in supported_scores:
+            return Response({}, status=status.HTTP_400_BAD_REQUEST)
+
+        response_data = {}
+        if score_type == 'progress':
+            response_data[score_type] = CoursesMetrics.get_course_avg_progress(course_id=course_id)
+        if score_type == 'proficiency':
+            response_data[score_type] = CoursesMetrics.get_course_avg_grade(course_id=course_id)
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
 class CoursesMetricsSocialLeadersList(SecureListAPIView):
     """
     ### The CoursesMetricsSocialLeadersList view allows clients to retrieve top n users who are leading
