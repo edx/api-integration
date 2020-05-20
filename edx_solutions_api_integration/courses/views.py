@@ -77,6 +77,7 @@ from edx_solutions_api_integration.courses.utils import (
     get_total_completions,
     get_user_position,
     get_filtered_aggregation_queryset,
+    get_course_enrollment_count,
 )
 from edx_solutions_api_integration.courseware_access import (
     course_exists,
@@ -992,7 +993,7 @@ class CoursesEnrollmentCount(SecureAPIView):
         if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         response_data = {}
-        enrollment_count = CoursesMetrics.get_course_enrollment_count(course_id)
+        enrollment_count = get_course_enrollment_count(course_id)
         response_data['enrollment_count'] =  enrollment_count
         return Response(response_data, status=status.HTTP_200_OK)
 
@@ -1860,37 +1861,6 @@ class CoursesMetrics(SecureAPIView):
     * Example: Display number of users enrolled in a given course
     """
     @staticmethod
-    def get_course_enrollment_count(course_id, org_id=None, exclude_org_admins=False):
-        """
-        Get enrollment count of a course
-        if org_id is passed then count is limited to that org's users
-        """
-        cache_category = 'course_enrollments'
-        if org_id:
-            cache_category = '{}_{}'.format(cache_category, org_id)
-            if exclude_org_admins:
-                cache_category = '{}_exclude_admins'.format(cache_category)
-
-        enrollment_count = get_cached_data(cache_category, course_id)
-        if enrollment_count is not None:
-            return enrollment_count.get('enrollment_count')
-
-        course_key = get_course_key(course_id)
-        exclude_user_ids = get_aggregate_exclusion_user_ids(course_key)
-        users_enrolled_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_user_ids)
-
-        if org_id:
-            users_enrolled_qs = users_enrolled_qs.filter(organizations=org_id).distinct()
-            if exclude_org_admins:
-                non_company_users = get_non_actual_company_users('mcka_role_company_admin', org_id)
-                users_enrolled_qs.exclude(id__in=non_company_users)
-
-        enrollment_count = users_enrolled_qs.count()
-        cache_course_data(cache_category, course_id, {'enrollment_count': enrollment_count})
-
-        return enrollment_count
-
-    @staticmethod
     def get_course_avg_grade(course_id, org_id=None):
         """
         Get average grade socre of a course
@@ -2013,7 +1983,7 @@ class CoursesMetrics(SecureAPIView):
         cohort_user_ids = _get_users_in_cohort(user_id, course_key, ignore_groupwork=True)
 
         if not any([group_ids, cohort_user_ids]):
-            enrollment_count = CoursesMetrics.get_course_enrollment_count(
+            enrollment_count = get_course_enrollment_count(
                 course_id=course_id,
                 org_id=organization,
                 exclude_org_admins=bool(exclude_type),
