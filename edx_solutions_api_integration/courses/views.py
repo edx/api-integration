@@ -406,17 +406,15 @@ def _get_courses_metrics_grades_leaders_list(course_key, **kwargs):
 
             serializer = CourseProficiencyLeadersSerializer(data.pop('queryset'), many=True)
             data['leaders'] = serializer.data  # pylint: disable=E1101
-            leader_boards_cache_cohort_size = getattr(settings, 'LEADER_BOARDS_CACHE_COHORT_SIZE', 5000)
 
             if kwargs.get('user_id'):
                 data.update(StudentGradebook.get_user_position(course_key, **kwargs))
 
-                if data.pop('enrollment_count') > leader_boards_cache_cohort_size:
-                    cache_course_data('grade', course_id, {'course_avg': data['course_avg']})
-                    cache_course_data('grade_leaderboard', course_id, {'leaders': data['leaders']})
-                    cache_course_user_data('grade', course_id, user_id, {
-                        'user_grade': data.get('user_grade', 0), 'user_position': data['user_position']
-                    })
+                cache_course_data('grade', course_id, {'course_avg': data['course_avg']})
+                cache_course_data('grade_leaderboard', course_id, {'leaders': data['leaders']})
+                cache_course_user_data('grade', course_id, user_id, {
+                    'user_grade': data.get('user_grade', 0), 'user_position': data['user_position']
+                })
             else:
                 data.pop('enrollment_count')
 
