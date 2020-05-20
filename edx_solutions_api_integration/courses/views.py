@@ -372,7 +372,9 @@ def _get_course_progress_metrics(course_key, **kwargs):
     data['total_possible_completions'] = total_possible_completions
     return data
 
+from silk.profiling.profiler import silk_profile
 
+@silk_profile(name='_get_courses_metrics_grades_leaders_list')
 def _get_courses_metrics_grades_leaders_list(course_key, **kwargs):
     course_id = course_key.to_deprecated_string()
     user_id = kwargs.get('user_id')
@@ -395,11 +397,17 @@ def _get_courses_metrics_grades_leaders_list(course_key, **kwargs):
             data.update(cached_grade_data)
             data.update(cached_leader_board_data)
         else:
-            data.update(StudentGradebook.generate_leaderboard(course_key, **kwargs))
+            data.update(StudentGradebook.generate_leaderboard(course_key, exclude_aggregate_scores=True, **kwargs))
+
+            if kwargs.get('cohort_user_ids'):
+                data['course_avg'] = StudentGradebook.course_grade_avg(course_key, **kwargs)
+            else:
+                data['course_avg'] = CoursesMetrics.get_course_avg_grade(course_id=course_id)
 
             serializer = CourseProficiencyLeadersSerializer(data.pop('queryset'), many=True)
             data['leaders'] = serializer.data  # pylint: disable=E1101
             leader_boards_cache_cohort_size = getattr(settings, 'LEADER_BOARDS_CACHE_COHORT_SIZE', 5000)
+
             if kwargs.get('user_id'):
                 data.update(StudentGradebook.get_user_position(course_key, **kwargs))
 
