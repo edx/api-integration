@@ -3410,6 +3410,7 @@ class CoursesGradingMetricsTests(
         }
 
     @make_non_atomic
+    @override_settings(CACHES={'default': {'BACKEND': 'django.core.cache.backends.dummy.DummyCache',}})
     def test_courses_metrics_grades_leaders_list_get(self):  # pylint: disable=R0915
         # setup data for course metrics grades leaders
         data = self._setup_courses_metrics_grades_leaders()

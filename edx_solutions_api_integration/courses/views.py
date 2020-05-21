@@ -372,9 +372,7 @@ def _get_course_progress_metrics(course_key, **kwargs):
     data['total_possible_completions'] = total_possible_completions
     return data
 
-from silk.profiling.profiler import silk_profile
 
-@silk_profile(name='_get_courses_metrics_grades_leaders_list')
 def _get_courses_metrics_grades_leaders_list(course_key, **kwargs):
     course_id = course_key.to_deprecated_string()
     user_id = kwargs.get('user_id')
