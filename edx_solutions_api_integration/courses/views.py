@@ -444,9 +444,7 @@ def _get_courses_metrics_completions_leaders_list(course_key, **kwargs):
         queryset = generate_leaderboard(course_key, **kwargs)
         serializer = CourseCompletionsLeadersSerializer(queryset, many=True)
         data['leaders'] = serializer.data  # pylint: disable=E1101
-        leader_boards_cache_cohort_size = getattr(settings, 'LEADER_BOARDS_CACHE_COHORT_SIZE', 5000)
-        if total_users > leader_boards_cache_cohort_size:
-            cache_course_data('progress_leaderboard', course_id, {'leaders': data['leaders']})
+        cache_course_data('progress_leaderboard', course_id, {'leaders': data['leaders']})
     else:
         cache_course_data('progress', course_id, {
             'course_avg': data['course_avg'],
@@ -484,11 +482,10 @@ def _get_courses_metrics_social_leaders_list(course_key, **kwargs):
     if user_id:
         user_data = StudentSocialEngagementScore.get_user_leaderboard_position(course_key, **kwargs)
         data.update(user_data)
-        leader_boards_cache_cohort_size = getattr(settings, 'LEADER_BOARDS_CACHE_COHORT_SIZE', 5000)
-        if data.pop('total_user_count') > leader_boards_cache_cohort_size:
-            cache_course_user_data('social', course_id, user_id, {"score": data['score'], "position": data['position']})
-            cache_course_data('social', course_id, {'course_avg': data['course_avg']})
-            cache_course_data('social_leaderboard', course_id, {'leaders': data['leaders']})
+        data.pop('total_user_count')
+        cache_course_user_data('social', course_id, user_id, {"score": data['score'], "position": data['position']})
+        cache_course_data('social', course_id, {'course_avg': data['course_avg']})
+        cache_course_data('social_leaderboard', course_id, {'leaders': data['leaders']})
     else:
         data.pop('total_user_count')
 
