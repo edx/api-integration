@@ -355,14 +355,18 @@ def _get_course_progress_metrics(course_key, **kwargs):
     total_actual_or_percent_completions, total_possible_completions = get_total_completions(course_key, **kwargs)
     if kwargs.get('user_id'):
         data.update(get_user_position(course_key, **kwargs))
-    total_users_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=kwargs.get('exclude_users'))
-    if kwargs.get('org_ids'):
-        total_users_qs = total_users_qs.filter(organizations__in=kwargs.get('org_ids'))
-    if kwargs.get('group_ids'):
-        total_users_qs = total_users_qs.filter(groups__in=kwargs.get('group_ids')).distinct()
-    if kwargs.get('cohort_user_ids'):
-        total_users_qs = total_users_qs.filter(id__in=kwargs.get('cohort_user_ids'))
-    total_users = total_users_qs.count()
+    if not any([kwargs.get('org_ids'), kwargs.get('group_ids'), kwargs.get('cohort_user_ids')]):
+        course_id = course_key.to_deprecated_string()
+        total_users = get_course_enrollment_count(course_id)
+    else:
+        total_users_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=kwargs.get('exclude_users'))
+        if kwargs.get('org_ids'):
+            total_users_qs = total_users_qs.filter(organizations__in=kwargs.get('org_ids'))
+        if kwargs.get('group_ids'):
+            total_users_qs = total_users_qs.filter(groups__in=kwargs.get('group_ids')).distinct()
+        if kwargs.get('cohort_user_ids'):
+            total_users_qs = total_users_qs.filter(id__in=kwargs.get('cohort_user_ids'))
+        total_users = total_users_qs.count()
     if total_users and total_actual_or_percent_completions and total_possible_completions:
         course_avg = total_actual_or_percent_completions / float(total_users)
         if not kwargs.get('percent_completion'):
