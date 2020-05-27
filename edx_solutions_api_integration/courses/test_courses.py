@@ -277,6 +277,7 @@ class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
                     self.assertEqual(response.data['social']['course_avg'], self.social_avg)
                     self.assertAlmostEqual(response.data['completions']['course_avg'], self.progress_avg)
 
+    @override_settings(CACHES={'default': {'BACKEND': 'django.core.cache.backends.dummy.DummyCache',}})
     def test_social_leaders(self, url_name='course-metrics-social-leaders'):
         # Test social average is global without cohorts
         api_endpoint = reverse(url_name, kwargs={'course_id': unicode(self.course.id)})
@@ -3408,6 +3409,7 @@ class CoursesGradingMetricsTests(
         }
 
     @make_non_atomic
+    @override_settings(CACHES={'default': {'BACKEND': 'django.core.cache.backends.dummy.DummyCache',}})
     def test_courses_metrics_grades_leaders_list_get(self):  # pylint: disable=R0915
         # setup data for course metrics grades leaders
         data = self._setup_courses_metrics_grades_leaders()
