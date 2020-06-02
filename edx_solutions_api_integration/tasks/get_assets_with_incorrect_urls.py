@@ -13,12 +13,14 @@ from celery.task import task, Task
 from django.db.models import Q
 from django.core.mail import EmailMessage
 from django.conf import settings
+from django.utils.html import strip_tags
 
 from opaque_keys.edx.keys import CourseKey
 from xmodule.modulestore.django import modulestore
 from xmodule.contentstore.content import StaticContent
 from xmodule.modulestore import InvalidLocationError
 from xmodule.modulestore.exceptions import ItemNotFoundError
+from xmodule.modulestore.mongo.base import MongoRevisionKey
 from xmodule.exceptions import NotFoundError
 from xmodule.assetstore.assetmgr import AssetManager
 from opaque_keys import InvalidKeyError
@@ -56,7 +58,7 @@ class AssetURLsTask(Task):
 
         subject = '{} assets with incorrect urls task completed'.format('Update' if update_script else 'Get')
         email = EmailMessage(subject, '', settings.DEFAULT_FROM_EMAIL, email_ids)
-        email.attach('assets_report.csv', assets_report.getvalue(), 'text/csv')
+        email.attach('platform_assets_report.csv', assets_report.getvalue(), 'text/csv')
         email.send(fail_silently=False)
 
 
@@ -70,6 +72,40 @@ def update_courses_cache(course_ids):
             update_course_in_cache(course_key)
         except:
             continue
+
+
+def get_block_location(studio_url, course_id, block):
+    """
+    Create appropriate studio urls
+    """
+    category = block.get('_id', {}).get('category')
+    name = block.get('_id', {}).get('name')
+
+    if category == 'about' and name == 'overview':
+        block_url = '{domain}/settings/details/{course_id}'.format(
+            domain=studio_url,
+            course_id=course_id
+        )
+    elif category == 'static_tab':
+        block_url = '{domain}/tabs/{course_id}'.format(
+            domain=studio_url,
+            course_id=course_id
+        )
+    elif category == 'course_info' and name == 'updates':
+        block_url = '{domain}/course_info/{course_id}'.format(
+            domain=studio_url,
+            course_id=course_id
+        )
+    else:
+        block_url = '{domain}/container/i4x://{org}/{course}/{category}/{name}'.format(
+            domain=studio_url,
+            org=block.get('_id', {}).get('org'),
+            course=block.get('_id', {}).get('course'),
+            category=category,
+            name=name
+        )
+
+    return block_url
 
 
 @task(
@@ -107,15 +143,20 @@ def get_assets_with_incorrect_urls(
 
 
 def find_asset_urls_in_course(task_id, course_id, environment, studio_url, staff_user_id, update):
-    block_url = '{domain}/container/i4x://{org}/{course}/{category}/{name}'
     course_key = CourseKey.from_string(course_id)
     query = SON([
         ('_id.tag', 'i4x'),
         ('_id.org', course_key.org),
         ('_id.course', course_key.course),
+        ('_id.revision', MongoRevisionKey.published),
     ])
 
     _store = store._get_modulestore_for_courselike(course_key)
+
+    # split_mongo based courses are not supported
+    if not hasattr(_store, 'collection'):
+        return []
+
     blocks = list(_store.collection.find(
         query,
         sort=[('_id.revision', pymongo.DESCENDING)],
@@ -125,12 +166,10 @@ def find_asset_urls_in_course(task_id, course_id, environment, studio_url, staff
     blocks_to_update = []
 
     for block in blocks:
-        block_loc = block_url.format(
-            domain=studio_url,
-            org=block.get('_id', {}).get('org'),
-            course=block.get('_id', {}).get('course'),
-            category=block.get('_id', {}).get('category'),
-            name=block.get('_id', {}).get('name')
+        block_loc = get_block_location(
+            studio_url=studio_url,
+            course_id=course_id,
+            block=block
         )
         block_assets = list()
         _find_asset_urls_in_block(
@@ -145,7 +184,17 @@ def find_asset_urls_in_course(task_id, course_id, environment, studio_url, staff
     if update:
         if blocks_to_update:
             for module in _store._load_items(course_key, blocks_to_update):
-                store.update_item(xblock=module, user_id=staff_user_id)
+                if hasattr(module.parent, 'block_id'):
+                    block_loc = module.parent.block_id
+                else:
+                    block_loc = module.location
+
+                try:
+                    store.update_item(xblock=module, user_id=staff_user_id)
+                except:
+                    log.info('[{}] Error updating module `{}` in course `{}`. Skipping..'
+                             .format(task_id, block_loc, course_id))
+                    continue
 
     return course_assets
 
@@ -178,13 +227,15 @@ def _find_asset_urls_in_block(
         urls = re.findall(URL_RE, value)
 
         for url in urls:
+            url = strip_tags(url)
             parsed_url = urlparse(url)
             asset_url = StaticContent.ASSET_URL_RE.match(parsed_url.path)
 
             if asset_url is not None:
                 # check if asset URL belongs to some other server or course
                 if parsed_url.hostname != environment or \
-                                asset_url.groupdict().get('course') != course_key.course:
+                                asset_url.groupdict().get('course') != course_key.course or \
+                                asset_url.groupdict().get('org') != course_key.org:
 
                     asset_info = {'name':  asset_url.groupdict().get('name'), 'module':block_loc, 'available': False}
                     asset_path = '{}{}'.format(

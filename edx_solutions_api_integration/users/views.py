@@ -12,7 +12,7 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.validators import validate_email, validate_slug
 from django.core.files.base import ContentFile
 from django.db import IntegrityError
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Case, When, Value, BooleanField
 from django.conf import settings
 from django.http import Http404
 from django.utils.translation import get_language, ugettext_lazy as _
@@ -85,10 +85,12 @@ from edx_solutions_api_integration.utils import (
     cache_course_data,
     cache_course_user_data,
     get_cached_data,
+    get_non_actual_company_users,
 )
 from edx_solutions_projects.serializers import BasicWorkgroupSerializer
 from edx_solutions_api_integration.users.serializers import (
     UserSerializer,
+    MassUsersDetailsSerializer,
     UserCountByCitySerializer,
     UserRolesSerializer,
     CourseProgressSerializer,
@@ -354,6 +356,7 @@ class UsersList(SecureListAPIView):
         usernames = css_param_to_list(self.request, 'username')
         organization_display_name = self.request.query_params.get('organization_display_name', None)
         internal_admin_flag = self.request.query_params.get('internal_admin_flag', None)
+        exclude_type = self.request.query_params.get('exclude_type', None)
 
         # filter internal admin course ids
         if internal_admin_flag:
@@ -364,6 +367,10 @@ class UsersList(SecureListAPIView):
         if org_ids:
             org_ids = map(int, org_ids.split(','))
             queryset = queryset.filter(organizations__id__in=org_ids).distinct()
+
+        if exclude_type and org_ids:
+            non_company_users = get_non_actual_company_users(exclude_type, org_ids[0])
+            queryset.exclude(id__in=non_company_users)
 
         if match == 'partial':
             # filter users by name, email or organizations
@@ -579,6 +586,27 @@ class UsersList(SecureListAPIView):
             })
 
         return serializer_context
+
+
+class MassUsersDetailsList(SecureListAPIView):
+    queryset = User.objects.all()
+    serializer_class = MassUsersDetailsSerializer
+
+    def get_queryset(self):
+        emails = css_data_to_list(self.request, 'email')
+        courses = css_data_to_list(self.request, 'courses')
+        courses = map(CourseKey.from_string, courses)
+
+        return self.queryset.filter(email__in=emails).annotate(
+            is_enrolled=Count(Case(
+                When(courseenrollment__course_id__in=courses, then=1),
+                output_field=BooleanField()
+            ))
+        )
+
+    def post(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
 
 class TokenBasedUserDetails(TokenBasedAPIView):
     """

@@ -1,5 +1,16 @@
 from completion_aggregator.models import Aggregator
-from django.db.models import Q, Sum, Avg
+from django.db.models import Q, Sum, Avg, F
+
+from student.models import CourseEnrollment
+
+from edx_solutions_api_integration.courseware_access import get_course_key
+from edx_solutions_api_integration.utils import (
+    cache_course_data,
+    get_aggregate_exclusion_user_ids,
+    get_cached_data,
+    get_non_actual_company_users,
+    Round,
+)
 
 
 def get_filtered_aggregation_queryset(course_key, **kwargs):
@@ -76,8 +87,12 @@ def generate_leaderboard(course_key, **kwargs):
 
 def get_total_completions(course_key, **kwargs):
     queryset = get_filtered_aggregation_queryset(course_key, **kwargs)
-    aggregate = queryset.aggregate(earned=Sum('earned'), possible=Avg('possible'))
-    return aggregate.get('earned'), aggregate.get('possible')
+    if kwargs.get('percent_completion'):
+        aggregate = queryset.aggregate(percent=Sum(Round((F('earned')/F('possible'))*100)), possible=Avg('possible'))
+        return aggregate.get('percent'), aggregate.get('possible')
+    else:
+        aggregate = queryset.aggregate(earned=Sum('earned'), possible=Avg('possible'))
+        return aggregate.get('earned'), aggregate.get('possible')
 
 
 def get_num_users_started(course_key, **kwargs):
@@ -125,3 +140,34 @@ def get_user_position(course_key, **kwargs):
         data['position'] = users_above + 1
         data['completions'] = user_completions * 100
     return data
+
+
+def get_course_enrollment_count(course_id, org_id=None, exclude_org_admins=False):
+    """
+    Get enrollment count of a course
+    if org_id is passed then count is limited to that org's users
+    """
+    cache_category = 'course_enrollments'
+    if org_id:
+        cache_category = '{}_{}'.format(cache_category, org_id)
+        if exclude_org_admins:
+            cache_category = '{}_exclude_admins'.format(cache_category)
+
+    enrollment_count = get_cached_data(cache_category, course_id)
+    if enrollment_count is not None:
+        return enrollment_count.get('enrollment_count')
+
+    course_key = get_course_key(course_id)
+    exclude_user_ids = get_aggregate_exclusion_user_ids(course_key)
+    users_enrolled_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=exclude_user_ids)
+
+    if org_id:
+        users_enrolled_qs = users_enrolled_qs.filter(organizations=org_id).distinct()
+        if exclude_org_admins:
+            non_company_users = get_non_actual_company_users('mcka_role_company_admin', org_id)
+            users_enrolled_qs.exclude(id__in=non_company_users)
+
+    enrollment_count = users_enrolled_qs.count()
+    cache_course_data(cache_category, course_id, {'enrollment_count': enrollment_count})
+
+    return enrollment_count

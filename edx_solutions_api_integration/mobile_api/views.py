@@ -27,6 +27,12 @@ from edx_solutions_api_integration.users.views import (
     UsersCourseProgressList,
     UsersCoursesDetail,
 )
+from edx_solutions_api_integration.utils import (
+    get_cached_data,
+    cache_course_data,
+    cache_course_user_data,
+    get_aggregate_exclusion_user_ids,
+)
 from openedx.core.lib.api.permissions import IsStaffOrOwner
 from student.models import CourseEnrollment
 from gradebook.models import StudentGradebook
@@ -153,25 +159,18 @@ class MobileUsersCoursesGrades(MobileListAPIView):
         Once persistent grades are enabled on the solutions fork, we'll use CourseGradeFactory instead.
         """
         course_key = get_course_key(course_id)
-        try:
-            record = StudentGradebook.objects.get(user=user, course_id=course_key)
-            course_grade = record.grade
-        except StudentGradebook.DoesNotExist:
-            course_grade = 0
+        data = get_cached_data('grade', course_id, user.id)
+        params = {'exclude_users': get_aggregate_exclusion_user_ids(course_key, roles=None)}
 
-        course_average = self._get_course_average_grade(course_key)
+        if not data:
+            course_avg = StudentGradebook.course_grade_avg(course_key, **params)
+            user_grade = StudentGradebook.get_user_grade(course_key, user.id)
+
+            data = {'user_grade': user_grade, 'course_avg': course_avg}
+            cache_course_data('grade', course_id, {'course_avg': course_avg})
+            cache_course_user_data('grade', course_id, user.id, {'user_grade': user_grade})
+
         return {
-            'course_grade': course_grade,
-            'course_average_grade': course_average
+            'course_grade': data.get('user_grade'),
+            'course_average_grade': data.get('course_avg')
         }
-
-    def _get_course_average_grade(self, course_key):
-        """
-        Get the average grade for all the users in the specified course.
-
-        Note: For performance reasons, we use the cached gradebook data here.
-        Once persistent grades are enabled on the solutions fork, we'll use CourseGradeFactory instead.
-        """
-        return StudentGradebook.course_grade_avg(
-            course_key
-        )
