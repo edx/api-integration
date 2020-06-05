@@ -68,6 +68,7 @@ urlpatterns = patterns(
         courses_views.CourseNavView.as_view()),
     url(r'^{0}$'.format(COURSE_ID_PATTERN), courses_views.CoursesDetail.as_view(), name='course-detail'),
     url(r'tree$', courses_views.CoursesTree.as_view()),
+    url(r'submission_map$', courses_views.CoursesSubmissionMap.as_view()),
     url(r'convert_ooyala_to_bcove/$', courses_views.OoyalaToBcoveConversion.as_view()),
     url(r'get_asset_urls/$', courses_views.AssetURLs.as_view()),
     url(r'/*$^', courses_views.CoursesList.as_view()),
