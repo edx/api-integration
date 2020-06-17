@@ -50,6 +50,7 @@ class Command(BaseCommand):
 
         logger.info('Http to Https update command: queuing task for {} Open Courses'.format(len(open_courses)))
 
+        open_courses = [str(open_course) for open_course in open_courses]
         for course_ids in self.chunks(open_courses, self.batch_size):
             update_http_to_https.delay(
                 course_ids, user_id
