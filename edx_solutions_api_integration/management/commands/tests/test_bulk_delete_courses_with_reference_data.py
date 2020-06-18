@@ -15,8 +15,7 @@ from django.test.utils import override_settings
 from freezegun import freeze_time
 from mock import PropertyMock
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-# ToDO: Find its alternate as it is removed in ironwood.
-#from openedx.core.djangoapps.content.course_structures.models import CourseStructure
+from openedx.core.djangoapps.content.course_structures.models import CourseStructure
 from student.models import CourseAccessRole, CourseEnrollment
 from student.tests.factories import GroupFactory, UserFactory
 from waffle.testutils import override_switch
@@ -84,14 +83,13 @@ class BulkCourseDeleteTests(ModuleStoreTestCase):
         CourseAggregatedMetaData(id=course_key, total_assessments=10, total_modules=20).save()
 
         structure_json = '{"test": true}'
-        # ToDO: Find its alternate as it is removed in ironwood.
-        # course_structure, created = CourseStructure.objects.get_or_create(
-        #     course_id=course_key,
-        #     defaults={'structure_json': structure_json}
-        # )
-        # if not created:
-        #     course_structure.structure_json = structure_json
-        #     course_structure.save()
+        course_structure, created = CourseStructure.objects.get_or_create(
+            course_id=course_key,
+            defaults={'structure_json': structure_json}
+        )
+        if not created:
+            course_structure.structure_json = structure_json
+            course_structure.save()
 
         CourseOverview.get_from_id(course_key)
 
@@ -106,8 +104,7 @@ class BulkCourseDeleteTests(ModuleStoreTestCase):
         self.assertEqual(1, StudentModule.objects.filter(course_id=course_id).count())
         self.assertEqual(1, CourseAggregatedMetaData.objects.filter(id=course_id).count())
         self.assertEqual(1, CourseOverview.objects.filter(id=course_id).count())
-        # ToDO: Find its alternate as it is removed in ironwood.
-        #self.assertEqual(1, CourseStructure.objects.filter(course_id=course_id).count())
+        self.assertEqual(1, CourseStructure.objects.filter(course_id=course_id).count())
 
         course = modulestore().get_course(course_id)
         self.assertIsNotNone(course)
@@ -125,8 +122,7 @@ class BulkCourseDeleteTests(ModuleStoreTestCase):
         self.assertEqual(0, StudentModule.objects.filter(course_id=course_id).count())
         self.assertEqual(0, CourseAggregatedMetaData.objects.filter(id=course_id).count())
         self.assertEqual(0, CourseOverview.objects.filter(id=course_id).count())
-        # ToDO: Find its alternate as it is removed in ironwood.
-        #self.assertEqual(0, CourseStructure.objects.filter(course_id=course_id).count())
+        self.assertEqual(0, CourseStructure.objects.filter(course_id=course_id).count())
 
         course = modulestore().get_course(course_id)
         self.assertIsNone(course)
