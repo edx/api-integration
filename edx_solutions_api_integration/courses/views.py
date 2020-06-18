@@ -19,6 +19,7 @@ from django.utils.translation import ugettext_lazy as _
 
 from pytz import UTC
 from lxml import etree
+from six import text_type
 from requests.exceptions import ConnectionError
 from rest_framework import status
 from rest_framework.response import Response
@@ -41,8 +42,8 @@ from lms.lib.comment_client.utils import CommentClientMaintenanceError, CommentC
 from mobile_api.course_info.views import apply_wrappers_to_content
 from opaque_keys.edx.keys import UsageKey
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from openedx.core.djangoapps.content.course_structures.api.v0.errors import CourseStructureNotAvailableError
 from openedx.core.djangoapps.content.course_structures.models import CourseStructure
+from openedx.core.djangoapps.content.course_structures.errors import CourseStructureNotAvailableError
 from openedx.core.djangoapps.course_groups.cohorts import get_cohort_user_ids
 from openedx.core.djangoapps.course_groups.models import CourseUserGroup
 from openedx.core.lib.courses import course_image_url
@@ -704,10 +705,33 @@ class CoursesList(SecureListAPIView):
         course_ids = css_param_to_list(self.request, 'course_id')
         if course_ids:
             course_keys = [get_course_key(course_id) for course_id in course_ids]
-            results = CourseOverview.get_select_courses(course_keys)
+            results = self.get_select_courses(course_keys)
         else:
             results = CourseOverview.get_all_courses()
         return results
+
+    def get_select_courses(self, course_keys):
+        """
+        Returns CourseOverview objects for the given course_keys.
+        """
+        course_overviews = []
+
+        log.info('Generating course overview for %d courses.', len(course_keys))
+        log.debug('Generating course overview(s) for the following courses: %s', course_keys)
+
+        for course_key in course_keys:
+            try:
+                course_overviews.append(CourseOverview.get_from_id(course_key))
+            except Exception as ex:  # pylint: disable=broad-except
+                log.exception(
+                    'An error occurred while generating course overview for %s: %s',
+                    unicode(course_key),
+                    text_type(ex),
+                )
+
+        log.info('Finished generating course overviews.')
+
+        return course_overviews
 
 
 class CoursesDetail(MobileAPIView):
@@ -2860,21 +2884,22 @@ class CoursesTree(MobileListAPIView):
         course_structures = CourseStructure.objects.filter(course_id__in=course_ids)
         response_data = []
         for course_structure in course_structures:
-            blocks = course_structure.structure.get('blocks', {})
+            for course_id in course_ids:
+                if course_structure.course_id != course_id:
+                    continue
 
-            course = None
-            for block in blocks.values():
-                block['name'] = block.pop('display_name')
-                block['category'] = block.pop('block_type')
-                if course is None and block['category'] == 'course':
-                    course = block
+                blocks = course_structure.structure.get('blocks', {}).copy()
+                for block in blocks.values():
+                    block['name'] = block.pop('display_name')
+                    block['category'] = block.pop('block_type')
 
-            self._update_blocks(course, blocks)
-            course_data = {
-                "id": str(course_structure.course_id),
-                "content": course['children']
-            }
-            response_data.append(course_data)
+                course = [block for block_id, block in blocks.items() if block['category'] == 'course'][0]
+                self._update_blocks(course, blocks)
+                course_data = {
+                    "id": str(course_id),
+                    "content": course['children']
+                }
+                response_data.append(course_data)
         return Response(response_data, status=status.HTTP_200_OK)
 
     def _update_blocks(self, _block, _blocks):

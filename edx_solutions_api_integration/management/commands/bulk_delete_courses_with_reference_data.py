@@ -32,15 +32,14 @@ class Command(BaseCommand):
     Deletes courses based on their age and relevant data of each course
     """
     help = 'Deletes courses based on their age and relevant data of each course'
-    option_list = BaseCommand.option_list + (
-        make_option(
+    def add_arguments(self, parser):
+        parser.add_argument(
             "-c",
             "--age",
             dest="age",
             help="Age in days",
             metavar="60"
         ),
-    )
     module_store = modulestore()
     total_courses = 0
     total_deleted = 0

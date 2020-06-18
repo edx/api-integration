@@ -3,7 +3,7 @@ Courses API URI specification
 The order of the URIs really matters here, due to the slash characters present in the identifiers
 """
 from django.conf import settings
-from django.conf.urls import patterns, url
+from django.conf.urls import url
 
 from rest_framework.urlpatterns import format_suffix_patterns
 
@@ -12,8 +12,7 @@ from edx_solutions_api_integration.courses import views as courses_views
 CONTENT_ID_PATTERN = r'(?P<content_id>(?:i4x://?[^/]+/[^/]+/[^/]+/[^@]+(?:@[^/]+)?)|(?:[^/]+))'
 COURSE_ID_PATTERN = settings.COURSE_ID_PATTERN
 
-urlpatterns = patterns(
-    '',
+urlpatterns = [
     url(r'^{0}/content/{1}/groups/(?P<group_id>[0-9]+)$'.format(COURSE_ID_PATTERN, CONTENT_ID_PATTERN),
         courses_views.CourseContentGroupsDetail.as_view()),
     url(r'^{0}/content/{1}/groups/*$'.format(COURSE_ID_PATTERN, CONTENT_ID_PATTERN),
@@ -71,6 +70,6 @@ urlpatterns = patterns(
     url(r'convert_ooyala_to_bcove/$', courses_views.OoyalaToBcoveConversion.as_view()),
     url(r'get_asset_urls/$', courses_views.AssetURLs.as_view()),
     url(r'/*$^', courses_views.CoursesList.as_view()),
-)
+]
 
 urlpatterns = format_suffix_patterns(urlpatterns)

@@ -26,13 +26,12 @@ class Command(BaseCommand):
     help = 'Updates urls hardcoded in xblock from http to https'
     batch_size = 100
 
-    option_list = BaseCommand.option_list + (
-        make_option(
+    def add_arguments(self, parser):
+        parser.add_argument(
             "--user-id",
             dest="user_id",
             help="Staff User ID",
         ),
-    )
 
     def handle(self, *args, **options):
         user_id = options.get('user_id')

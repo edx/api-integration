@@ -146,6 +146,7 @@ class BlockCompletionSerializer(serializers.ModelSerializer):
 
     class Meta(object):  # pylint: disable=missing-docstring,too-few-public-methods
         model = BlockCompletion
+        fields = '__all__'
 
     user_id = serializers.IntegerField(source='user.id')
     content_id = serializers.CharField(source='block_key')

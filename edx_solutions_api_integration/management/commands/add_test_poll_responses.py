@@ -31,13 +31,13 @@ class Command(BaseCommand):
     Command to generate dummy problem responses xblock poll in a course
     """
     help = 'Generates dummy responses for users enrolled in a course'
-    option_list = BaseCommand.option_list + (
-        make_option(
+    def add_arguments(self, parser):
+        parser.add_argument(
             "--course-id",
             dest="course_id",
             help="Course ID",
         ),
-        make_option(
+        parser.add_argument(
             "--num-responses",
             dest="num_responses",
             default=10000,
@@ -46,14 +46,13 @@ class Command(BaseCommand):
                  "generating 10k responses. Setting this to 0 will generate"
                  "a dummy response for every user in every poll.",
         ),
-        make_option(
+        parser.add_argument(
             "--batch-size",
             dest="batch_size",
             default=500,
             type="int",
             help="Batch size to use when adding responses to the database.",
         ),
-    )
     state_summary = {}
 
     @staticmethod

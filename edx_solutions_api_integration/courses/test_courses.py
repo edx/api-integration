@@ -314,8 +314,7 @@ class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
     active=True,
 )
 @mock.patch("edx_solutions_api_integration.courses.views.get_course_thread_stats", _fake_get_course_thread_stats)
-@mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': False,
-                                                   'ADVANCED_SECURITY': False,
+@mock.patch.dict("django.conf.settings.FEATURES", {'ADVANCED_SECURITY': False,
                                                    'PREVENT_CONCURRENT_LOGINS': False})
 @ddt.ddt
 class CoursesApiTests(
@@ -2859,8 +2858,7 @@ class CoursesApiTests(
     '{}.{}'.format(WAFFLE_COMPLETION_NAMESPACE, ENABLE_COMPLETION_TRACKING),
     active=True,
 )
-@mock.patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': False,
-                                                   'ADVANCED_SECURITY': False,
+@mock.patch.dict("django.conf.settings.FEATURES", {'ADVANCED_SECURITY': False,
                                                    'PREVENT_CONCURRENT_LOGINS': False,
                                                    'MARK_PROGRESS_ON_GRADING_EVENT': True,
                                                    'SIGNAL_ON_SCORE_CHANGED': True,

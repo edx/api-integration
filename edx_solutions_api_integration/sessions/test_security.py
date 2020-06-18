@@ -16,13 +16,13 @@ from django.utils.translation import ugettext as _
 from django.core.cache import cache
 from student.models import UserProfile
 from student.tests.factories import UserFactory
+from util.password_policy_validators import create_validator_config
 
 TEST_API_KEY = str(uuid.uuid4())
 
 
 @override_settings(EDX_API_KEY=TEST_API_KEY)
-@patch.dict("django.conf.settings.FEATURES", {'ENFORCE_PASSWORD_POLICY': True,
-                                              'ENABLE_MAX_FAILED_LOGIN_ATTEMPTS': True,
+@patch.dict("django.conf.settings.FEATURES", {'ENABLE_MAX_FAILED_LOGIN_ATTEMPTS': True,
                                               'PREVENT_CONCURRENT_LOGINS': False})
 class SessionApiSecurityTest(TestCase):
     """
@@ -104,27 +104,36 @@ class SessionApiSecurityTest(TestCase):
             response, mock_audit_log = self._do_request(self.session_url, 'test', 'test_password', secure=True)
             self._assert_response(response, status=201)
 
-    @override_settings(PASSWORD_MIN_LENGTH=4)
+    @override_settings(AUTH_PASSWORD_VALIDATORS=[
+        create_validator_config('util.password_policy_validators.MinimumLengthValidator', {'min_length': 4})
+    ])
     def test_with_short_password(self):
         """
         Try (and fail) user creation with shorter password
         """
         response, mock_audit_log = self._do_request(self.user_url, 'test', 'abc', email='test@edx.org',
                                                     first_name='John', last_name='Doe', secure=True)
-        message = _('Password: Invalid Length (must be 4 characters or more)')
+        message = _('Password: This password is too short. It must contain at least 4 characters.')
         self._assert_response(response, status=400, message=message)
 
-    @override_settings(PASSWORD_MAX_LENGTH=12)
+    @override_settings(AUTH_PASSWORD_VALIDATORS=[
+        create_validator_config('util.password_policy_validators.MaximumLengthValidator', {'max_length': 12})
+    ])
     def test_with_long_password(self):
         """
         Try (and fail) user creation with longer password
         """
         response, mock_audit_log = self._do_request(self.user_url, 'test', 'test_password', email='test@edx.org',
                                                     first_name='John', last_name='Doe', secure=True)
-        message = _('Password: Invalid Length (must be 12 characters or fewer)')
+        message = _('Password: This password is too long. It must contain no more than 12 characters.')
         self._assert_response(response, status=400, message=message)
 
-    @override_settings(PASSWORD_COMPLEXITY={'UPPER': 2, 'LOWER': 2, 'PUNCTUATION': 2, 'DIGITS': 2})
+    @override_settings(AUTH_PASSWORD_VALIDATORS=[
+        create_validator_config('util.password_policy_validators.NumericValidator', {'min_numeric': 2}),
+        create_validator_config('util.password_policy_validators.LowercaseValidator', {'min_lower': 2}),
+        create_validator_config('util.password_policy_validators.UppercaseValidator', {'min_upper': 2}),
+        create_validator_config('util.password_policy_validators.PunctuationValidator', {'min_punctuation': 2})
+    ])
     def test_password_without_uppercase(self):
         """
         Try (and fail) user creation since password should have atleast
@@ -132,43 +141,63 @@ class SessionApiSecurityTest(TestCase):
         """
         response, mock_audit_log = self._do_request(self.user_url, 'test', 'test.pa64!', email='test@edx.org',
                                                     first_name='John', last_name='Doe', secure=True)
-        message = _('Password: Must be more complex (must contain 2 or more uppercase characters)')
+        message = _('Password: This password must contain at least 2 uppercase letters.')
         self._assert_response(response, status=400, message=message)
 
-    @override_settings(PASSWORD_COMPLEXITY={'UPPER': 2, 'LOWER': 2, 'PUNCTUATION': 2, 'DIGITS': 2})
+    @override_settings(AUTH_PASSWORD_VALIDATORS=[
+        create_validator_config('util.password_policy_validators.NumericValidator', {'min_numeric': 2}),
+        create_validator_config('util.password_policy_validators.LowercaseValidator', {'min_lower': 2}),
+        create_validator_config('util.password_policy_validators.UppercaseValidator', {'min_upper': 2}),
+        create_validator_config('util.password_policy_validators.PunctuationValidator', {'min_punctuation': 2})
+    ])
     def test_password_without_lowercase(self):
         """
-        Try (and fail) user creation without any numeric characters
-        in password
+        Try (and fail) user creation since password should have atleast
+       2 lower characters
         """
         response, mock_audit_log = self._do_request(self.user_url, 'test', 'TEST.PA64!', email='test@edx.org',
                                                     first_name='John', last_name='Doe', secure=True)
-        message = _('Password: Must be more complex (must contain 2 or more lowercase characters)')
+        message = _('Password: This password must contain at least 2 lowercase letters.')
         self._assert_response(response, status=400, message=message)
 
-    @override_settings(PASSWORD_COMPLEXITY={'UPPER': 2, 'LOWER': 2, 'PUNCTUATION': 2, 'DIGITS': 2})
+    @override_settings(AUTH_PASSWORD_VALIDATORS=[
+        create_validator_config('util.password_policy_validators.NumericValidator', {'min_numeric': 2}),
+        create_validator_config('util.password_policy_validators.LowercaseValidator', {'min_lower': 2}),
+        create_validator_config('util.password_policy_validators.UppercaseValidator', {'min_upper': 2}),
+        create_validator_config('util.password_policy_validators.PunctuationValidator', {'min_punctuation': 2})
+    ])
     def test_password_without_punctuation(self):
         """
         Try (and fail) user creation without any punctuation in password
         """
         response, mock_audit_log = self._do_request(self.user_url, 'test', 'test64Ss', email='test@edx.org',  # pylint: disable=W0612,C0301
                                                     first_name='John', last_name='Doe', secure=True)
-        message = _('Password: Must be more complex (must contain 2 or more uppercase characters,'
-                    ' must contain 2 or more punctuation characters)')
+        message = _('Password: This password must contain at least 2 uppercase letters.; '
+                    'This password must contain at least 2 punctuation marks.')
         self._assert_response(response, status=400, message=message)
 
-    @override_settings(PASSWORD_COMPLEXITY={'UPPER': 2, 'LOWER': 2, 'PUNCTUATION': 2, 'DIGITS': 2})
+    @override_settings(AUTH_PASSWORD_VALIDATORS=[
+        create_validator_config('util.password_policy_validators.NumericValidator', {'min_numeric': 2}),
+        create_validator_config('util.password_policy_validators.LowercaseValidator', {'min_lower': 2}),
+        create_validator_config('util.password_policy_validators.UppercaseValidator', {'min_upper': 2}),
+        create_validator_config('util.password_policy_validators.PunctuationValidator', {'min_punctuation': 2})
+    ])
     def test_password_without_numeric(self):
         """
         Try (and fail) user creation without any numeric characters in password
         """
         response, mock_audit_log = self._do_request(self.user_url, 'test', 'test.paSs!', email='test@edx.org',  # pylint: disable=W0612,C0301
                                                     first_name='John', last_name='Doe', secure=True)
-        message = _('Password: Must be more complex (must contain 2 or more uppercase characters,'
-                    ' must contain 2 or more digits)')
+        message = _('Password: This password must contain at least 2 numbers.; '
+                    'This password must contain at least 2 uppercase letters.')
         self._assert_response(response, status=400, message=message)
 
-    @override_settings(PASSWORD_COMPLEXITY={'UPPER': 2, 'LOWER': 2, 'PUNCTUATION': 2, 'DIGITS': 2})
+    @override_settings(AUTH_PASSWORD_VALIDATORS=[
+        create_validator_config('util.password_policy_validators.NumericValidator', {'min_numeric': 2}),
+        create_validator_config('util.password_policy_validators.LowercaseValidator', {'min_lower': 2}),
+        create_validator_config('util.password_policy_validators.UppercaseValidator', {'min_upper': 2}),
+        create_validator_config('util.password_policy_validators.PunctuationValidator', {'min_punctuation': 2})
+    ])
     def test_password_with_complexity(self):
         """
         This should pass since it has everything needed for a complex password

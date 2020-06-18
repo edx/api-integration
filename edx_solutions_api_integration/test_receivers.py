@@ -13,7 +13,7 @@ from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_st
 
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
-from util.signals import course_deleted
+from xmodule.modulestore.django import SignalHandler
 
 from edx_solutions_api_integration.models import GroupProfile, CourseGroupRelationship, CourseContentGroupRelationship
 MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
@@ -22,6 +22,7 @@ MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 @override_settings(MODULESTORE=MODULESTORE_CONFIG)
 class ApiManagerReceiversTests(ModuleStoreTestCase):
     """ Test suite for signal receivers """
+    ENABLED_SIGNALS = ['course_deleted']
 
     def setUp(self):
         super(ApiManagerReceiversTests, self).setUp()
@@ -69,7 +70,7 @@ class ApiManagerReceiversTests(ModuleStoreTestCase):
         self.assertEqual(CourseContentGroupRelationship.objects.filter(course_id=self.course.id, content_id=unicode(self.chapter.location)).count(), 1)  # pylint: disable=C0301
 
         # Emit the signal
-        course_deleted.send(sender=None, course_key=self.course.id)
+        SignalHandler.course_deleted.send(sender=None, course_key=self.course.id)
 
         # Validate that the course references were removed
         self.assertEqual(CourseGroupRelationship.objects.filter(course_id=unicode(self.course.id)).count(), 0)

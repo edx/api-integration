@@ -5,13 +5,13 @@ import logging
 
 from cryptography.fernet import Fernet
 
+from importlib import import_module
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth import SESSION_KEY, BACKEND_SESSION_KEY, HASH_SESSION_KEY, load_backend
 from django.contrib.auth.models import AnonymousUser, User
-from django.core.context_processors import csrf
+from django.template.context_processors import csrf
 from django.core.exceptions import ObjectDoesNotExist
-from django.utils.importlib import import_module
 from django.utils.translation import ugettext as _
 from edx_solutions_api_integration.permissions import SecureAPIView
 from rest_framework import status
@@ -20,13 +20,13 @@ from rest_framework.views import APIView
 from django.utils import timezone
 
 
-from util.bad_request_rate_limiter import BadRequestRateLimiter
+from util.request_rate_limiter import BadRequestRateLimiter
 from edx_solutions_api_integration.utils import generate_base_uri
 
 from edx_solutions_api_integration.users.serializers import SimpleUserSerializer
-from student.models import (
-    LoginFailures, PasswordHistory
-)
+from edx_solutions_api_integration.models import PasswordHistory
+from student.models import LoginFailures
+
 AUDIT_LOG = logging.getLogger("audit")
 
 
@@ -173,7 +173,7 @@ class SessionsList(SecureAPIView):
                 else:
                     response_status = status.HTTP_403_FORBIDDEN
             else:
-                limiter.tick_bad_request_counter(request)
+                limiter.tick_request_counter(request)
 
                 # tick the failed login counters if the user exists in the database
                 if LoginFailures.is_feature_enabled():

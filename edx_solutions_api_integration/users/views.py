@@ -8,14 +8,15 @@ from datetime import datetime
 from functools import reduce
 
 from django.contrib.auth.models import Group
-from django.core.exceptions import ObjectDoesNotExist
-from django.core.validators import validate_email, validate_slug, ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.core.validators import validate_email, validate_slug
 from django.core.files.base import ContentFile
 from django.db import IntegrityError
 from django.db.models import Count, Q, Case, When, Value, BooleanField
 from django.conf import settings
 from django.http import Http404
 from django.utils.translation import get_language, ugettext_lazy as _
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from rest_framework.response import Response
 from rest_framework import status
@@ -28,7 +29,7 @@ from gradebook.utils import generate_user_gradebook
 from social_engagement.models import StudentSocialEngagementScore
 from instructor.access import revoke_access, update_forum_role
 from openedx.core.djangoapps.lang_pref import LANGUAGE_KEY
-from notification_prefs.views import enable_notifications
+from lms.djangoapps.notification_prefs.views import enable_notifications
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import UsageKey, CourseKey
 from opaque_keys.edx.locations import Location, SlashSeparatedCourseKey
@@ -46,7 +47,7 @@ from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
 from openedx.core.djangoapps.user_api.accounts.image_helpers import get_profile_image_names, get_profile_image_storage
 from edx_notifications.lib.consumer import mark_notification_read
 from completion_aggregator.models import Aggregator
-from student.models import CourseEnrollment, CourseEnrollmentException, PasswordHistory, UserProfile, LoginFailures
+from student.models import CourseEnrollment, CourseEnrollmentException, UserProfile, LoginFailures
 from student.roles import (
     CourseAccessRole,
     CourseInstructorRole,
@@ -55,11 +56,8 @@ from student.roles import (
     CourseAssistantRole,
     UserBasedRole,
 )
-from util.bad_request_rate_limiter import BadRequestRateLimiter
-from util.password_policy_validators import (
-    validate_password_length, validate_password_complexity,
-    validate_password_dictionary
-)
+from util.request_rate_limiter import BadRequestRateLimiter
+from util.password_policy_validators import validate_password
 from xmodule.modulestore import InvalidLocationError
 
 from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
@@ -72,7 +70,7 @@ from edx_solutions_api_integration.permissions import (
     HasOrgsFilterBackend,
     MobileAPIView,
 )
-from edx_solutions_api_integration.models import CourseGroupRelationship, GroupProfile, APIUser as User
+from edx_solutions_api_integration.models import CourseGroupRelationship, PasswordHistory, GroupProfile, APIUser as User
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from edx_solutions_api_integration.utils import (
     generate_base_uri,
@@ -334,7 +332,6 @@ class UsersList(SecureListAPIView):
         DELETE /api/users?username=edx
 
     ### Use Cases/Notes:
-    * Password formatting policies can be enabled through the "ENFORCE_PASSWORD_POLICY" feature flag
     * The first_name and last_name fields are additionally concatenated and stored in the 'name' field of UserProfile
     * Values for level_of_education can be found in the LEVEL_OF_EDUCATION_CHOICES enum, located
         in common/student/models.py
@@ -342,7 +339,7 @@ class UsersList(SecureListAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     course_key = None
-    filter_backends = (filters.DjangoFilterBackend, IdsInFilterBackend, HasOrgsFilterBackend)
+    filter_backends = (DjangoFilterBackend, IdsInFilterBackend, HasOrgsFilterBackend)
 
     def get_queryset(self):
         """
@@ -403,7 +400,7 @@ class UsersList(SecureListAPIView):
                     queryset = queryset.filter(courseenrollment__course_id__in=courses, courseenrollment__is_active=True).distinct()
                 else:
                     courses_filter_list = [
-                        Q(courseenrollment__course_id__icontains=course) & Q(courseenrollment__is_active=True) for
+                        Q(courseenrollment__course_id__id__icontains=course) & Q(courseenrollment__is_active=True) for
                         course in courses]
                     courses_filter_list = reduce(lambda a, b: a | b, courses_filter_list)
                     queryset = queryset.filter(courses_filter_list)
@@ -465,7 +462,7 @@ class UsersList(SecureListAPIView):
             return Response({'message': _('username is missing')}, status.HTTP_400_BAD_REQUEST)
 
         password = request.data.get('password')
-        if settings.FEATURES.get('ENFORCE_PASSWORD_POLICY', True) and password is None:
+        if password is None:
             return Response({'message': _('password is missing')}, status.HTTP_400_BAD_REQUEST)
 
         first_name = request.data.get('first_name', '')
@@ -484,14 +481,11 @@ class UsersList(SecureListAPIView):
         attribute_values = css_data_to_list(request, 'attribute_values')
 
         # enforce password complexity as an optional feature
-        if settings.FEATURES.get('ENFORCE_PASSWORD_POLICY', False):
-            try:
-                validate_password_length(password)
-                validate_password_complexity(password)
-                validate_password_dictionary(password)
-            except ValidationError, err:
-                response_data['message'] = _('Password: ') + '; '.join(err.messages)
-                return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            validate_password(password)
+        except ValidationError, err:
+            response_data['message'] = _('Password: ') + '; '.join(err.messages)
+            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
         try:
             validate_email(email)
         except ValidationError:
@@ -724,7 +718,7 @@ class UsersDetail(SecureAPIView):
         try:
             existing_user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
-            limiter.tick_bad_request_counter(request)
+            limiter.tick_request_counter(request)
             existing_user = None
         if existing_user is None:
             return Response({}, status=status.HTTP_404_NOT_FOUND)
@@ -802,17 +796,14 @@ class UsersDetail(SecureAPIView):
         if password:
             old_password_hash = existing_user.password
             _serialize_user(response_data, existing_user)
-            if settings.FEATURES.get('ENFORCE_PASSWORD_POLICY', False):
-                try:
-                    validate_password_length(password)
-                    validate_password_complexity(password)
-                    validate_password_dictionary(password)
-                except ValidationError, err:
-                    # bad user? tick the rate limiter counter
-                    AUDIT_LOG.warning("API::Bad password in password_reset.")
-                    response_data['message'] = _('Password: ') + '; '.join(err.messages)
-                    response_data['code'] = _('invalid_password')
-                    return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                validate_password(password)
+            except ValidationError, err:
+                # bad user? tick the rate limiter counter
+                AUDIT_LOG.warning("API::Bad password in password_reset.")
+                response_data['message'] = _('Password: ') + '; '.join(err.messages)
+                response_data['code'] = _('invalid_password')
+                return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
             # also, check the password reuse policy
             err_msg = None
             if not PasswordHistory.is_allowable_password_reuse(existing_user, password):
@@ -1794,17 +1785,17 @@ class UsersCourseProgressList(SecureListAPIView):
                 filtered_courses = CourseOverview.objects.filter(Q(end__gt=datetime.today()) | Q(end__isnull=True)).values_list('id', flat=True)
             else:
                 filtered_courses = CourseOverview.objects.filter(end__lte=datetime.today()).values_list('id', flat=True)
-            enrollments = enrollments.filter(course_id__in=[CourseKey.from_string(key) for key in filtered_courses])
+            enrollments = enrollments.filter(course_id__in=[key for key in filtered_courses])
 
         enrollments = enrollments.values('course_id', 'created', 'is_active')
         course_keys = []
         for course_enrollment in enrollments:
-            course_keys.append(CourseKey.from_string(course_enrollment['course_id']))
+            course_keys.append(course_enrollment['course_id'])
 
         user_grades = StudentGradebook.objects.filter(course_id__in=course_keys, user_id=user.id)\
             .values('course_id', 'grade')
         student_progress = {
-            str(progress['course_key']): progress
+            progress['course_key']: progress
             for progress in Aggregator.objects.filter(
                 course_key__in=course_keys,
                 user=user,

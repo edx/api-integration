@@ -1,6 +1,6 @@
 """ Users API URI specification """
 from django.conf import settings
-from django.conf.urls import patterns, url
+from django.conf.urls import url
 from django.db import transaction
 
 from rest_framework.urlpatterns import format_suffix_patterns
@@ -10,8 +10,7 @@ from edx_solutions_api_integration.users import views as users_views
 COURSE_ID_PATTERN = settings.COURSE_ID_PATTERN
 
 
-urlpatterns = patterns(
-    '',
+urlpatterns = [
     url(r'^metrics/cities/$', users_views.UsersMetricsCitiesList.as_view(), name='apimgr-users-metrics-cities-list'),
     url(r'^(?P<user_id>[a-zA-Z0-9]+)/courses/grades$',
         users_views.UsersCoursesGradesList.as_view(), name='users-courses-grades-list'),
@@ -55,5 +54,5 @@ urlpatterns = patterns(
         users_views.ClientSpecificAttributesView.as_view(), name='users-attributes'),
     url(r'validate-token/$', users_views.TokenBasedUserDetails.as_view(),
         name='validate-bearer-token'),
-)
+]
 urlpatterns = format_suffix_patterns(urlpatterns)

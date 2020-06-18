@@ -13,15 +13,15 @@ from django.utils.translation import ugettext as _
 from rest_framework.response import Response
 
 from edx_solutions_api_integration.courseware_access import get_course
-from edx_solutions_api_integration.models import CourseGroupRelationship
+from edx_solutions_api_integration.models import CourseGroupRelationship, PasswordHistory
 from edx_solutions_api_integration.users.views import _manage_role
 from edx_solutions_organizations.models import Organization
 from rest_framework.decorators import list_route
 
-from notification_prefs.views import enable_notifications
+from lms.djangoapps.notification_prefs.views import enable_notifications
 from openedx.core.djangoapps.course_groups.cohorts import add_cohort, get_cohort_by_name
 from openedx.core.djangoapps.course_groups.models import CohortMembership, CourseCohort, CourseUserGroup
-from student.models import CourseEnrollment, PasswordHistory, UserProfile
+from student.models import CourseEnrollment, UserProfile
 
 from opaque_keys.edx.keys import CourseKey
 
