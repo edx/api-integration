@@ -775,7 +775,7 @@ class UsersDetail(SecureAPIView):
             old_username = str(existing_user.username)
             existing_username = User.objects.filter(username=username).filter(~Q(id=user_id))
             if existing_username:
-                response_data['message'] = "User '%s' already exists" % (username)
+                response_data['message'] = _("User '{username}' already exists").format(username=username)
                 response_data['field_conflict'] = "username"
                 response_data['code'] = "invalid_username"
                 return Response(response_data, status=status.HTTP_409_CONFLICT)
