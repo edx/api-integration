@@ -36,6 +36,8 @@ from courseware.views.views import get_static_tab_fragment
 from django_comment_common.models import FORUM_ROLE_MODERATOR
 from gradebook.models import StudentGradebook
 from instructor.access import revoke_access, update_forum_role
+from xmodule.modulestore import ModuleStoreEnum
+
 from lms.djangoapps.course_api.blocks.api import get_blocks
 from lms.lib.comment_client.thread import get_course_thread_stats
 from lms.lib.comment_client.utils import CommentClientMaintenanceError, CommentClientRequestError
@@ -98,7 +100,7 @@ from edx_solutions_api_integration.permissions import (
     MobileListAPIView,
     SecureAPIView,
     SecureListAPIView,
-)
+    SecureCreateAPIView)
 from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer
 from edx_solutions_api_integration.utils import (
     cache_course_data,
@@ -3018,3 +3020,65 @@ class AssetURLs(MobileAPIView, IsStaffView):
         )
 
         return Response({'task_id': task.task_id}, status=status.HTTP_200_OK)
+
+
+class CoursesSubmissionMap(MobileListAPIView):
+    """
+    **Use Case**
+
+        CoursesSubmissionMap returns a mapped list of submission ids and activities under a course.
+
+
+    **Example Request**
+
+        POST /api/courses/submission_map
+        {
+            course_id: 'CA/CS102/2018',
+            group_id: 'i4x://GW/GW/gp-v2-submission/acd59b3d25144c83a8198441e8d873d0''
+        }
+
+    **Example Response**
+    {
+        "activity_id1": {
+            "submissions": ["submission_id1", "submission_id2"],
+            "display_name": "Activity1"
+        }
+    }
+    """
+    def post(self, request, *args, **kwargs):
+        course_id = request.data.get('course_id')
+        if not course_id:
+            return Response({}, status=status.HTTP_400_BAD_REQUEST)
+
+        course_key = get_course_key(course_id)
+        self._find_submission_ids(course_key)
+
+        course_structure = CourseStructure.objects.filter(course_id=course_key).first()
+        blocks = course_structure.structure.get('blocks', {})
+        submissions = {}
+        for block_id, block in blocks.items():
+            if block['block_type'] == 'gp-v2-activity':
+                submissions[block_id] = {
+                    'display_name': block['display_name'],
+                    'submissions': self._find_submissions(block_id, blocks)
+                }
+        return Response(submissions, status=status.HTTP_200_OK)
+
+    def _find_submissions(self, block_id, blocks):
+        submissions = []
+        for child_id in blocks[block_id]['children']:
+            child = blocks[child_id]
+            if child['block_type'] == 'gp-v2-submission':
+                submissions += [self.submission_ids.get(child_id)]
+            submissions += self._find_submissions(child_id, blocks)
+
+        return submissions
+
+    def _find_submission_ids(self, course_id):
+        store = modulestore()
+        gw_blocks = store.get_items(
+            course_id,
+            qualifiers={"category": 'gp-v2-submission'},
+            revision=ModuleStoreEnum.RevisionOption.published_only
+        )
+        self.submission_ids = {str(gw.location): gw.upload_id for gw in gw_blocks}
