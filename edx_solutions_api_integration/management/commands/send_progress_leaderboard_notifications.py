@@ -1,11 +1,10 @@
 """
 Management command to check users progress and sends notifications
-./manage.py lms send_progress_leaderboard_notifications  --settings=aws --time-range=30
+./manage.py lms send_progress_leaderboard_notifications  --settings=production --time-range=30
 """
 
 import logging
 import sys
-from optparse import make_option
 
 from completion_aggregator.models import Aggregator
 from django.conf import settings
@@ -26,18 +25,16 @@ class Command(BaseCommand):
     """
     Command to check users progress and sends notifications
     """
-    help = 'Check users progress and sends notifications'
-    batch_size = 100
+    help = "Time range in minute for which we need to check progress updates in past",
 
-    option_list = BaseCommand.option_list + (
-        make_option(
+    def add_arguments(self, parser):
+        parser.add_argument(
             "--time-range",
             dest="time_range",
-            type='int',
+            type=int,
             default=60,
             help="Time range in minute for which we need to check progress updates in past",
-        ),
-    )
+        )
 
     def handle(self, *args, **options):
         if not settings.FEATURES['ENABLE_NOTIFICATIONS']:
@@ -76,7 +73,7 @@ class Command(BaseCommand):
                     try:
                         notification_msg = NotificationMessage(
                             msg_type=get_notification_type(u'open-edx.lms.leaderboard.progress.rank-changed'),
-                            namespace=unicode(str(course_key)),
+                            namespace=unicode(course_key),
                             payload={
                                 '_schema_version': '1',
                                 'rank': position,
@@ -95,7 +92,7 @@ class Command(BaseCommand):
                         # so we need to resolve these links at dispatch time
                         #
                         notification_msg.add_click_link_params({
-                            'course_id': unicode(str(course_key)),
+                            'course_id': unicode(course_key),
                         })
 
                         publish_notification_to_user(int(leader.user_id), notification_msg)

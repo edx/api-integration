@@ -164,7 +164,10 @@ class APIUser(User):
 
 
 class LeaderBoard(TimeStampedModel):
-    user = models.ForeignKey(User)
+    """
+    Model to store progress leaders against a course
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     course_key = CourseKeyField(max_length=255)
     position = models.IntegerField()
 
