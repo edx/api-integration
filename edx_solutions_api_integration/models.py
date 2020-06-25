@@ -6,6 +6,7 @@ from django.contrib.auth.hashers import make_password
 from django.db import models
 from django.utils import timezone
 
+from opaque_keys.edx.django.models import CourseKeyField
 from model_utils.models import TimeStampedModel
 from .utils import is_int
 
@@ -160,6 +161,12 @@ class APIUser(User):
     class Meta(object):
         """ Meta attribute to make this a proxy model"""
         proxy = True
+
+
+class LeaderBoard(TimeStampedModel):
+    user = models.ForeignKey(User)
+    course_key = CourseKeyField(max_length=255)
+    position = models.IntegerField()
 
 
 class PasswordHistory(models.Model):
