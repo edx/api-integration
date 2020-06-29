@@ -50,7 +50,7 @@ class Command(BaseCommand):
 
         for course_key in courses:
             all_progress = Aggregator.objects.filter(
-                aggregation_name='course', course_key=course_key
+                aggregation_name='course', course_key=course_key, percent__gt=0
             ).order_by('-percent', 'last_modified')[:leaderboard_size]
 
             all_leaders = LeaderBoard.objects.filter(course_key=course_key).all()
