@@ -70,7 +70,7 @@ def generate_leaderboard(course_key, **kwargs):
     ]
 
     """
-    queryset = get_filtered_aggregation_queryset(course_key, **kwargs)
+    queryset = get_filtered_aggregation_queryset(course_key, **kwargs).filter(percent__gt=0)
     queryset = queryset.values(
         'user__id',
         'user__username',
