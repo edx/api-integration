@@ -17,7 +17,6 @@ from edx_notifications.lib.publisher import (
 )
 
 from ...models import LeaderBoard
-from edx_solutions_api_integration.models import GroupProfile
 
 
 log = logging.getLogger(__name__)
@@ -39,20 +38,23 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        # if not settings.FEATURES['ENABLE_NOTIFICATIONS']:
-        #     return
+        if not settings.FEATURES['ENABLE_NOTIFICATIONS']:
+            return
 
         # Increase time range so that users don't miss notification in case cron job is skipped or delayed.
         time_range = timezone.now() - timezone.timedelta(minutes=options['time_range'] * 2)
-        leaderboard_size = 3#getattr(settings, 'LEADERBOARD_SIZE', 3)
+        leaderboard_size = getattr(settings, 'LEADERBOARD_SIZE', 3)
         courses = Aggregator.objects.filter(
             aggregation_name='course',
-            last_modified__lte=time_range
+            last_modified__gte=time_range
         ).distinct().values_list('course_key', flat=True)
         for course_key in courses:
             all_progress = Aggregator.objects.filter(
                 aggregation_name='course', course_key=course_key, percent__gt=0
+            ).exclude(user__courseaccessrole__course_id=course_key,
+                      user__courseaccessrole__role__in=['staff', 'observer', 'assistant']
             ).order_by('-percent', 'last_modified')[:leaderboard_size]
+
             all_leaders = LeaderBoard.objects.filter(course_key=course_key).all()
             leaders = {l.position: l for l in all_leaders}
             positions = {l.user_id: l.position for l in all_leaders}
@@ -66,55 +68,36 @@ class Command(BaseCommand):
                 old_position = positions.get(progress.user_id, sys.maxint)
                 leader.user_id = progress.user_id
                 leader.save()
+                is_new = progress.modified >= time_range
 
-                if self.is_user_eligible_for_notification(progress.user):
-                    is_new = progress.modified >= time_range
+                if old_leader != progress.user_id and position < old_position and is_new:
+                    try:
+                        notification_msg = NotificationMessage(
+                            msg_type=get_notification_type(u'open-edx.lms.leaderboard.progress.rank-changed'),
+                            namespace=unicode(course_key),
+                            payload={
+                                '_schema_version': '1',
+                                'rank': position,
+                                'leaderboard_name': 'Progress',
+                            }
+                        )
 
-                    if old_leader != progress.user_id and position < old_position and is_new:
-                        try:
-                            notification_msg = NotificationMessage(
-                                msg_type=get_notification_type(u'open-edx.lms.leaderboard.progress.rank-changed'),
-                                namespace=unicode(course_key),
-                                payload={
-                                    '_schema_version': '1',
-                                    'rank': position,
-                                    'leaderboard_name': 'Progress',
-                                }
-                            )
+                        #
+                        # add in all the context parameters we'll need to
+                        # generate a URL back to the website that will
+                        # present the new course announcement
+                        #
+                        # IMPORTANT: This can be changed to msg.add_click_link() if we
+                        # have a particular URL that we wish to use. In the initial use case,
+                        # we need to make the link point to a different front end website
+                        # so we need to resolve these links at dispatch time
+                        #
+                        notification_msg.add_click_link_params({
+                            'course_id': unicode(course_key),
+                        })
 
-                            #
-                            # add in all the context parameters we'll need to
-                            # generate a URL back to the website that will
-                            # present the new course announcement
-                            #
-                            # IMPORTANT: This can be changed to msg.add_click_link() if we
-                            # have a particular URL that we wish to use. In the initial use case,
-                            # we need to make the link point to a different front end website
-                            # so we need to resolve these links at dispatch time
-                            #
-                            notification_msg.add_click_link_params({
-                                'course_id': unicode(course_key),
-                            })
-
-                            publish_notification_to_user(int(leader.user_id), notification_msg)
-                        except Exception, ex:  # pylint: disable=broad-except
-                            # Notifications are never critical, so we don't want to disrupt any
-                            # other logic processing. So log and continue.
-                            log.exception(ex)
-
-    # This method will check if user is eligible for receiving the notification based on its role.
-    def is_user_eligible_for_notification(self, existing_user):
-        # if user is staff then no notification will be send.
-        if existing_user.is_staff:
-            return False
-
-        # if user has "observer" or "ta" permission then notification will be send.
-        groups_prohibited = ['mcka_role_mcka_observer', 'mcka_role_mcka_ta']
-        groups = existing_user.groups.all()
-        assigned_group_names = GroupProfile.objects.filter(group__in=groups,
-                                                           group_type="permission").values_list('name', flat=True)
-        for group_name in groups_prohibited:
-            if group_name in assigned_group_names:
-                return False
-
-        return True
+                        publish_notification_to_user(int(leader.user_id), notification_msg)
+                    except Exception, ex:  # pylint: disable=broad-except
+                        # Notifications are never critical, so we don't want to disrupt any
+                        # other logic processing. So log and continue.
+                        log.exception(ex)
