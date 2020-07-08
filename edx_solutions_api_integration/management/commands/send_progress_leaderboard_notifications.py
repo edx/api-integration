@@ -53,7 +53,7 @@ class Command(BaseCommand):
             all_progress = Aggregator.objects.filter(
                 aggregation_name='course', course_key=course_key, percent__gt=0
             ).exclude(user__in=User.objects.filter(courseaccessrole__course_id=course_key,
-                      courseaccessrole__role__in=['staff', 'observer', 'assistant'])
+                      courseaccessrole__role__in=['staff', 'observer', 'assistant', 'instructor'])
             ).order_by('-percent', 'last_modified')[:leaderboard_size]
 
             all_leaders = LeaderBoard.objects.filter(course_key=course_key).all()
