@@ -17,6 +17,7 @@ from edx_notifications.lib.publisher import (
 )
 
 from ...models import LeaderBoard
+from edx_solutions_api_integration.models import APIUser as User
 
 
 log = logging.getLogger(__name__)
@@ -51,8 +52,8 @@ class Command(BaseCommand):
         for course_key in courses:
             all_progress = Aggregator.objects.filter(
                 aggregation_name='course', course_key=course_key, percent__gt=0
-            ).exclude(user__courseaccessrole__course_id=course_key,
-                      user__courseaccessrole__role__in=['staff', 'observer', 'assistant']
+            ).exclude(user__in=User.objects.filter(courseaccessrole__course_id=course_key,
+                      courseaccessrole__role__in=['staff', 'observer', 'assistant'])
             ).order_by('-percent', 'last_modified')[:leaderboard_size]
 
             all_leaders = LeaderBoard.objects.filter(course_key=course_key).all()
