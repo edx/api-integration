@@ -2289,7 +2289,7 @@ class CoursesApiTests(
         self.assertEqual(len(response.data['leaders']), 4)
         # Two users have the same completions, so position could be either 2 or 3
         self.assertIn(response.data['position'], (2, 3))
-        self.assertEqual('{0:.3f}'.format(response.data['completions']), '28.000')
+        self.assertEqual('{0:.3f}'.format(response.data['completions']), '77.778')
 
         # with skipleaders filter
         test_uri = '{}?user_id={}&skipleaders=true'.format(setup_data['leaders_uri'], setup_data['users'][1].id)
