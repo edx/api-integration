@@ -2289,7 +2289,7 @@ class CoursesApiTests(
         self.assertEqual(len(response.data['leaders']), 4)
         # Two users have the same completions, so position could be either 2 or 3
         self.assertIn(response.data['position'], (2, 3))
-        self.assertEqual('{0:.3f}'.format(response.data['completions']), '28.000')
+        self.assertEqual('{0:.3f}'.format(response.data['completions']), '77.778')
 
         # with skipleaders filter
         test_uri = '{}?user_id={}&skipleaders=true'.format(setup_data['leaders_uri'], setup_data['users'][1].id)
@@ -2297,7 +2297,7 @@ class CoursesApiTests(
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.data.get('leaders', None))
         self.assertEqual('{0:.3f}'.format(response.data['course_avg']), expected_course_avg)
-        self.assertEqual('{0:.3f}'.format(response.data['completions']), '28.000')
+        self.assertEqual('{0:.3f}'.format(response.data['completions']), '77.778')
 
         # test with bogus course
         test_uri = '{}/{}/metrics/completions/leaders/'.format(self.base_courses_uri, self.test_bogus_course_id)
@@ -2317,8 +2317,8 @@ class CoursesApiTests(
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['leaders']), 1)
         self.assertEqual(response.data['leaders'][0]['id'], setup_data['users'][1].id)
-        self.assertEqual('{0:.3f}'.format(response.data['leaders'][0]['completions']), '28.000')
-        self.assertEqual('{0:.3f}'.format(response.data['course_avg']), '28.000')
+        self.assertEqual('{0:.3f}'.format(response.data['leaders'][0]['completions']), '77.778')
+        self.assertEqual('{0:.3f}'.format(response.data['course_avg']), '77.778')
 
         # test with unknown user
         test_uri = '{}?user_id={}&skipleaders=true'.format(setup_data['leaders_uri'], '909999')
