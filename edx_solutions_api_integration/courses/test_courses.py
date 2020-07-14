@@ -2275,7 +2275,7 @@ class CoursesApiTests(
 
     def test_courses_completions_leaders(self):
         setup_data = self._setup_courses_completions_leaders()
-        expected_course_avg = '25.000'
+        expected_course_avg = '48.077'
         test_uri = '{}?count=6'.format(setup_data['leaders_uri'])
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
@@ -2353,7 +2353,7 @@ class CoursesApiTests(
         Test courses completions leaders with group filter
         """
         setup_data = self._setup_courses_completions_leaders()
-        expected_course_avg = '18.000'
+        expected_course_avg = '50.000'
         test_uri = '{}?groups={}'.format(setup_data['leaders_uri'], setup_data['groups'][0].id)
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
@@ -2404,7 +2404,7 @@ class CoursesApiTests(
         Test courses completions leaders with group filter for users in multiple groups
         """
         setup_data = self._setup_courses_completions_leaders()
-        expected_course_avg = '25.000'
+        expected_course_avg = '48.077'
         group_ids = ','.join([str(group.id) for group in setup_data['groups']])
         test_uri = '{}?groups={}'.format(setup_data['leaders_uri'], group_ids)
         response = self.do_get(test_uri)
