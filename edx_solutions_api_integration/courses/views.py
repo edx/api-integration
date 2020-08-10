@@ -2,6 +2,8 @@
 
 import itertools
 import logging
+
+import re
 import warnings
 import sys
 from StringIO import StringIO
@@ -3022,11 +3024,12 @@ class AssetURLs(MobileAPIView, IsStaffView):
         return Response({'task_id': task.task_id}, status=status.HTTP_200_OK)
 
 
-class CoursesSubmissionMap(MobileListAPIView):
+class CourseGWMap(MobileListAPIView):
     """
     **Use Case**
 
-        CoursesSubmissionMap returns a mapped list of submission ids and activities under a course.
+        CourseGWMap returns a mapped list of submission ids, review questions and activities
+         under a course and a given groupwork.
 
 
     **Example Request**
@@ -3039,46 +3042,131 @@ class CoursesSubmissionMap(MobileListAPIView):
 
     **Example Response**
     {
-        "activity_id1": {
-            "submissions": ["submission_id1", "submission_id2"],
-            "display_name": "Activity1"
+        "block-v1:edx+GW+2019+type@gp-v2-activity+block@7d0c547fefe74d5a9ce2512bd88762de": {
+            "submissions": [
+                {
+                    "upload_id": "Personal_Development_plan",
+                    "id": "block-v1:edx+GW+2019+type@gp-v2-submission+block@830971388f81492eb142ff882125de52"
+                }
+            ],
+            "review_question": [
+                {
+                    "title": "The individual's score for the Personal Development Plan: ",
+                    "question_content": "<select>\n<option value=\"\">Grading</option>\n<option value=\"10\">10</option>\n<option value=\"20\">20</option>\n<option value=\"30\">30</option>\n<option value=\"40\">40</option>\n<option value=\"50\">50</option>\n<option value=\"60\">60</option>\n<option value=\"70\">70</option>\n<option value=\"80\">80</option>\n<option value=\"90\">90</option>\n<option value=\"100\">100</option>\n</select>",
+                    "choices": {
+                        "10": "10",
+                        "20": "20",
+                        "30": "30",
+                        "50": "50",
+                        "40": "40",
+                        "60": "60",
+                        "70": "70",
+                        "90": "90",
+                        "80": "80",
+                        "100": "100"
+                    },
+                    "type": "choice",
+                    "id": "block-v1:edx+GW+2019+type@gp-v2-review-question+block@b204f82758af436ca8d35d8b1564a1bc",
+                    "question_id": "ea7b31c1a442dcf78abeff39b8002d952bf96a8a",
+                    "ta_review_stage_id": "xyz"
+                },
+                {
+                    "title": "Any comments? ",
+                    "question_content": "<textarea/>",
+                    "type": "text",
+                    "id": "block-v1:edx+GW+2019+type@gp-v2-review-question+block@1204f82758af436ca8d35d8b1564a1b1",
+                    "question_id": "1a7b31c1a442dcf78abeff39b8002d952bf96a81",
+                    "ta_review_stage_id": "xyz"
+                }
+            ],
+            "display_name": "Personal Development Plan",
         }
     }
     """
+    blocks_data = {}
+
     def post(self, request, *args, **kwargs):
         course_id = request.data.get('course_id')
-        if not course_id:
+        group_id = request.data.get('group_id')
+        if not course_id or not group_id:
             return Response({}, status=status.HTTP_400_BAD_REQUEST)
 
         course_key = get_course_key(course_id)
-        self._find_submission_ids(course_key)
+        self._collect_blocks_data(course_key, 'gp-v2-submission', ['upload_id'])
+        self._collect_blocks_data(course_key, 'gp-v2-activity', ['group_reviews_required_count'])
+        self._collect_blocks_data(
+            course_key, 'gp-v2-review-question',
+            ['question_id', 'title', 'question_content']
+        )
 
         course_structure = CourseStructure.objects.filter(course_id=course_key).first()
         blocks = course_structure.structure.get('blocks', {})
-        submissions = {}
+        activities = []
         for block_id, block in blocks.items():
-            if block['block_type'] == 'gp-v2-activity':
-                submissions[block_id] = {
-                    'display_name': block['display_name'],
-                    'submissions': self._find_submissions(block_id, blocks)
-                }
-        return Response(submissions, status=status.HTTP_200_OK)
+            if block_id == group_id and block['block_type'] == 'gp-v2-project':
+                activities = self._find_blocks_with_type(
+                        block_id, blocks, 'gp-v2-activity'
+                    )
+                break
 
-    def _find_submissions(self, block_id, blocks):
-        submissions = []
+        gw_data = {}
+        for block_id in activities:
+            block = blocks.get(block_id)
+            if not block:
+                continue
+            submissions = self._find_blocks_with_type(block_id, blocks, 'gp-v2-submission')
+            submissions = [self.blocks_data['gp-v2-submission'].get(s, {}).get('upload_id') for s in submissions]
+            submissions = [s for s in submissions if s]
+            gw_data[block_id] = {
+                'display_name': block['display_name'],
+                'submissions': submissions,
+                'review_questions': []
+            }
+            # Ignore all activities except TA Graded
+            if self.blocks_data['gp-v2-activity'].get(block_id, {}).get('group_reviews_required_count') != 0:
+                continue
+
+            ta_reviews = self._find_blocks_with_type(block_id, blocks, 'gp-v2-stage-peer-review')
+            review_questions = []
+            for ta_review in ta_reviews:
+                question_ids = self._find_blocks_with_type(ta_review, blocks, 'gp-v2-review-question')
+                for question_id in question_ids:
+                    review_question = self.blocks_data['gp-v2-review-question'].get(question_id, {})
+                    if review_question:
+                        review_question['ta_review_stage_id'] = ta_review
+                        review_questions += [review_question]
+
+            gw_data[block_id]['review_questions'] = review_questions
+
+        return Response(gw_data, status=status.HTTP_200_OK)
+
+    def _find_blocks_with_type(self, block_id, blocks, block_type):
+        matched_blocks = []
         for child_id in blocks[block_id]['children']:
             child = blocks[child_id]
-            if child['block_type'] == 'gp-v2-submission':
-                submissions += [self.submission_ids.get(child_id)]
-            submissions += self._find_submissions(child_id, blocks)
+            if child['block_type'] == block_type:
+                matched_blocks += [child_id]
+            matched_blocks += self._find_blocks_with_type(child_id, blocks, block_type)
 
-        return submissions
+        return matched_blocks
 
-    def _find_submission_ids(self, course_id):
+    def _collect_blocks_data(self, course_id, block_key, keys):
         store = modulestore()
-        gw_blocks = store.get_items(
+        _blocks = store.get_items(
             course_id,
-            qualifiers={"category": 'gp-v2-submission'},
+            qualifiers={"category": block_key},
             revision=ModuleStoreEnum.RevisionOption.published_only
         )
-        self.submission_ids = {str(gw.location): gw.upload_id for gw in gw_blocks}
+        self.blocks_data[block_key] = {
+            str(b.location): {k: getattr(b, k, None) for k in keys} for b in _blocks
+        }
+        for b_id, block in self.blocks_data[block_key].items():
+            block['id'] = b_id
+            if 'question_content' in block:
+                content = block['question_content'].replace(' ', '')
+                if '<textarea/>' in content:
+                    block['type'] = 'text'
+                else:
+                    block['type'] = 'choice'
+                    # regex to convert html options values to dictionary
+                    block['choices'] = dict(re.findall('value="([^"]+)">([^<]+)', content))
