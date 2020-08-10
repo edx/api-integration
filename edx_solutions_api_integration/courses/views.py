@@ -3029,7 +3029,7 @@ class CourseGWMap(MobileListAPIView):
     **Use Case**
 
         CourseGWMap returns a mapped list of submission ids, review questions and activities
-         under a course and a given groupwork.
+         under a course and a given project_id.
 
 
     **Example Request**
@@ -3037,7 +3037,7 @@ class CourseGWMap(MobileListAPIView):
         POST /api/courses/submission_map
         {
             course_id: 'CA/CS102/2018',
-            group_id: 'i4x://GW/GW/gp-v2-submission/acd59b3d25144c83a8198441e8d873d0''
+            project_id: 1
         }
 
     **Example Response**
@@ -3087,9 +3087,16 @@ class CourseGWMap(MobileListAPIView):
 
     def post(self, request, *args, **kwargs):
         course_id = request.data.get('course_id')
-        group_id = request.data.get('group_id')
-        if not course_id or not group_id:
-            return Response({}, status=status.HTTP_400_BAD_REQUEST)
+        project_id = request.data.get('project_id')
+        if not course_id or not project_id:
+            return Response(
+                {'error': 'Both course id and project id are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        project = Project.objects.filter(course_id=course_id, id=project_id).first()
+        if not project:
+            return Response({'error': 'Invalid project id.'}, status=status.HTTP_400_BAD_REQUEST)
 
         course_key = get_course_key(course_id)
         self._collect_blocks_data(course_key, 'gp-v2-submission', ['upload_id'])
@@ -3103,7 +3110,7 @@ class CourseGWMap(MobileListAPIView):
         blocks = course_structure.structure.get('blocks', {})
         activities = []
         for block_id, block in blocks.items():
-            if block_id == group_id and block['block_type'] == 'gp-v2-project':
+            if block_id == project.content_id and block['block_type'] == 'gp-v2-project':
                 activities = self._find_blocks_with_type(
                         block_id, blocks, 'gp-v2-activity'
                     )
