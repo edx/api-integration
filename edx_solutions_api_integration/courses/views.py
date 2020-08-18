@@ -3176,4 +3176,5 @@ class CourseGWMap(MobileListAPIView):
                 else:
                     block['type'] = 'choice'
                     # regex to convert html options values to dictionary
-                    block['choices'] = dict(re.findall('value="([^"]+)">([^<]+)', content))
+                    choices = re.findall('value="([^"]+)">([^<]+)', content)
+                    block['choices'] = {c: v for v, c in choices}
