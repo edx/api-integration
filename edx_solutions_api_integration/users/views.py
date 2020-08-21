@@ -28,6 +28,8 @@ from gradebook.models import StudentGradebook
 from gradebook.utils import generate_user_gradebook
 from social_engagement.models import StudentSocialEngagementScore
 from instructor.access import revoke_access, update_forum_role
+
+from student.models import anonymous_id_for_user
 from openedx.core.djangoapps.lang_pref import LANGUAGE_KEY
 from lms.djangoapps.notification_prefs.views import enable_notifications
 from opaque_keys import InvalidKeyError
@@ -1990,3 +1992,42 @@ class ClientSpecificAttributesView(MobileAPIView):
         item.save()
 
         return Response({}, status=status.HTTP_200_OK)
+
+
+class UsersAnonymousId(SecureAPIView):
+    """
+    Create anonymous id for user if doesn't exist, Xblock renderer
+    method does this job if we login with a user that is missing
+    the anonymous id. But If we are doing bulk upload i.e. in case
+    of GW submissions the render method isn't called for every user
+    because we will be using S2S oauth token, so we need to call this
+    API first to avoid any errors due to missing anonymous ids.
+    """
+    def post(self, request):
+        """
+        POST /api/users/anonymous_id
+
+        payload:
+            {
+                'course_id': 'QA/next/2020',
+                'email_id': 'test@test.com'
+            }
+        """
+
+        course_id = request.data.get('course_id')
+        email_id = request.data.get('email_id')
+        if not course_id or not email_id:
+            return Response(
+                {'error': 'Both course id and user email are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = User.objects.filter(email__iexact=email_id).first()
+        if not user:
+            return Response(
+                {'error': 'No user found'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        course_id = CourseKey.from_string(course_id)
+        anonymous_id_for_user(user=user, course_id=course_id)
+        return Response({}, status=status.HTTP_201_CREATED)
