@@ -54,5 +54,7 @@ urlpatterns = [
         users_views.ClientSpecificAttributesView.as_view(), name='users-attributes'),
     url(r'validate-token/$', users_views.TokenBasedUserDetails.as_view(),
         name='validate-bearer-token'),
+    url(r'anonymous_id/$', users_views.UsersAnonymousId.as_view(),
+        name='user-anonymous-id'),
 ]
 urlpatterns = format_suffix_patterns(urlpatterns)
