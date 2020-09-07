@@ -108,6 +108,7 @@ from edx_solutions_api_integration.utils import (
     cache_course_data,
     cache_course_user_data,
     css_param_to_list,
+    css_data_to_list,
     generate_base_uri,
     get_aggregate_exclusion_user_ids,
     get_cached_data,
@@ -706,7 +707,11 @@ class CoursesList(SecureListAPIView):
     serializer_class = CourseSerializer
 
     def get_queryset(self):
-        course_ids = css_param_to_list(self.request, 'course_id')
+        if self.request.method == 'GET':
+            course_ids = css_param_to_list(self.request, 'course_id')
+        else:
+            course_ids = css_data_to_list(self.request, 'course_id')
+
         if course_ids:
             course_keys = [get_course_key(course_id) for course_id in course_ids]
             results = self.get_select_courses(course_keys)
@@ -736,6 +741,9 @@ class CoursesList(SecureListAPIView):
         log.info('Finished generating course overviews.')
 
         return course_overviews
+
+    def post(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
 
 
 class CoursesDetail(MobileAPIView):
