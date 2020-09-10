@@ -1708,7 +1708,6 @@ class UsersRolesList(SecureListAPIView):
         """
         DELETE /api/users/{user_id}/roles/
         """
-        import pdb; pdb.set_trace()
         try:
             user = User.objects.get(id=user_id)
         except ObjectDoesNotExist:
@@ -1729,7 +1728,7 @@ class UsersRolesList(SecureListAPIView):
                     course_id = role.get('course_id')
                     course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612,C0301
                     if not course_descriptor:
-                        raise ValueError  # ValueError is also thrown by the following role setters
+                        raise ValueError  # ValueError is also thrown by the following role revoke
                     _manage_role(course_descriptor, user, role_value, 'revoke')
                 except ValueError:
                     return Response({}, status=status.HTTP_400_BAD_REQUEST)
