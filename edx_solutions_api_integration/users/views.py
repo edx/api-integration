@@ -1704,6 +1704,36 @@ class UsersRolesList(SecureListAPIView):
                     return Response({}, status=status.HTTP_400_BAD_REQUEST)
         return Response(request.data, status=status.HTTP_200_OK)
 
+    def delete(self, request, user_id):
+        """
+        DELETE /api/users/{user_id}/roles/
+        """
+        try:
+            user = User.objects.get(id=user_id)
+        except ObjectDoesNotExist:
+            raise Http404
+
+        roles = request.data.get('roles', {})
+        if not roles:
+            return Response({}, status=status.HTTP_400_BAD_REQUEST)
+
+        ignore_roles = request.data.get('ignore_roles', [])
+        for role in roles:
+            role_value = role.get('role')
+            if not role_value:
+                return Response({}, status=status.HTTP_400_BAD_REQUEST)
+
+            if role_value not in ignore_roles:
+                try:
+                    course_id = role.get('course_id')
+                    course_descriptor, course_key, course_content = get_course(request, user, course_id)  # pylint: disable=W0612,C0301
+                    if not course_descriptor:
+                        raise ValueError  # ValueError is also thrown by the following role revoke
+                    _manage_role(course_descriptor, user, role_value, 'revoke')
+                except ValueError:
+                    return Response({}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({}, status=status.HTTP_204_NO_CONTENT)
+
 
 class UsersRolesCoursesDetail(SecureAPIView):
     """
