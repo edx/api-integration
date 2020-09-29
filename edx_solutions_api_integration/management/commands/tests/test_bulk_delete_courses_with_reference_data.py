@@ -7,12 +7,15 @@ import mock
 import pytz
 from completion.waffle import ENABLE_COMPLETION_TRACKING, WAFFLE_NAMESPACE
 from completion_aggregator.models import Aggregator
+from course_metadata.models import CourseAggregatedMetaData
 from courseware.models import StudentModule
 from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test.utils import override_settings
+from edx_solutions_api_integration.models import CourseGroupRelationship
 from freezegun import freeze_time
+from gradebook.models import StudentGradebook
 from mock import PropertyMock
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.content.course_structures.models import CourseStructure
@@ -21,12 +24,9 @@ from student.tests.factories import GroupFactory, UserFactory
 from waffle.testutils import override_switch
 from xmodule.course_module import CourseDescriptor
 from xmodule.modulestore.django import modulestore
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_store_config
+from xmodule.modulestore.tests.django_utils import (ModuleStoreTestCase,
+                                                    mixed_store_config)
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
-
-from course_metadata.models import CourseAggregatedMetaData
-from edx_solutions_api_integration.models import CourseGroupRelationship
-from gradebook.models import StudentGradebook
 
 MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 
@@ -43,7 +43,7 @@ class BulkCourseDeleteTests(ModuleStoreTestCase):
     YESNO_PATCH_LOCATION = 'edx_solutions_api_integration.management.commands.bulk_delete_courses_with_reference_data.query_yes_no'  # pylint: disable=C0301
 
     def setUp(self):
-        super(BulkCourseDeleteTests, self).setUp()
+        super().setUp()
 
     @staticmethod
     def create_course():
@@ -108,7 +108,7 @@ class BulkCourseDeleteTests(ModuleStoreTestCase):
 
         course = modulestore().get_course(course_id)
         self.assertIsNotNone(course)
-        self.assertEqual(unicode(course_id), unicode(course.id))
+        self.assertEqual(str(course_id), str(course.id))
 
     def assert_reference_data_deleted(self, course_id):
         """

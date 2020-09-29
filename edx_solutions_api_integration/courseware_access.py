@@ -1,11 +1,10 @@
 """ Centralized access to LMS courseware app """
-from django.contrib.auth.models import AnonymousUser
-
 from courseware import courses, module_render
 from courseware.model_data import FieldDataCache
+from django.contrib.auth.models import AnonymousUser
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey, UsageKey
-from opaque_keys.edx.locations import SlashSeparatedCourseKey, Location
+from opaque_keys.edx.locations import Location, SlashSeparatedCourseKey
 from xmodule.modulestore import InvalidLocationError
 from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.exceptions import ItemNotFoundError

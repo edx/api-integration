@@ -1,8 +1,8 @@
 """ Django REST Framework Serializers for groups """
 import json
-from django.core.exceptions import ObjectDoesNotExist
 
 from django.contrib.auth.models import Group
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
 
@@ -47,7 +47,7 @@ class GroupSerializer(serializers.HyperlinkedModelSerializer):
         except ObjectDoesNotExist:
             return None
 
-    class Meta(object):
+    class Meta:
         """ Meta class for defining additional serializer characteristics """
         model = Group
         fields = ('id', 'url', 'name', 'type', 'data')

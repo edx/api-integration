@@ -3,17 +3,16 @@ Tests for session api with advance security features
 """
 import json
 import uuid
-from mock import patch
 from datetime import datetime, timedelta
-from freezegun import freeze_time
-from pytz import UTC
 
+from django.core.cache import cache
 from django.test.utils import override_settings
 from django.utils import timezone
 from django.utils.translation import ugettext as _
-from django.core.cache import cache
-
+from freezegun import freeze_time
+from mock import patch
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
+from pytz import UTC
 from util.password_policy_validators import create_validator_config
 
 TEST_API_KEY = str(uuid.uuid4())
@@ -61,7 +60,7 @@ class UserPasswordResetTest(CacheIsolationTestCase):
             self._assert_response(response, status=403, message=message)
 
             #reset the password and then try login
-            pass_reset_url = "%s/%s" % (self.user_url, str(user_id))
+            pass_reset_url = "{}/{}".format(self.user_url, str(user_id))
             response = self._do_post_pass_reset_request(
                 pass_reset_url, password='Test.Me64@', secure=True
             )
@@ -86,7 +85,7 @@ class UserPasswordResetTest(CacheIsolationTestCase):
         self._assert_response(response, status=201)
         user_id = response.data['id']  # pylint: disable=E1101
 
-        pass_reset_url = "%s/%s" % (self.user_url, str(user_id))
+        pass_reset_url = "{}/{}".format(self.user_url, str(user_id))
         response = self._do_post_pass_reset_request(
             pass_reset_url, password='Test.Me64#', secure=True
         )
@@ -137,7 +136,7 @@ class UserPasswordResetTest(CacheIsolationTestCase):
         self._assert_response(response, status=201)
         user_id = response.data['id']  # pylint: disable=E1101
 
-        pass_reset_url = "%s/%s" % (self.user_url, str(user_id))
+        pass_reset_url = "{}/{}".format(self.user_url, str(user_id))
 
         response = self._do_post_pass_reset_request(
             pass_reset_url, password='Test.Me64#', secure=True
@@ -166,7 +165,7 @@ class UserPasswordResetTest(CacheIsolationTestCase):
         self._assert_response(response, status=201)
         user_id = response.data['id']  # pylint: disable=E1101
 
-        pass_reset_url = "%s/%s" % (self.user_url, str(user_id))
+        pass_reset_url = "{}/{}".format(self.user_url, str(user_id))
         response = self._do_post_pass_reset_request(
             pass_reset_url, password='NewP@ses34!', secure=True
         )
@@ -198,8 +197,8 @@ class UserPasswordResetTest(CacheIsolationTestCase):
 
         pass_reset_url = '{}/{}'.format(self.user_url, user_id)
 
-        for i in xrange(30):
-            password = u'test_password{0}'.format(i)
+        for i in range(30):
+            password = 'test_password{}'.format(i)
             response = self._do_post_pass_reset_request(
                 '{}/{}'.format(self.user_url, i + 200),
                 password=password,

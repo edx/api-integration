@@ -1,22 +1,19 @@
 """
 Tests for user related use cases in mobile APIs
 """
+from urllib.parse import urlencode
+
 import ddt
 from capa.tests.response_xml_factory import MultipleChoiceResponseXMLFactory
-
-from mobileapps.models import Theme, MobileApp
-import urllib
-
-from mobile_api.testutils import MobileAPITestCase
+from edx_solutions_api_integration.test_utils import OAuth2TokenMixin
 from edx_solutions_organizations.models import Organization
-from openedx.core.djangolib.testing.utils import get_mock_request
-from student.tests.factories import UserFactory, CourseEnrollmentFactory
-from lms.djangoapps.grades.tests.utils import answer_problem
 from gradebook.models import StudentGradebook
+from lms.djangoapps.grades.tests.utils import answer_problem
+from mobile_api.testutils import MobileAPITestCase
+from mobileapps.models import MobileApp, Theme
+from openedx.core.djangolib.testing.utils import get_mock_request
+from student.tests.factories import CourseEnrollmentFactory, UserFactory
 from xmodule.modulestore.tests.factories import ItemFactory
-from edx_solutions_api_integration.test_utils import (
-    OAuth2TokenMixin,
-)
 
 
 class TestUserOrganizationsApi(MobileAPITestCase):
@@ -202,7 +199,7 @@ class TestUserDiscussionMetricsApi(MobileAPITestCase):
 
         response = self.api_response(
             expected_response_code=None,
-            data={'course_id': unicode(self.course.id), 'username': other_user.username}
+            data={'course_id': str(self.course.id), 'username': other_user.username}
         )
         if is_staff:
             self.assertEqual(response.status_code, 200)
@@ -222,7 +219,7 @@ class TestUserDiscussionMetricsApi(MobileAPITestCase):
 
         response = self.api_response(
             expected_response_code=None,
-            data={'course_id': unicode(self.course.id), 'username': self.user.username}
+            data={'course_id': str(self.course.id), 'username': self.user.username}
         )
 
         if is_staff:
@@ -238,7 +235,7 @@ class TestUserDiscussionMetricsApi(MobileAPITestCase):
 
         response = self.api_response(
             expected_response_code=None,
-            data={'course_id': unicode(self.course.id), 'username': self.user.username}
+            data={'course_id': str(self.course.id), 'username': self.user.username}
         )
 
         self.assertEqual(response.status_code, 200)
@@ -283,7 +280,7 @@ class TestUserCourseGradesApi(MobileAPITestCase, OAuth2TokenMixin):
 
         response = self.api_response(
             expected_response_code=None,
-            data={'course_id': unicode(self.course.id), 'username': other_user.username}
+            data={'course_id': str(self.course.id), 'username': other_user.username}
         )
         if is_staff:
             self.assertEqual(response.status_code, 200)
@@ -303,7 +300,7 @@ class TestUserCourseGradesApi(MobileAPITestCase, OAuth2TokenMixin):
 
         response = self.api_response(
             expected_response_code=None,
-            data={'course_id': unicode(self.course.id), 'username': self.user.username}
+            data={'course_id': str(self.course.id), 'username': self.user.username}
         )
 
         if is_staff:
@@ -319,7 +316,7 @@ class TestUserCourseGradesApi(MobileAPITestCase, OAuth2TokenMixin):
 
         response = self.api_response(
             expected_response_code=None,
-            data={'course_id': unicode(self.course.id), 'username': self.user.username}
+            data={'course_id': str(self.course.id), 'username': self.user.username}
         )
 
         self.assertEqual(response.status_code, 200)
@@ -368,7 +365,7 @@ class TestUserCourseGradesApi(MobileAPITestCase, OAuth2TokenMixin):
         self.login_and_enroll()
         response = self.api_response(
             expected_response_code=None,
-            data={'course_id': unicode(self.course.id), 'username': self.user.username}
+            data={'course_id': str(self.course.id), 'username': self.user.username}
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['course_grade'], 0)
@@ -407,7 +404,7 @@ class TestUserCourseGradesApi(MobileAPITestCase, OAuth2TokenMixin):
         self.login_and_enroll()
         response = self.api_response(
             expected_response_code=None,
-            data={'course_id': unicode(self.course.id), 'username': self.user.username}
+            data={'course_id': str(self.course.id), 'username': self.user.username}
         )
 
         self.assertEqual(response.status_code, 200)
@@ -433,7 +430,7 @@ class TestUserCourseGradesApi(MobileAPITestCase, OAuth2TokenMixin):
 
         response = self.api_response(
             expected_response_code=None,
-            data={'course_id': unicode(self.course.id), 'username': self.user.username}
+            data={'course_id': str(self.course.id), 'username': self.user.username}
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['course_grade'], user_grade)
@@ -446,7 +443,7 @@ class TestUserCourseGradesApi(MobileAPITestCase, OAuth2TokenMixin):
         """
         self.users_and_problem_setup()
         CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
-        query_string = urllib.urlencode({'course_id': self.course.id, 'username': self.user.username})
+        query_string = urlencode({'course_id': self.course.id, 'username': self.user.username})
         url = '/api/server/mobile/v1/users/courses/grades/?{}'.format(query_string)
         self.request.user = self.user
         answer_problem(self.course, self.request, self.problem, score=1, max_value=1)
@@ -466,7 +463,7 @@ class TestUserCourseGradesApi(MobileAPITestCase, OAuth2TokenMixin):
         )
         # Now, try with a valid token header:
         token = self.create_oauth2_token(self.user)
-        response = self.client.get(url, HTTP_AUTHORIZATION="Bearer {0}".format(token))
+        response = self.client.get(url, HTTP_AUTHORIZATION="Bearer {}".format(token))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['course_grade'], user_grade)
 
@@ -516,7 +513,7 @@ class TestUserCourseApi(MobileAPITestCase):
 
         response = self.api_response(
             expected_response_code=None,
-            data={'course_id': unicode(self.course.id), 'username': other_user.username}
+            data={'course_id': str(self.course.id), 'username': other_user.username}
         )
         if is_staff:
             self.assertEqual(response.status_code, 200)
@@ -536,7 +533,7 @@ class TestUserCourseApi(MobileAPITestCase):
 
         response = self.api_response(
             expected_response_code=None,
-            data={'course_id': unicode(self.course.id), 'username': self.user.username}
+            data={'course_id': str(self.course.id), 'username': self.user.username}
         )
 
         if is_staff:
@@ -552,7 +549,7 @@ class TestUserCourseApi(MobileAPITestCase):
 
         response = self.api_response(
             expected_response_code=None,
-            data={'course_id': unicode(self.course.id), 'username': self.user.username}
+            data={'course_id': str(self.course.id), 'username': self.user.username}
         )
 
         self.assertEqual(response.status_code, 200)

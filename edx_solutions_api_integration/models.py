@@ -1,13 +1,14 @@
 """ Database ORM models managed by this Django app """
 import logging
+
 from django.conf import settings
-from django.contrib.auth.models import Group, User
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import Group, User
 from django.db import models
 from django.utils import timezone
-
-from opaque_keys.edx.django.models import CourseKeyField
 from model_utils.models import TimeStampedModel
+from opaque_keys.edx.django.models import CourseKeyField
+
 from .utils import is_int
 
 AUDIT_LOG = logging.getLogger("audit")
@@ -103,7 +104,7 @@ class GroupProfile(TimeStampedModel):
     the auth_groups table
     """
 
-    class Meta(object):
+    class Meta:
         """
         Meta class for modifying things like table name
         """
@@ -129,7 +130,7 @@ class CourseContentGroupRelationship(TimeStampedModel):
     group_profile = models.ForeignKey(GroupProfile, db_index=True)
     record_active = models.BooleanField(default=True)
 
-    class Meta(object):
+    class Meta:
         """
         Mapping model to enable grouping of course content such as chapters
         """
@@ -142,7 +143,7 @@ class APIUserQuerySet(models.query.QuerySet):
         if 'id' in kwargs and not is_int(kwargs['id']):
             kwargs['anonymoususerid__anonymous_user_id'] = kwargs['id']
             del kwargs['id']
-        return super(APIUserQuerySet, self).filter(*args, **kwargs)
+        return super().filter(*args, **kwargs)
 
 
 class APIUserManager(models.Manager):
@@ -158,7 +159,7 @@ class APIUser(User):
     """
     objects = APIUserManager()
 
-    class Meta(object):
+    class Meta:
         """ Meta attribute to make this a proxy model"""
         proxy = True
 
@@ -177,7 +178,7 @@ class PasswordHistory(models.Model):
     This model will keep track of past passwords that a user has used
     as well as providing contraints (e.g. can't reuse passwords)
     """
-    class Meta(object):
+    class Meta:
         app_label = "student"
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -336,7 +337,7 @@ class PasswordHistory(models.Model):
                 # This means we got something unexpected. We don't want to throw an exception, but
                 # log as an error and basically allow any password reuse
                 AUDIT_LOG.error('''
-                                Unknown password hashing algorithm "{0}" found in existing password
+                                Unknown password hashing algorithm "{}" found in existing password
                                 hash, password reuse policy will not be enforced!!!
                                 '''.format(algorithm))
                 return True

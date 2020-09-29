@@ -6,18 +6,16 @@ Command to generate dummy problem responses xblock poll in a course
 import json
 import logging
 import random
-
-from django.contrib.auth.models import User
-from django.core.management.base import BaseCommand, CommandError
 from itertools import product
 from optparse import make_option
 
 from courseware.models import StudentModule  # pylint: disable=import-error
+from django.contrib.auth.models import User
+from django.core.management.base import BaseCommand, CommandError
 from edx_solutions_api_integration.models import APIUser as User
 from opaque_keys.edx.keys import CourseKey
 from xmodule.modulestore import ModuleStoreEnum
 from xmodule.modulestore.django import modulestore
-
 
 # Variables
 

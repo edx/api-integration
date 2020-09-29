@@ -10,22 +10,22 @@ from django.contrib.auth.models import Group, User
 from django.db import IntegrityError
 from django.db.models import Q
 from django.utils.translation import ugettext as _
-from rest_framework.response import Response
-
 from edx_solutions_api_integration.courseware_access import get_course
-from edx_solutions_api_integration.models import CourseGroupRelationship, PasswordHistory
+from edx_solutions_api_integration.models import (CourseGroupRelationship,
+                                                  PasswordHistory)
+from edx_solutions_api_integration.permissions import SecureViewSet
 from edx_solutions_api_integration.users.views import _manage_role
 from edx_solutions_organizations.models import Organization
-from rest_framework.decorators import list_route
-
 from lms.djangoapps.notification_prefs.views import enable_notifications
-from openedx.core.djangoapps.course_groups.cohorts import add_cohort, get_cohort_by_name
-from openedx.core.djangoapps.course_groups.models import CohortMembership, CourseCohort, CourseUserGroup
-from student.models import CourseEnrollment, UserProfile
-
 from opaque_keys.edx.keys import CourseKey
-
-from edx_solutions_api_integration.permissions import SecureViewSet
+from openedx.core.djangoapps.course_groups.cohorts import (add_cohort,
+                                                           get_cohort_by_name)
+from openedx.core.djangoapps.course_groups.models import (CohortMembership,
+                                                          CourseCohort,
+                                                          CourseUserGroup)
+from rest_framework.decorators import list_route
+from rest_framework.response import Response
+from student.models import CourseEnrollment, UserProfile
 
 AUDIT_LOG = logging.getLogger("audit")
 
@@ -166,7 +166,7 @@ class ImportParticipantsViewSet(SecureViewSet):
             user.save()
             data['user_object'] = user
             # Profile
-            UserProfile.objects.create(user=user, name=u'{} {}'.format(user.first_name, user.last_name))
+            UserProfile.objects.create(user=user, name='{} {}'.format(user.first_name, user.last_name))
             # Notifications
             if settings.FEATURES.get('ENABLE_DISCUSSION_EMAIL_DIGEST'):
                 enable_notifications(user)
@@ -177,7 +177,7 @@ class ImportParticipantsViewSet(SecureViewSet):
             self._add_error(errors, str(exc.message), _('Registering Participant'), email)
         else:
             response['user_id'] = user.id
-            AUDIT_LOG.info(u"API::New account created with user-id - {0}".format(user.id))
+            AUDIT_LOG.info("API::New account created with user-id - {}".format(user.id))
 
         # Associate with company.
         try:

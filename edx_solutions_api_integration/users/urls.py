@@ -2,10 +2,8 @@
 from django.conf import settings
 from django.conf.urls import url
 from django.db import transaction
-
-from rest_framework.urlpatterns import format_suffix_patterns
-
 from edx_solutions_api_integration.users import views as users_views
+from rest_framework.urlpatterns import format_suffix_patterns
 
 COURSE_ID_PATTERN = settings.COURSE_ID_PATTERN
 
@@ -15,13 +13,13 @@ urlpatterns = [
     url(r'^(?P<user_id>[a-zA-Z0-9]+)/courses/grades$',
         users_views.UsersCoursesGradesList.as_view(), name='users-courses-grades-list'),
     url(
-        r'^(?P<user_id>[a-zA-Z0-9]+)/courses/{0}/grades$'.format(COURSE_ID_PATTERN),
+        r'^(?P<user_id>[a-zA-Z0-9]+)/courses/{}/grades$'.format(COURSE_ID_PATTERN),
         transaction.non_atomic_requests(users_views.UsersCoursesGradesDetail.as_view()),
         name='users-courses-grades-detail'
     ),
-    url(r'^(?P<user_id>[a-zA-Z0-9]+)/courses/{0}/metrics/social/$'.format(COURSE_ID_PATTERN),
+    url(r'^(?P<user_id>[a-zA-Z0-9]+)/courses/{}/metrics/social/$'.format(COURSE_ID_PATTERN),
         users_views.UsersSocialMetrics.as_view(), name='users-social-metrics'),
-    url(r'^(?P<user_id>[a-zA-Z0-9]+)/courses/{0}$'.format(COURSE_ID_PATTERN),
+    url(r'^(?P<user_id>[a-zA-Z0-9]+)/courses/{}$'.format(COURSE_ID_PATTERN),
         users_views.UsersCoursesDetail.as_view(), name='users-courses-detail'),
     url(
         r'^(?P<user_id>[a-zA-Z0-9]+)/courses/*$',
@@ -37,7 +35,7 @@ urlpatterns = [
         users_views.UsersPreferencesDetail.as_view(), name='users-preferences-detail'),
     url(r'^(?P<user_id>[a-zA-Z0-9]+)/organizations/$',
         users_views.UsersOrganizationsList.as_view(), name='users-organizations-list'),
-    url(r'^(?P<user_id>[a-zA-Z0-9]+)/roles/(?P<role>[a-z_]+)/courses/{0}$'.format(COURSE_ID_PATTERN),
+    url(r'^(?P<user_id>[a-zA-Z0-9]+)/roles/(?P<role>[a-z_]+)/courses/{}$'.format(COURSE_ID_PATTERN),
         users_views.UsersRolesCoursesDetail.as_view(), name='users-roles-courses-detail'),
     url(r'^(?P<user_id>[a-zA-Z0-9]+)/roles/*$', users_views.UsersRolesList.as_view(), name='users-roles-list'),
     url(r'^(?P<user_id>[a-zA-Z0-9]+)/workgroups/$',

@@ -1,30 +1,29 @@
 """ This module has utility methods to be used in tests. """
-import StringIO
 import json
 import uuid
 from datetime import datetime, timedelta
 from functools import wraps
+from io import StringIO
 
 import mock
-from PIL import Image
 from courseware import module_render
 from courseware.model_data import FieldDataCache
 from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.test import Client
 from django.utils.http import urlencode
+from gradebook.signals import on_course_grade_changed
 from lms.djangoapps.grades.signals.signals import PROBLEM_WEIGHTED_SCORE_CHANGED
 from oauth2_provider import models as dot_models
+from PIL import Image
 from student.tests.factories import UserFactory
 from util.db import OuterAtomic
 from xmodule.modulestore.django import SignalHandler
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
-from gradebook.signals import on_course_grade_changed
-
 
 def get_temporary_image():
-    io = StringIO.StringIO()
+    io = StringIO()
     size = (200, 200)
     color = (255, 0, 0, 0)
     image = Image.new("RGBA", size, color)
@@ -64,7 +63,7 @@ def make_non_atomic(*args):
         return _wrap
 
 
-class CourseGradingMixin(object):
+class CourseGradingMixin:
     """
     Mixin class to setup a course with grading to be used in tests
     """
@@ -143,13 +142,13 @@ class CourseGradingMixin(object):
         item = ItemFactory.create(
             parent_location=vertical1.location,
             category='mentoring',
-            display_name=u"test mentoring homework",
+            display_name="test mentoring homework",
 
         )
         item2 = ItemFactory.create(
             parent_location=vertical2.location,
             category='mentoring',
-            display_name=u"test mentoring midterm",
+            display_name="test mentoring midterm",
         )
 
         grading_course = self.store.get_course(grading_course.id)
@@ -252,19 +251,19 @@ class APIClientMixin(Client):
                                   headers=headers)
 
 
-class SignalDisconnectTestMixin(object):
+class SignalDisconnectTestMixin:
     """
     Mixin for tests to disable calls to signals.
     """
 
     @classmethod
     def setUpClass(cls):
-        super(SignalDisconnectTestMixin, cls).setUpClass()
+        super().setUpClass()
         cls.connect_signals()
 
     @classmethod
     def tearDownClass(cls):
-        super(SignalDisconnectTestMixin, cls).tearDownClass()
+        super().tearDownClass()
         cls.disconnect_signals()
 
     @staticmethod
@@ -282,7 +281,7 @@ class SignalDisconnectTestMixin(object):
         PROBLEM_WEIGHTED_SCORE_CHANGED.disconnect(on_course_grade_changed)
 
 
-class OAuth2TokenMixin(object):
+class OAuth2TokenMixin:
     """
        Mixin for tests to create bearer token.
     """

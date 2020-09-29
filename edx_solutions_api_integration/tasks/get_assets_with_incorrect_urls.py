@@ -1,36 +1,34 @@
-import logging
-import pymongo
-import re
-import datetime
-from urlparse import urlparse, urljoin
-from pytz import UTC
 import csv
-import StringIO
+import datetime
+import logging
+import re
+from io import StringIO
+from urllib.parse import urljoin, urlparse
 
+import pymongo
 from bson.son import SON
-from celery.task import task, Task
-
-from django.db.models import Q
-from django.core.mail import EmailMessage
+from celery.task import Task, task
 from django.conf import settings
+from django.core.mail import EmailMessage
+from django.db.models import Q
 from django.utils.html import strip_tags
-
+from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
-from xmodule.modulestore.django import modulestore
+from openedx.core.djangoapps.content.block_structure.api import update_course_in_cache
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from pytz import UTC
+from xmodule.assetstore.assetmgr import AssetManager
 from xmodule.contentstore.content import StaticContent
+from xmodule.exceptions import NotFoundError
 from xmodule.modulestore import InvalidLocationError
+from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.exceptions import ItemNotFoundError
 from xmodule.modulestore.mongo.base import MongoRevisionKey
-from xmodule.exceptions import NotFoundError
-from xmodule.assetstore.assetmgr import AssetManager
-from opaque_keys import InvalidKeyError
-from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from openedx.core.djangoapps.content.block_structure.api import update_course_in_cache
 
 log = logging.getLogger(__name__)
 store = modulestore()
 
-URL_RE = 'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+URL_RE = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
 
 
 class AssetURLsTask(Task):
@@ -50,7 +48,7 @@ class AssetURLsTask(Task):
                     asset.get('available') == True
                 ])
 
-        assets_report = StringIO.StringIO()
+        assets_report = StringIO()
         writer = csv.writer(assets_report)
         writer.writerow(headers)
         for row in rows:
@@ -109,7 +107,7 @@ def get_block_location(studio_url, course_id, block):
 
 
 @task(
-    name=u'lms.djangoapps.api_integration.tasks.get_assets_with_incorrect_urls',
+    name='lms.djangoapps.api_integration.tasks.get_assets_with_incorrect_urls',
     bind=True,
     base=AssetURLsTask
 )
@@ -222,7 +220,7 @@ def _find_asset_urls_in_block(
                 course_key, environment, staff_user_id, update,
                 dictionary=dictionary, value_key=value_key
             )
-    elif type(value) in (str, unicode):
+    elif type(value) in (str, str):
         save_updated = False
         urls = re.findall(URL_RE, value)
 

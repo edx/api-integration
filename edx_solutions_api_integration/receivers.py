@@ -2,12 +2,11 @@
 Signal handlers supporting various course metadata use cases
 """
 from django.dispatch import receiver
-
-from xmodule.modulestore.django import SignalHandler
-
-from edx_solutions_api_integration.models import CourseGroupRelationship, CourseContentGroupRelationship
-from student.models import ENROLL_STATUS_CHANGE
+from edx_solutions_api_integration.models import (
+    CourseContentGroupRelationship, CourseGroupRelationship)
 from edx_solutions_api_integration.utils import invalid_user_data_cache
+from student.models import ENROLL_STATUS_CHANGE
+from xmodule.modulestore.django import SignalHandler
 
 
 @receiver(SignalHandler.course_deleted)

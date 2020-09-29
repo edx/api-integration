@@ -1,9 +1,7 @@
 """ Sessions API URI specification """
 from django.conf.urls import url
-
-from rest_framework.urlpatterns import format_suffix_patterns
-
 from edx_solutions_api_integration.sessions import views as sessions_views
+from rest_framework.urlpatterns import format_suffix_patterns
 
 urlpatterns = [
     url(r'/*$^', sessions_views.SessionsList.as_view()),
