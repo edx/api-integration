@@ -223,7 +223,7 @@ class SessionsDetail(SecureAPIView):
             user = backend.get_user(user_id) or AnonymousUser()
         except KeyError:
             user = AnonymousUser()
-        if user.is_authenticated():
+        if user.is_authenticated:
             response_data['token'] = session.session_key
             response_data['expires'] = session.get_expiry_age()
             response_data['uri'] = base_uri
@@ -269,7 +269,7 @@ class AssetsToken(APIView):
             user = backend.get_user(user_id) or AnonymousUser()
         except KeyError:
             user = AnonymousUser()
-        if user.is_authenticated():
+        if user.is_authenticated:
             response_data['assets_token'] = Fernet(bytes(settings.ASSETS_TOKEN_ENCRYPTION_KEY))\
                 .encrypt(bytes(session.session_key))
             return Response(response_data, status=status.HTTP_200_OK)

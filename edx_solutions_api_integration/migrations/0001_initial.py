@@ -54,10 +54,10 @@ class Migration(migrations.Migration):
             fields=[
                 ('created', model_utils.fields.AutoCreatedField(default=django.utils.timezone.now, verbose_name='created', editable=False)),
                 ('modified', model_utils.fields.AutoLastModifiedField(default=django.utils.timezone.now, verbose_name='modified', editable=False)),
-                ('group', models.OneToOneField(primary_key=True, serialize=False, to='auth.Group')),
+                ('group', models.OneToOneField(primary_key=True, serialize=False, to='auth.Group', on_delete=models.CASCADE)),
                 ('name', models.CharField(max_length=255)),
                 ('record_active', models.BooleanField(default=True)),
-                ('parent_group', models.ForeignKey(related_name='child_groups', default=0, blank=True, to='edx_solutions_api_integration.GroupRelationship', null=True)),
+                ('parent_group', models.ForeignKey(related_name='child_groups', default=0, blank=True, to='edx_solutions_api_integration.GroupRelationship', null=True, on_delete=models.CASCADE)),
             ],
             options={
                 'abstract': False,
@@ -70,8 +70,8 @@ class Migration(migrations.Migration):
                 ('created', model_utils.fields.AutoCreatedField(default=django.utils.timezone.now, verbose_name='created', editable=False)),
                 ('modified', model_utils.fields.AutoLastModifiedField(default=django.utils.timezone.now, verbose_name='modified', editable=False)),
                 ('record_active', models.BooleanField(default=True)),
-                ('from_group_relationship', models.ForeignKey(related_name='from_group_relationships', verbose_name=b'From Group', to='edx_solutions_api_integration.GroupRelationship')),
-                ('to_group_relationship', models.ForeignKey(related_name='to_group_relationships', verbose_name=b'To Group', to='edx_solutions_api_integration.GroupRelationship')),
+                ('from_group_relationship', models.ForeignKey(related_name='from_group_relationships', verbose_name=b'From Group', to='edx_solutions_api_integration.GroupRelationship', on_delete=models.CASCADE)),
+                ('to_group_relationship', models.ForeignKey(related_name='to_group_relationships', verbose_name=b'To Group', to='edx_solutions_api_integration.GroupRelationship', on_delete=models.CASCADE)),
             ],
             options={
                 'abstract': False,
@@ -89,17 +89,17 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='groupprofile',
             name='group',
-            field=models.OneToOneField(to='auth.Group'),
+            field=models.OneToOneField(to='auth.Group', on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='coursegrouprelationship',
             name='group',
-            field=models.ForeignKey(to='auth.Group'),
+            field=models.ForeignKey(to='auth.Group', on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='coursecontentgrouprelationship',
             name='group_profile',
-            field=models.ForeignKey(to='edx_solutions_api_integration.GroupProfile'),
+            field=models.ForeignKey(to='edx_solutions_api_integration.GroupProfile', on_delete=models.CASCADE),
         ),
         migrations.AlterUniqueTogether(
             name='coursecontentgrouprelationship',

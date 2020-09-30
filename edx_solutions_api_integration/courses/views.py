@@ -12,11 +12,6 @@ from io import StringIO
 
 from completion.models import BlockCompletion
 from completion_aggregator.models import Aggregator
-from courseware.courses import (get_course_about_section,
-                                get_course_info_section,
-                                get_course_info_section_module)
-from courseware.models import StudentModule
-from courseware.views.views import get_static_tab_fragment
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.cache import cache
@@ -63,9 +58,11 @@ from edx_solutions_projects.serializers import (BasicWorkgroupSerializer,
 from gradebook.models import StudentGradebook
 from instructor.access import revoke_access, update_forum_role
 from lms.djangoapps.course_api.blocks.api import get_blocks
-from lms.lib.comment_client.thread import get_course_thread_stats
-from lms.lib.comment_client.utils import (CommentClientMaintenanceError,
-                                          CommentClientRequestError)
+from lms.djangoapps.courseware.courses import (get_course_about_section,
+                                               get_course_info_section,
+                                               get_course_info_section_module)
+from lms.djangoapps.courseware.models import StudentModule
+from lms.djangoapps.courseware.views.views import get_static_tab_fragment
 from lxml import etree
 from mobile_api.course_info.views import apply_wrappers_to_content
 from opaque_keys.edx.keys import CourseKey, UsageKey
@@ -74,6 +71,9 @@ from openedx.core.djangoapps.content.course_structures.errors import CourseStruc
 from openedx.core.djangoapps.content.course_structures.models import CourseStructure
 from openedx.core.djangoapps.course_groups.cohorts import get_cohort_user_ids
 from openedx.core.djangoapps.course_groups.models import CourseUserGroup
+from openedx.core.djangoapps.django_comment_common.comment_client.thread import get_course_thread_stats
+from openedx.core.djangoapps.django_comment_common.comment_client.utils import (
+    CommentClientMaintenanceError, CommentClientRequestError)
 from openedx.core.lib.courses import course_image_url
 from openedx.core.lib.xblock_utils import get_course_update_items
 from pytz import UTC
@@ -317,7 +317,7 @@ def _get_course_progress_metrics(course_key, **kwargs):
     if kwargs.get('user_id'):
         data.update(get_user_position(course_key, **kwargs))
     if not any([kwargs.get('org_ids'), kwargs.get('group_ids'), kwargs.get('cohort_user_ids')]):
-        course_id = course_key.to_deprecated_string()
+        course_id = str(course_key)
         total_users = get_course_enrollment_count(course_id)
     else:
         total_users_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=kwargs.get('exclude_users'))
@@ -339,7 +339,7 @@ def _get_course_progress_metrics(course_key, **kwargs):
 
 
 def _get_courses_metrics_grades_leaders_list(course_key, **kwargs):
-    course_id = course_key.to_deprecated_string()
+    course_id = str(course_key)
     user_id = kwargs.get('user_id')
     data = {}
 
@@ -385,7 +385,7 @@ def _get_courses_metrics_grades_leaders_list(course_key, **kwargs):
 
 
 def _get_courses_metrics_completions_leaders_list(course_key, **kwargs):
-    course_id = course_key.to_deprecated_string()
+    course_id = str(course_key)
     user_id = kwargs.get('user_id')
     data = {}
 
@@ -427,7 +427,7 @@ def _get_courses_metrics_completions_leaders_list(course_key, **kwargs):
 
 
 def _get_courses_metrics_social_leaders_list(course_key, **kwargs):
-    course_id = course_key.to_deprecated_string()
+    course_id = str(course_key)
     user_id = kwargs.get('user_id')
     data = {}
 

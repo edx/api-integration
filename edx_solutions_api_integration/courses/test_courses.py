@@ -20,8 +20,6 @@ from completion.waffle import ENABLE_COMPLETION_TRACKING
 from completion.waffle import WAFFLE_NAMESPACE as WAFFLE_COMPLETION_NAMESPACE
 from completion_aggregator.models import Aggregator
 from completion_aggregator.tasks import aggregation_tasks
-from courseware import module_render
-from courseware.model_data import FieldDataCache
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.contrib.auth.models import Group
@@ -44,6 +42,8 @@ from edx_solutions_projects.models import Project, Workgroup
 from freezegun import freeze_time
 from gradebook.models import StudentGradebook
 from instructor.access import allow_access
+from lms.djangoapps.courseware import module_render
+from lms.djangoapps.courseware.model_data import FieldDataCache
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
 from requests.exceptions import ConnectionError

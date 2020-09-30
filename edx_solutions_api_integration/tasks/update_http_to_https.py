@@ -5,8 +5,7 @@ import pymongo
 from bson.son import SON
 from celery.task import task
 from opaque_keys.edx.keys import CourseKey
-from openedx.core.djangoapps.content.block_structure.api import \
-    update_course_in_cache
+from openedx.core.djangoapps.content.block_structure.api import update_course_in_cache
 from xmodule.modulestore.django import modulestore
 
 log = logging.getLogger(__name__)

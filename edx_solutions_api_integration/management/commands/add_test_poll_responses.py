@@ -9,7 +9,7 @@ import random
 from itertools import product
 from optparse import make_option
 
-from courseware.models import StudentModule  # pylint: disable=import-error
+from lms.djangoapps.courseware.models import StudentModule  # pylint: disable=import-error
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 from edx_solutions_api_integration.models import APIUser as User

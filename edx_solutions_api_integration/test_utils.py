@@ -6,8 +6,8 @@ from functools import wraps
 from io import StringIO
 
 import mock
-from courseware import module_render
-from courseware.model_data import FieldDataCache
+from lms.djangoapps.courseware import module_render
+from lms.djangoapps.courseware.model_data import FieldDataCache
 from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.test import Client

@@ -17,8 +17,8 @@ import ddt
 import mock
 from completion.models import BlockCompletion
 from completion.waffle import ENABLE_COMPLETION_TRACKING, WAFFLE_NAMESPACE
-from courseware import module_render
-from courseware.model_data import FieldDataCache
+from lms.djangoapps.courseware import module_render
+from lms.djangoapps.courseware.model_data import FieldDataCache
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -2181,10 +2181,10 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         # Add a role that does not have a corresponding moderator role configured
         allow_access(course4, self.user, 'staff')
         # Now modify the existing no-moderator role using the API, which tries to set the moderator role
-        # Also change one of the existing moderator roles, but call it using the deprecated string version
+        # Also change one of the existing moderator roles
         data = {'roles': [
-            {'course_id': course4.id.to_deprecated_string(), 'role': 'instructor'},
-            {'course_id': course2.id.to_deprecated_string(), 'role': 'instructor'},
+            {'course_id': str(course4.id), 'role': 'instructor'},
+            {'course_id': str(course2.id), 'role': 'instructor'},
         ]}
         response = self.do_put(test_uri, data)
         self.assertEqual(response.status_code, 200)

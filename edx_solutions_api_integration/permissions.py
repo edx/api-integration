@@ -10,8 +10,7 @@ from edx_solutions_api_integration.models import APIUser as User
 from edx_solutions_api_integration.utils import (address_exists_in_network,
                                                  get_client_ip_address,
                                                  str2bool)
-from openedx.core.lib.api.authentication import \
-    OAuth2AuthenticationAllowInactiveUser
+from openedx.core.lib.api.authentication import BearerAuthenticationAllowInactiveUser
 from rest_framework import filters, generics, pagination, permissions, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -170,7 +169,7 @@ class MobilePermissionMixin:
     """
     authentication_classes = (
         JwtAuthentication,
-        OAuth2AuthenticationAllowInactiveUser,
+        BearerAuthenticationAllowInactiveUser,
         SessionAuthenticationAllowInactiveUser,
     )
     permission_classes = (permissions.IsAuthenticated, )
@@ -180,7 +179,7 @@ class TokenBasedAuthenticationMixin:
     """
     Mixin to set custom authentication_classes
     """
-    authentication_classes = (OAuth2AuthenticationAllowInactiveUser, )
+    authentication_classes = (BearerAuthenticationAllowInactiveUser, )
 
 
 class FilterBackendMixin:

@@ -8,8 +8,8 @@ from datetime import datetime
 from functools import reduce
 
 from completion_aggregator.models import Aggregator
-from courseware import module_render
-from courseware.model_data import FieldDataCache
+from lms.djangoapps.courseware import module_render
+from lms.djangoapps.courseware.model_data import FieldDataCache
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
@@ -56,7 +56,8 @@ from instructor.access import revoke_access, update_forum_role
 from lms.djangoapps.notification_prefs.views import enable_notifications
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey, UsageKey
-from opaque_keys.edx.locations import Location, SlashSeparatedCourseKey
+from opaque_keys.edx.locations import Location
+from opaque_keys.edx.locator import CourseLocator
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.course_groups.cohorts import (
     add_cohort, add_user_to_cohort, get_cohort_by_name,
@@ -138,7 +139,7 @@ def _save_content_position(request, user, course_key, position):
         child_key = UsageKey.from_string(child_content_id)
     except InvalidKeyError:
         try:
-            child_key = Location.from_deprecated_string(child_content_id)
+            child_key = Location.from_string(child_content_id)
         except (InvalidLocationError, InvalidKeyError):
             pass
     if not child_key:
@@ -183,8 +184,8 @@ def _manage_role(course_descriptor, user, role, action):
             new_role.save()
         if role in forum_moderator_roles:
             try:
-                dep_string = course_descriptor.id.to_deprecated_string()
-                ssck = SlashSeparatedCourseKey.from_deprecated_string(dep_string)
+                dep_string = str(course_descriptor.id)
+                ssck = CourseLocator.from_string(dep_string)
                 update_forum_role(ssck, user, FORUM_ROLE_MODERATOR, 'allow')
             except Role.DoesNotExist:
                 try:
@@ -206,8 +207,8 @@ def _manage_role(course_descriptor, user, role, action):
             queryset = queryset.filter(course_id=course_descriptor.id)
             if len(queryset) == 0:
                 try:
-                    dep_string = course_descriptor.id.to_deprecated_string()
-                    ssck = SlashSeparatedCourseKey.from_deprecated_string(dep_string)
+                    dep_string = str(course_descriptor.id)
+                    ssck = CourseLocator.from_string(dep_string)
                     update_forum_role(ssck, user, FORUM_ROLE_MODERATOR, 'revoke')
                 except Role.DoesNotExist:
                     try:

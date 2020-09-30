@@ -20,11 +20,11 @@ class GroupRelationship(TimeStampedModel):
     which allows us to utilize Django's user/group/permission
     models and features instead of rolling our own.
     """
-    group = models.OneToOneField(Group, primary_key=True)
+    group = models.OneToOneField(Group, primary_key=True, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     parent_group = models.ForeignKey('self',
                                      related_name="child_groups",
-                                     blank=True, null=True, default=0)
+                                     blank=True, null=True, default=0, on_delete=models.CASCADE)
     linked_groups = models.ManyToManyField('self',
                                            through="LinkedGroupRelationship",
                                            symmetrical=False,
@@ -80,10 +80,10 @@ class LinkedGroupRelationship(TimeStampedModel):
     """
     from_group_relationship = models.ForeignKey(GroupRelationship,
                                                 related_name="from_group_relationships",
-                                                verbose_name="From Group")
+                                                verbose_name="From Group", on_delete=models.CASCADE)
     to_group_relationship = models.ForeignKey(GroupRelationship,
                                               related_name="to_group_relationships",
-                                              verbose_name="To Group")
+                                              verbose_name="To Group", on_delete=models.CASCADE)
     record_active = models.BooleanField(default=True)
 
 
@@ -94,7 +94,7 @@ class CourseGroupRelationship(TimeStampedModel):
     is to manage the courses for an XSeries or other sort of program.
     """
     course_id = models.CharField(max_length=255, db_index=True)
-    group = models.ForeignKey(Group, db_index=True)
+    group = models.ForeignKey(Group, db_index=True, on_delete=models.CASCADE)
     record_active = models.BooleanField(default=True)
 
 
@@ -110,7 +110,7 @@ class GroupProfile(TimeStampedModel):
         """
         db_table = "auth_groupprofile"
 
-    group = models.OneToOneField(Group, db_index=True)
+    group = models.OneToOneField(Group, db_index=True, on_delete=models.CASCADE)
     group_type = models.CharField(null=True, max_length=32, db_index=True)
     name = models.CharField(max_length=255, null=True, blank=True)
     data = models.TextField(blank=True)  # JSON dictionary for generic key/value pairs
@@ -127,7 +127,7 @@ class CourseContentGroupRelationship(TimeStampedModel):
     """
     course_id = models.CharField(max_length=255, db_index=True)
     content_id = models.CharField(max_length=255, db_index=True)
-    group_profile = models.ForeignKey(GroupProfile, db_index=True)
+    group_profile = models.ForeignKey(GroupProfile, db_index=True, on_delete=models.CASCADE)
     record_active = models.BooleanField(default=True)
 
     class Meta:

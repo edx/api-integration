@@ -9,7 +9,7 @@ import pytz
 from completion.models import BlockCompletion
 from completion_aggregator.models import Aggregator
 from course_metadata.models import CourseAggregatedMetaData
-from courseware.models import StudentModule
+from lms.djangoapps.courseware.models import StudentModule
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from edx_solutions_api_integration.models import (
