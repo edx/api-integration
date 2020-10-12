@@ -1,27 +1,24 @@
-import logging
-import json
-import re
-from pytz import UTC
 import datetime
+import json
+import logging
+import re
 from collections import defaultdict
+from urllib import request as urllib_request
 
-from celery.task import task, Task
-import urllib2
 from bs4 import BeautifulSoup
-
+from celery.task import Task, task
 from django.conf import settings
-from django.template.loader import render_to_string
-from django.core.cache import cache
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db.models import Q
-from xmodule.modulestore.django import modulestore
-from xmodule.modulestore import ModuleStoreEnum
+from django.template.loader import render_to_string
 from opaque_keys.edx.keys import CourseKey
-
 from openedx.core.djangoapps.content.block_structure.api import update_course_in_cache
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-
+from pytz import UTC
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.django import modulestore
 
 PLAYBACK_API_ENDPOINT = 'https://edge.api.brightcove.com/playback/v1/accounts/{account_id}/videos/ref:{reference_id}'
 BRIGHTCOVE_ACCOUNT_ID = '6057949416001'
@@ -61,7 +58,7 @@ class ConversionScriptTask(Task):
             globals()[callback](result, kwargs)
 
 
-@task(name=u'lms.djangoapps.api_integration.tasks.convert_ooyala_to_bcove', bind=True, base=ConversionScriptTask)
+@task(name='lms.djangoapps.api_integration.tasks.convert_ooyala_to_bcove', bind=True, base=ConversionScriptTask)
 def convert_ooyala_to_bcove(
         self, staff_user_id, course_ids,
         company_name=None, callback=None,
@@ -166,10 +163,10 @@ def get_brightcove_video_id(reference_id, block_id, course_id, task_id, bcove_po
         account_id=BRIGHTCOVE_ACCOUNT_ID,
         reference_id=reference_id
     )
-    request = urllib2.Request(api_endpoint, headers={"BCOV-Policy": bcove_policy})
+    request = urllib_request.Request(api_endpoint, headers={"BCOV-Policy": bcove_policy})
 
     try:
-        response = urllib2.urlopen(request).read()
+        response = urllib_request.urlopen(request).read()
         video_data = json.loads(response)
     except Exception as e:
         logger.warning('Brightcove ID retrieval failed against reference ID: `{}` with exception: {}'
@@ -389,7 +386,7 @@ def module_list_success_callback(result, kwargs):
     send_mail(subject, text, settings.DEFAULT_FROM_EMAIL, email_ids)
 
 
-@task(name=u'lms.djangoapps.api_integration.tasks.get_modules_with_video_embeds',bind=True, base=ConversionScriptTask)
+@task(name='lms.djangoapps.api_integration.tasks.get_modules_with_video_embeds',bind=True, base=ConversionScriptTask)
 def get_modules_with_video_embeds(self, course_ids, email_ids, report, callback=None):
     if not course_ids:
         course_ids = CourseOverview.objects.filter(

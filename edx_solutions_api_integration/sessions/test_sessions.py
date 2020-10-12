@@ -5,11 +5,11 @@
 Run these tests @ Devstack:
     rake fasttest_lms[common/djangoapps/edx_solutions_api_integration/tests/test_session_views.py]
 """
-from random import randint
 import uuid
-import mock
 from datetime import datetime
+from random import randint
 
+import mock
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.test import TestCase
@@ -189,4 +189,3 @@ class SessionsApiTests(TestCase, APIClientMixin):
         # Test with missing password in request data
         response = self.do_post(self.base_sessions_uri, {'username': self.test_username})
         self.assertEqual(response.status_code, 400)
-

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 This test file will verify proper password history enforcement
 """
@@ -7,10 +6,9 @@ from datetime import timedelta
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
+from edx_solutions_api_integration.models import PasswordHistory
 from freezegun import freeze_time
 from mock import patch
-
-from edx_solutions_api_integration.models import PasswordHistory
 from student.tests.factories import AdminFactory, UserFactory
 
 

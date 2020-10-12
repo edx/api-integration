@@ -1,18 +1,18 @@
 import logging
-import pymongo
 import re
+
+import pymongo
 from bson.son import SON
 from celery.task import task
 from opaque_keys.edx.keys import CourseKey
-from xmodule.modulestore.django import modulestore
-
 from openedx.core.djangoapps.content.block_structure.api import update_course_in_cache
+from xmodule.modulestore.django import modulestore
 
 log = logging.getLogger(__name__)
 store = modulestore()
 
 
-@task(name=u'lms.djangoapps.api_integration.tasks.update_http_to_https')
+@task(name='lms.djangoapps.api_integration.tasks.update_http_to_https')
 def update_http_to_https(course_ids, staff_user_id):
     update_urls_in_courses(course_ids, staff_user_id)
     update_courses_cache(course_ids)
@@ -49,9 +49,9 @@ def update_content(course_id, block):
             updated = updated | is_updated
             block[key] = updated_block
 
-        if type(value) == str or type(value) == unicode and 'http://' in value:
-            matches = re.findall('(http://[^\s]*)', value)
-            log.info('Updating urls %s for course %s' % (' '.join(matches), course_id))
+        if type(value) == str or type(value) == str and 'http://' in value:
+            matches = re.findall(r'(http://[^\s]*)', value)
+            log.info('Updating urls {} for course {}'.format(' '.join(matches), course_id))
             block[key] = value.replace('http://', 'https://')
             updated = True
 

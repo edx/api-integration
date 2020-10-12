@@ -3,17 +3,18 @@ import logging
 
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
-from student.models import CourseEnrollment
-from edx_solutions_api_integration.courseware_access import get_course_key
-from edx_solutions_api_integration.utils import get_client_ip_address, address_exists_in_network
-from rest_framework import permissions, generics, filters, pagination, viewsets
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from edx_rest_framework_extensions.auth.session.authentication import SessionAuthenticationAllowInactiveUser
-from openedx.core.lib.api.authentication import OAuth2AuthenticationAllowInactiveUser
-from edx_solutions_api_integration.utils import str2bool
+from edx_solutions_api_integration.courseware_access import get_course_key
 from edx_solutions_api_integration.models import APIUser as User
+from edx_solutions_api_integration.utils import (address_exists_in_network,
+                                                 get_client_ip_address,
+                                                 str2bool)
+from openedx.core.lib.api.authentication import BearerAuthenticationAllowInactiveUser
+from rest_framework import filters, generics, pagination, permissions, viewsets
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from student.models import CourseEnrollment
 
 log = logging.getLogger(__name__)
 
@@ -155,33 +156,33 @@ class HasOrgsFilterBackend(filters.BaseFilterBackend):
         return queryset.distinct()
 
 
-class PermissionMixin(object):
+class PermissionMixin:
     """
     Mixin to set custom permission_classes
     """
     permission_classes = (ApiKeyHeaderPermission, IPAddressRestrictedPermission)
 
 
-class MobilePermissionMixin(object):
+class MobilePermissionMixin:
     """
     Mixin to set custom permission_classes
     """
     authentication_classes = (
         JwtAuthentication,
-        OAuth2AuthenticationAllowInactiveUser,
+        BearerAuthenticationAllowInactiveUser,
         SessionAuthenticationAllowInactiveUser,
     )
     permission_classes = (permissions.IsAuthenticated, )
 
 
-class TokenBasedAuthenticationMixin(object):
+class TokenBasedAuthenticationMixin:
     """
     Mixin to set custom authentication_classes
     """
-    authentication_classes = (OAuth2AuthenticationAllowInactiveUser, )
+    authentication_classes = (BearerAuthenticationAllowInactiveUser, )
 
 
-class FilterBackendMixin(object):
+class FilterBackendMixin:
     """
     Mixin to set custom filter_backends
     """
@@ -221,7 +222,7 @@ class CustomPagination(pagination.PageNumberPagination):
             return page_size
 
 
-class PaginationMixin(object):
+class PaginationMixin:
     """
     Mixin to set custom pagination support
     """

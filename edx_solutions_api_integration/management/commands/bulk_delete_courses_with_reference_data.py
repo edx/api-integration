@@ -1,28 +1,28 @@
 """
 Management command deletes old courses and relevant data from mongo db and mysql db
 """
-import pytz
 import logging
-from optparse import make_option
 from datetime import datetime, timedelta
+from optparse import make_option
 
+import pytz
 from completion.models import BlockCompletion
-from util.prompt import query_yes_no
-
+from completion_aggregator.models import Aggregator
+from course_metadata.models import CourseAggregatedMetaData
+from lms.djangoapps.courseware.models import StudentModule
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from edx_solutions_api_integration.models import (
+    CourseContentGroupRelationship, CourseGroupRelationship)
+from gradebook.models import StudentGradebook, StudentGradebookHistory
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from openedx.core.djangoapps.content.course_structures.models import CourseStructure
+from openedx.core.djangoapps.course_groups.models import (
+    CourseCohortsSettings, CourseUserGroup)
+from student.models import CourseAccessRole, CourseEnrollment
+from util.prompt import query_yes_no
 from xmodule.modulestore import ModuleStoreEnum
 from xmodule.modulestore.django import modulestore
-
-from edx_solutions_api_integration.models import CourseGroupRelationship, CourseContentGroupRelationship
-from openedx.core.djangoapps.course_groups.models import CourseCohortsSettings, CourseUserGroup
-from course_metadata.models import CourseAggregatedMetaData
-from openedx.core.djangoapps.content.course_structures.models import CourseStructure
-from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from courseware.models import StudentModule
-from completion_aggregator.models import Aggregator
-from gradebook.models import StudentGradebook, StudentGradebookHistory
-from student.models import CourseAccessRole, CourseEnrollment
 
 log = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class Command(BaseCommand):
         """
         Deletes reference data for course
         """
-        log.info('removing reference data for course %s', unicode(course_key))
+        log.info('removing reference data for course %s', str(course_key))
         CourseGroupRelationship.objects.filter(course_id=course_key).delete()
         CourseContentGroupRelationship.objects.filter(course_id=course_key).delete()
         CourseCohortsSettings.objects.filter(course_id=course_key).delete()
@@ -71,7 +71,7 @@ class Command(BaseCommand):
         """
         user_id = ModuleStoreEnum.UserID.mgmt_command
         with self.module_store.bulk_operations(course_key):
-            log.info('Removing course %s from modulestore', unicode(course_key))
+            log.info('Removing course %s from modulestore', str(course_key))
             self.module_store.delete_course(course_key, user_id)
 
     @transaction.atomic
@@ -104,7 +104,7 @@ class Command(BaseCommand):
                     except Exception as ex:   # pylint: disable=broad-except
                         log.exception("Exception while deleting course %s", ex.message)
 
-            completion_message = "command completed. Total %s courses deleted out of %s" % (
+            completion_message = "command completed. Total {} courses deleted out of {}".format(
                 self.total_deleted, self.total_courses
             )
             log.info(completion_message)

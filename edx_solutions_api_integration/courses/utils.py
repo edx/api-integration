@@ -1,16 +1,10 @@
 from completion_aggregator.models import Aggregator
-from django.db.models import Q, Sum, Avg, F
-
-from student.models import CourseEnrollment
-
+from django.db.models import Avg, F, Q, Sum
 from edx_solutions_api_integration.courseware_access import get_course_key
 from edx_solutions_api_integration.utils import (
-    cache_course_data,
-    get_aggregate_exclusion_user_ids,
-    get_cached_data,
-    get_non_actual_company_users,
-    Round,
-)
+    Round, cache_course_data, get_aggregate_exclusion_user_ids,
+    get_cached_data, get_non_actual_company_users)
+from student.models import CourseEnrollment
 
 
 def get_filtered_aggregation_queryset(course_key, **kwargs):
