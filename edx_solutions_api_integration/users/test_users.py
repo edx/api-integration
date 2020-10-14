@@ -45,7 +45,7 @@ from edx_solutions_projects.models import Project, Workgroup
 from gradebook.models import StudentGradebook
 from instructor.access import allow_access
 from mock import patch
-from notification_prefs import NOTIFICATION_PREF_KEY
+from lms.djangoapps.discussion.notification_prefs import NOTIFICATION_PREF_KEY
 from openedx.core.djangoapps.user_api.models import UserPreference
 from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
 from requests.exceptions import ConnectionError

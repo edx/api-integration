@@ -17,7 +17,7 @@ from django.db.models import Func
 from django.shortcuts import get_object_or_404
 from django.utils.timezone import now
 from edx_solutions_organizations.models import Organization
-from lms.djangoapps.notification_prefs.views import UsernameCipher
+from lms.djangoapps.discussion.notification_prefs.views import UsernameCipher
 from opaque_keys.edx.keys import CourseKey
 from openedx.core.djangoapps.user_api.accounts.image_helpers import (
     _get_default_profile_image_urls, _get_profile_image_urls,

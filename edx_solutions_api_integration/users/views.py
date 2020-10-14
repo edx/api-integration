@@ -53,7 +53,7 @@ from edx_solutions_projects.serializers import BasicWorkgroupSerializer
 from gradebook.models import StudentGradebook
 from gradebook.utils import generate_user_gradebook
 from instructor.access import revoke_access, update_forum_role
-from lms.djangoapps.notification_prefs.views import enable_notifications
+from lms.djangoapps.discussion.notification_prefs.views import enable_notifications
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey, UsageKey
 from opaque_keys.edx.locations import Location

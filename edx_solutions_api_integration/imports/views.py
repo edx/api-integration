@@ -16,7 +16,7 @@ from edx_solutions_api_integration.models import (CourseGroupRelationship,
 from edx_solutions_api_integration.permissions import SecureViewSet
 from edx_solutions_api_integration.users.views import _manage_role
 from edx_solutions_organizations.models import Organization
-from lms.djangoapps.notification_prefs.views import enable_notifications
+from lms.djangoapps.discussion.notification_prefs.views import enable_notifications
 from opaque_keys.edx.keys import CourseKey
 from openedx.core.djangoapps.course_groups.cohorts import (add_cohort,
                                                            get_cohort_by_name)
