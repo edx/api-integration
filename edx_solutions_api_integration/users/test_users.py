@@ -29,7 +29,7 @@ from django.test.client import Client
 from django.test.utils import override_settings
 from django.utils import timezone
 from django.utils.translation import ugettext as _
-from django_comment_common.models import (FORUM_ROLE_MODERATOR, ForumsConfig,
+from openedx.core.djangoapps.django_comment_common.models import (FORUM_ROLE_MODERATOR, ForumsConfig,
                                           Role)
 from edx_notifications.data import NotificationMessage, NotificationType
 from edx_notifications.lib.consumer import get_notifications_count_for_user

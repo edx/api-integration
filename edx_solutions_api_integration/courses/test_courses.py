@@ -29,7 +29,7 @@ from django.core.urlresolvers import reverse
 from django.test.client import Client
 from django.test.utils import override_settings
 from django.utils import timezone
-from django_comment_common.models import FORUM_ROLE_MODERATOR, Role
+from openedx.core.djangoapps.django_comment_common.models import FORUM_ROLE_MODERATOR, Role
 from edx_solutions_api_integration.courseware_access import (
     get_course_descriptor, get_course_key)
 from edx_solutions_api_integration.test_utils import (

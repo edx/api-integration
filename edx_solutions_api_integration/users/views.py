@@ -20,7 +20,7 @@ from django.db.models import BooleanField, Case, Count, Q, Value, When
 from django.http import Http404
 from django.utils.translation import get_language
 from django.utils.translation import ugettext_lazy as _
-from django_comment_common.models import FORUM_ROLE_MODERATOR, Role
+from openedx.core.djangoapps.django_comment_common.models import FORUM_ROLE_MODERATOR, Role
 from django_filters.rest_framework import DjangoFilterBackend
 from edx_notifications.lib.consumer import mark_notification_read
 from edx_solutions_api_integration.courseware_access import (course_exists,

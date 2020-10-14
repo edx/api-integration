@@ -20,7 +20,7 @@ from django.db.models import Count, F, Max, Min, Prefetch, Q, Sum
 from django.http import Http404
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
-from django_comment_common.models import FORUM_ROLE_MODERATOR
+from openedx.core.djangoapps.django_comment_common.models import FORUM_ROLE_MODERATOR
 from edx_solutions_api_integration.courses.serializers import (
     BlockCompletionSerializer, CourseCompletionsLeadersSerializer,
     CourseProficiencyLeadersSerializer, CourseSerializer,
