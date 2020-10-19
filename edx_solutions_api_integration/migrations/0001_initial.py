@@ -70,8 +70,8 @@ class Migration(migrations.Migration):
                 ('created', model_utils.fields.AutoCreatedField(default=django.utils.timezone.now, verbose_name='created', editable=False)),
                 ('modified', model_utils.fields.AutoLastModifiedField(default=django.utils.timezone.now, verbose_name='modified', editable=False)),
                 ('record_active', models.BooleanField(default=True)),
-                ('from_group_relationship', models.ForeignKey(related_name='from_group_relationships', verbose_name=b'From Group', to='edx_solutions_api_integration.GroupRelationship', on_delete=models.CASCADE)),
-                ('to_group_relationship', models.ForeignKey(related_name='to_group_relationships', verbose_name=b'To Group', to='edx_solutions_api_integration.GroupRelationship', on_delete=models.CASCADE)),
+                ('from_group_relationship', models.ForeignKey(related_name='from_group_relationships', verbose_name='From Group', to='edx_solutions_api_integration.GroupRelationship', on_delete=models.CASCADE)),
+                ('to_group_relationship', models.ForeignKey(related_name='to_group_relationships', verbose_name='To Group', to='edx_solutions_api_integration.GroupRelationship', on_delete=models.CASCADE)),
             ],
             options={
                 'abstract': False,
