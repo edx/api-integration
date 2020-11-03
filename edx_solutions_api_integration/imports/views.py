@@ -51,6 +51,9 @@ class ImportParticipantsViewSet(SecureViewSet):
 
         if not errors:
             self._enroll_user(data, errors)
+            user = data.get('user_object')
+            if user:
+                response['user_id'] = user.id
 
         response.update({'errors': errors})
         return Response(response)
