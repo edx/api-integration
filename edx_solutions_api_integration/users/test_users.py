@@ -889,7 +889,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         }
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 400)
-        self.assertIn(b'Invalid email address', response.content)
+        self.assertIn('Invalid email address', response.content.decode('utf-8'))
 
     def test_user_detail_duplicate_email(self):
         user2 = UserFactory()
@@ -902,7 +902,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 200)
         response = self.do_post(test_uri2, data)
         self.assertEqual(response.status_code, 400)
-        self.assertIn(b'A user with that email address already exists.', response.content)
+        self.assertIn('A user with that email address already exists.', response.content.decode('utf-8'))
 
     def test_user_detail_email_updated(self):
         test_uri = '{}/{}'.format(self.users_base_uri, self.user.id)
