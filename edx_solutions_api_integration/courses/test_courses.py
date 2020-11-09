@@ -157,7 +157,6 @@ class CohortAverageTestCase(SharedModuleStoreTestCase, APIClientMixin):
             for loc in (cls.html1.location, cls.html2.location):
                 BlockCompletion.objects.submit_completion(
                     user=cls.users[0],
-                    course_key=cls.course.id,
                     block_key=loc,
                     completion=1.0,
                 )
@@ -592,7 +591,6 @@ class CoursesApiTests(
 
             BlockCompletion.objects.submit_completion(
                 user=user,
-                course_key=course.id,
                 block_key=local_content_child.scope_ids.usage_id,
                 completion=1.0,
             )
@@ -600,7 +598,6 @@ class CoursesApiTests(
             # observer should complete everything, so we can assert that it is filtered out
             BlockCompletion.objects.submit_completion(
                 user=users[user_count - 1],
-                course_key=course.id,
                 block_key=local_content_child.scope_ids.usage_id,
                 completion=1.0,
             )
@@ -649,7 +646,7 @@ class CoursesApiTests(
                 confirm_uri = self.test_server_prefix + test_uri + '/' + course['id']
                 self.assertEqual(course['uri'], confirm_uri)
                 self.assertIsNotNone(course['course_image_url'])
-        self.assertItemsEqual(courses, courses_in_result)
+        self.assertCountEqual(courses, courses_in_result)
 
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_course_detail_without_date_values(self, store):
@@ -1647,7 +1644,7 @@ class CoursesApiTests(
         self.assertIn('logo_url', response.data['results'][0]['organizations'][0])
         roles = response.data['results'][0]['roles']
         self.assertIsNotNone(roles)
-        self.assertItemsEqual(['instructor', 'observer'], roles)
+        self.assertCountEqual(['instructor', 'observer'], roles)
         self.assertIn('grades', response.data['results'][0])
         self.assertEqual(
             response.data['results'][0]['grades'], {
@@ -1674,7 +1671,7 @@ class CoursesApiTests(
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 3)
-        self.assertItemsEqual(['first_name', 'last_name'], list(response.data['results'][0].keys()))
+        self.assertCountEqual(['first_name', 'last_name'], list(response.data['results'][0].keys()))
 
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
     def test_courses_users_list_pagination(self, store):
@@ -2334,7 +2331,6 @@ class CoursesApiTests(
         for content in setup_data['contents'][2:]:
             BlockCompletion.objects.submit_completion(
                 user=setup_data['users'][0],
-                course_key=course.id,
                 block_key=content.scope_ids.usage_id,
                 completion=1.0,
             )
@@ -2372,7 +2368,6 @@ class CoursesApiTests(
             allow_access(course, user, role)
             BlockCompletion.objects.submit_completion(
                 user=user,
-                course_key=course.id,
                 block_key=local_content.scope_ids.usage_id,
                 completion=1.0,
             )
@@ -2540,7 +2535,6 @@ class CoursesApiTests(
             # mark two users a complete
             BlockCompletion.objects.submit_completion(
                 user=user,
-                course_key=self.course.id,
                 block_key=self.content_child.scope_ids.usage_id,
                 completion=1.0,
             )
@@ -2582,7 +2576,6 @@ class CoursesApiTests(
         for user in users:
             BlockCompletion.objects.submit_completion(
                 user=user,
-                course_key=self.course.id,
                 block_key=self.content_child.scope_ids.usage_id,
                 completion=1.0,
             )
@@ -3747,7 +3740,6 @@ class CompletionEndpointTestCase(SharedModuleStoreTestCase, APIClientMixin):
             for loc in (cls.html1.location, cls.html2.location):
                 BlockCompletion.objects.submit_completion(
                     user=cls.test_user,
-                    course_key=cls.course.id,
                     block_key=loc,
                     completion=1.0,
                 )
@@ -3769,7 +3761,7 @@ class CompletionEndpointTestCase(SharedModuleStoreTestCase, APIClientMixin):
                     'content_id': str(self.html2.location),
                     'course_id': str(self.course.id),
                     'stage': None,
-                    'course_key': str(self.course.id),
+                    'context_key': str(self.course.id),
                     'block_key': str(self.html2.location),
                     'block_type': 'html',
                     'completion': 1.0,

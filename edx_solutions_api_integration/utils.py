@@ -343,7 +343,7 @@ def get_ids_from_list_param(request, param_name):
     if ids:
         upper_bound = getattr(settings, 'API_LOOKUP_UPPER_BOUND', 100)
         try:
-            ids = map(int, ids.split(','))[:upper_bound]
+            ids = list(map(int, ids.split(',')))[:upper_bound]
         except Exception:
             raise ParseError("Invalid {} parameter value".format(param_name))
 

@@ -620,9 +620,9 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 2)
         self.assertEqual(len(response.data['results'][0]['roles']), 2)
-        self.assertItemsEqual(response.data['results'][0]['roles'], ['instructor', 'observer'])
+        self.assertCountEqual(response.data['results'][0]['roles'], ['instructor', 'observer'])
         self.assertEqual(len(response.data['results'][1]['roles']), 1)
-        self.assertItemsEqual(response.data['results'][1]['roles'], ['staff'])
+        self.assertCountEqual(response.data['results'][1]['roles'], ['staff'])
 
     def test_user_list_get_with_has_organization_filter(self):
         test_uri = self.users_base_uri
@@ -889,7 +889,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         }
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 400)
-        self.assertIn('Invalid email address', response.content)
+        self.assertIn(b'Invalid email address', response.content)
 
     def test_user_detail_duplicate_email(self):
         user2 = UserFactory()
@@ -902,7 +902,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 200)
         response = self.do_post(test_uri2, data)
         self.assertEqual(response.status_code, 400)
-        self.assertIn('A user with that email address already exists.', response.content)
+        self.assertIn(b'A user with that email address already exists.', response.content)
 
     def test_user_detail_email_updated(self):
         test_uri = '{}/{}'.format(self.users_base_uri, self.user.id)
@@ -2771,7 +2771,6 @@ class UsersProgressApiTests(
 
         BlockCompletion.objects.submit_completion(
             user=self.user,
-            course_key=self.course.id,
             block_key=self.content_child.scope_ids.usage_id,
             completion=1.0,
         )
@@ -2868,14 +2867,12 @@ class UsersProgressApiTests(
 
         BlockCompletion.objects.submit_completion(
             user=self.user,
-            course_key=self.course.id,
             block_key=self.content_child.scope_ids.usage_id,
             completion=1.0,
         )
 
         BlockCompletion.objects.submit_completion(
             user=self.user,
-            course_key=self.course.id,
             block_key=mobile_course_content.scope_ids.usage_id,
             completion=1.0,
         )

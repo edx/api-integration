@@ -58,7 +58,7 @@ class Command(BaseCommand):
         CourseStructure.objects.filter(course_id=course_key).delete()
         CourseOverview.objects.filter(id=course_key).delete()
         StudentModule.objects.filter(course_id=course_key).delete()
-        BlockCompletion.objects.filter(course_key=course_key).delete()
+        BlockCompletion.objects.filter(context_key=course_key).delete()
         Aggregator.objects.filter(course_key=course_key).delete()
         StudentGradebookHistory.objects.filter(course_id=course_key).delete()
         StudentGradebook.objects.filter(course_id=course_key).delete()
