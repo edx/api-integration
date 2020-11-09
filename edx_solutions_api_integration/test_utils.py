@@ -3,7 +3,7 @@ import json
 import uuid
 from datetime import datetime, timedelta
 from functools import wraps
-from io import StringIO
+from io import BytesIO
 
 import mock
 from lms.djangoapps.courseware import module_render
@@ -23,12 +23,12 @@ from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
 
 def get_temporary_image():
-    io = StringIO()
+    io = BytesIO()
     size = (200, 200)
     color = (255, 0, 0, 0)
     image = Image.new("RGBA", size, color)
     image.save(io, format='PNG')
-    image_file = InMemoryUploadedFile(io, None, 'temp.png', 'image/png', io.len, None)
+    image_file = InMemoryUploadedFile(io, None, 'temp.png', 'image/png', io.getbuffer().nbytes  , None)
     image_file.seek(0)
     return image_file
 
