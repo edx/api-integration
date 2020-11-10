@@ -68,8 +68,8 @@ class SessionApiRateLimitingProtectionTest(CacheIsolationTestCase, APIClientMixi
         message = _('Rate limit exceeded in api login.')
         self._assert_response(response, status=403, message=message)
 
-        # now reset the time to 5 mins from now in future in order to unblock
-        reset_time = datetime.now(UTC) + timedelta(seconds=300)
+        # now reset the time to 9 mins from now in future in order to unblock
+        reset_time = datetime.now(UTC) + timedelta(seconds=560)
         with freeze_time(reset_time):
             response = self.do_post(self.session_url, data)
             self._assert_response(response, status=201)
@@ -86,7 +86,7 @@ class SessionApiRateLimitingProtectionTest(CacheIsolationTestCase, APIClientMixi
         value for 'message' in the JSON dict.
         """
         self.assertEqual(response.status_code, status)
-        response_dict = json.loads(response.content)
+        response_dict = json.loads(response.content.decode("utf-8"))
 
         if message is not None:
             msg = ("'%s' did not contain '%s'" %

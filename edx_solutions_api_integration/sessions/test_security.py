@@ -245,7 +245,7 @@ class SessionApiSecurityTest(TestCase):
         self._assert_audit_log(mock_audit_log, 'info',
                                ["API::User logged in successfully with user-id - {}".format(self.user.id)])
         self._assert_not_in_audit_log(mock_audit_log, 'info', ['test'])
-        response_dict = json.loads(response.content)
+        response_dict = json.loads(response.content.decode("utf-8"))
 
         response, mock_audit_log = self._do_request(self.session_url + '/' + response_dict['token'], 'test',
                                                     'test_password', secure=True, request_method='DELETE')
@@ -297,7 +297,7 @@ class SessionApiSecurityTest(TestCase):
         if response.status_code == 204:
             return
 
-        response_dict = json.loads(response.content)
+        response_dict = json.loads(response.content.decode("utf-8"))
 
         if message is not None:
             msg = ("'%s' did not contain '%s'" %

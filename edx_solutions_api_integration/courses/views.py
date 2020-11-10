@@ -101,7 +101,7 @@ def _inner_content(tag):
     inner_content = None
     if tag is not None:
         inner_content = tag.text if tag.text else ''
-        inner_content += ''.join(etree.tostring(e) for e in tag)  # pylint: disable=E1101
+        inner_content += ''.join(etree.tostring(e, encoding="unicode") for e in tag)  # pylint: disable=E1101
         inner_content += tag.tail if tag.tail else ''
 
     return inner_content
@@ -162,7 +162,7 @@ def _parse_overview_html(html):
                             bios = article.findall('p')
                             bio_html = ''
                             for bio in bios:
-                                bio_html += etree.tostring(bio)  # pylint: disable=E1101
+                                bio_html += etree.tostring(bio, encoding="unicode")  # pylint: disable=E1101
 
                             if bio_html:
                                 article_data['bio'] = bio_html
@@ -2175,7 +2175,7 @@ class CoursesTimeSeriesMetrics(SecureAPIView):
             earned__gt=0.0,
         ).exclude(user_id__in=exclude_users)
         modules_completed_qs = BlockCompletion.objects.filter(
-            course_key__exact=course_key,
+            context_key__exact=course_key,
             user__courseenrollment__is_active=True,
             user__courseenrollment__course_id__exact=course_key,
             user__is_active=True,
@@ -2355,7 +2355,7 @@ class CompletionList(SecureListAPIView):  # pylint: disable=too-many-ancestors
         if not course_exists(course_id):
             raise Http404
         course_key = get_course_key(course_id)
-        queryset = BlockCompletion.objects.filter(course_key=course_key).select_related('user')
+        queryset = BlockCompletion.objects.filter(context_key=course_key).select_related('user')
         user_ids = get_ids_from_list_param(self.request, 'user_id')
         if user_ids:
             queryset = queryset.filter(user__in=user_ids)
@@ -2400,7 +2400,6 @@ class CompletionList(SecureListAPIView):  # pylint: disable=too-many-ancestors
             return Response({'message': _('user_id is invalid')}, status.HTTP_400_BAD_REQUEST)
         completion, created = BlockCompletion.objects.submit_completion(
             user=user,
-            course_key=course_key,
             block_key=content_key,
             completion=1.0,
         )

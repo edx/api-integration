@@ -64,6 +64,7 @@ def generate_leaderboard(course_key, **kwargs):
     ]
 
     """
+    count = kwargs.get('count')
     queryset = get_filtered_aggregation_queryset(course_key, **kwargs).filter(percent__gt=0)
     queryset = queryset.values(
         'user__id',
@@ -74,7 +75,9 @@ def generate_leaderboard(course_key, **kwargs):
         'user__profile__profile_image_uploaded_at',
         'earned',
         'percent',
-    ).order_by('-percent', 'modified')[:kwargs.get('count')]
+    ).order_by('-percent', 'modified')
+    if count:
+        queryset = queryset [:int(count)]
 
     return queryset
 

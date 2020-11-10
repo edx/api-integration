@@ -148,7 +148,7 @@ class BlockCompletionSerializer(serializers.ModelSerializer):
 
     user_id = serializers.IntegerField(source='user.id')
     content_id = serializers.CharField(source='block_key')
-    course_id = serializers.CharField(source='course_key')
+    course_id = serializers.CharField(source='context_key')
     stage = serializers.SerializerMethodField()
 
     def get_stage(self, _obj):  # pylint: disable=no-self-use

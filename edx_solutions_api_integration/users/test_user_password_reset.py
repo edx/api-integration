@@ -212,8 +212,8 @@ class UserPasswordResetTest(CacheIsolationTestCase):
         message = _('Rate limit exceeded in password_reset.')
         self._assert_response(response, status=403, message=message)
 
-        # now reset the time to 5 mins from now in future in order to unblock
-        reset_time = datetime.now(UTC) + timedelta(seconds=300)
+        # now reset the time to 9 mins from now in future in order to unblock
+        reset_time = datetime.now(UTC) + timedelta(seconds=560)
         with freeze_time(reset_time):
             response = self._do_post_pass_reset_request(
                 pass_reset_url, password='Test.Me64@', secure=True
@@ -352,7 +352,7 @@ class UserPasswordResetTest(CacheIsolationTestCase):
         value for 'message' in the JSON dict.
         """
         self.assertEqual(response.status_code, status)
-        response_dict = json.loads(response.content)
+        response_dict = json.loads(response.content.decode("utf-8"))
 
         if message is not None:
             msg = ("'%s' did not contain '%s'" %
