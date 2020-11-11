@@ -43,7 +43,7 @@ urlpatterns = [
     url(r'^(?P<user_id>[a-zA-Z0-9]+)/notifications/(?P<msg_id>[0-9]+)/$',
         users_views.UsersNotificationsDetail.as_view(), name='users-notifications-detail'),
     url(r'^(?P<user_id>[a-zA-Z0-9]+)$', users_views.UsersDetail.as_view(), name='apimgr-users-detail'),
-    url(r'/*$^', users_views.UsersList.as_view(), name='apimgr-users-list'),
+    url(r'^$', users_views.UsersList.as_view(), name='apimgr-users-list'),
     url(r'mass-details/$', users_views.MassUsersDetailsList.as_view(), name='apimgr-mass-users-detail'),
     url(r'^(?P<user_id>[a-zA-Z0-9]+)/courses/progress',
         users_views.UsersCourseProgressList.as_view(), name='users-courses-progress'),

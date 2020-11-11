@@ -8,7 +8,7 @@ COURSE_ID_PATTERN = settings.COURSE_ID_PATTERN
 GROUP_ID_PATTERN = r'(?P<group_id>[0-9]+)'
 
 urlpatterns = [
-    url(r'/*$^', groups_views.GroupsList.as_view()),
+    url(r'^$', groups_views.GroupsList.as_view()),
     url(r'^{}/courses/{}$'.format(GROUP_ID_PATTERN, COURSE_ID_PATTERN), groups_views.GroupsCoursesDetail.as_view()),
     url(r'^{}/courses/*$'.format(GROUP_ID_PATTERN), groups_views.GroupsCoursesList.as_view()),
     url(r'^{}/organizations/*$'.format(GROUP_ID_PATTERN), groups_views.GroupsOrganizationsList.as_view()),
