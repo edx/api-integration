@@ -3049,8 +3049,9 @@ class CourseGWMap(MobileListAPIView):
         }
 
     **Example Response**
-    {
-        "block-v1:edx+GW+2019+type@gp-v2-activity+block@7d0c547fefe74d5a9ce2512bd88762de": {
+    [
+        {
+            "block_id": "block-v1:edx+GW+2019+type@gp-v2-activity+block@7d0c547fefe74d5a9ce2512bd88762de",
             "submissions": [
                 {
                     "upload_id": "Personal_Development_plan",
@@ -3089,7 +3090,7 @@ class CourseGWMap(MobileListAPIView):
             ],
             "display_name": "Personal Development Plan",
         }
-    }
+    ]
     """
     blocks_data = {}
 
@@ -3124,7 +3125,7 @@ class CourseGWMap(MobileListAPIView):
                     )
                 break
 
-        gw_data = {}
+        gw_data = []
         for block_id in activities:
             block = blocks.get(block_id)
             if not block:
@@ -3132,13 +3133,15 @@ class CourseGWMap(MobileListAPIView):
             submissions = self._find_blocks_with_type(block_id, blocks, 'gp-v2-submission')
             submissions = [self.blocks_data['gp-v2-submission'].get(s, {}).get('upload_id') for s in submissions]
             submissions = [s for s in submissions if s]
-            gw_data[block_id] = {
+            data = {
                 'display_name': block['display_name'],
                 'submissions': submissions,
-                'review_questions': []
+                'review_questions': [],
+                'block_id': block_id
             }
             # Ignore all activities except TA Graded
             if self.blocks_data['gp-v2-activity'].get(block_id, {}).get('group_reviews_required_count') != 0:
+                gw_data += [data]
                 continue
 
             ta_reviews = self._find_blocks_with_type(block_id, blocks, 'gp-v2-stage-peer-review')
@@ -3151,7 +3154,8 @@ class CourseGWMap(MobileListAPIView):
                         review_question['ta_review_stage_id'] = ta_review
                         review_questions += [review_question]
 
-            gw_data[block_id]['review_questions'] = review_questions
+            data['review_questions'] = review_questions
+            gw_data += [data]
 
         return Response(gw_data, status=status.HTTP_200_OK)
 
