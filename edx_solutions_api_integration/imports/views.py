@@ -224,10 +224,9 @@ class ImportParticipantsViewSet(SecureViewSet):
                 # Add permission for role.
                 permission = permissions[role]
                 permission_groups = Group.objects.get(groupprofile__name=permission)
-                permission_groups.user_set.get_or_create(id=user.id)
-        except IntegrityError:
-            # This situation can occur if one user try to enroll in multiple courses
-            pass
+                user.groups.through.objects.get_or_create(group=permission_groups, user=user)
+        except IntegrityError as exc:
+            AUDIT_LOG.exception(exc.message or exc)
         except Exception as exc:
             self._add_error(errors, str(exc.message), _("Setting Participant's Status"), email)
         else:
