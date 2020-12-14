@@ -50,7 +50,7 @@ class ImportParticipantsViewSet(SecureViewSet):
         data = self._validate_data(request, errors, new=False)
 
         if not errors:
-            self._enroll_user(data, errors)
+            self._enroll_user(data, errors, response=response)
 
         response.update({'errors': errors})
         return Response(response)
@@ -185,7 +185,7 @@ class ImportParticipantsViewSet(SecureViewSet):
         except Exception as exc:
             self._add_error(errors, str(exc.message), _('Enrolling Participant in Company'), email)
 
-    def _enroll_user(self, data, errors):
+    def _enroll_user(self, data, errors, response={}):
         """Enroll user in a course and add him to a cohort."""
         user = data.get('user_object')
         email = user.email
@@ -224,9 +224,14 @@ class ImportParticipantsViewSet(SecureViewSet):
                 # Add permission for role.
                 permission = permissions[role]
                 permission_groups = Group.objects.get(groupprofile__name=permission)
-                permission_groups.user_set.add(user.id)
+                user.groups.through.objects.get_or_create(group=permission_groups, user=user)
+        except IntegrityError as exc:
+            AUDIT_LOG.exception(exc.message or exc)
         except Exception as exc:
             self._add_error(errors, str(exc.message), _("Setting Participant's Status"), email)
+        else:
+            response['user_id'] = user.id
+            AUDIT_LOG.info(u"API::User updated with user-id - {0}".format(user.id))
 
     @staticmethod
     def _add_error(errors, reason, activity, email):
