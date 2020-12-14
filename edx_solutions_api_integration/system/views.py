@@ -1,11 +1,9 @@
 """ BASE API VIEWS """
 from django.middleware.csrf import get_token
-
-from rest_framework import status
-from rest_framework.response import Response
-
 from edx_solutions_api_integration.permissions import SecureAPIView
 from edx_solutions_api_integration.utils import generate_base_uri
+from rest_framework import status
+from rest_framework.response import Response
 
 
 class SystemDetail(SecureAPIView):

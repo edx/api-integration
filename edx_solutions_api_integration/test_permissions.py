@@ -2,10 +2,10 @@
 Run these tests @ Devstack:
     rake fasttest_lms[common/djangoapps/edx_solutions_api_integration/tests/test_permissions.py]
 """
-from random import randint
 import uuid
-import mock
+from random import randint
 
+import mock
 from django.test import TestCase
 from django.test.utils import override_settings
 

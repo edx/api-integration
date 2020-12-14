@@ -5,16 +5,15 @@ Management command to update urls hardcoded in xblock from http to https
 
 import datetime
 import logging
-import urllib2 as urllib
+from optparse import make_option
+
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 from django.utils.timezone import utc
 from edx_solutions_api_integration.models import APIUser as User
 from edx_solutions_api_integration.tasks import update_http_to_https
-from optparse import make_option
-from pytz import UTC
-
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from pytz import UTC
 
 logger = logging.getLogger(__name__)
 

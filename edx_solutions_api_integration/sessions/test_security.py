@@ -4,16 +4,16 @@ Tests for session api with advance security features
 """
 import json
 import uuid
-from mock import patch
 from datetime import datetime, timedelta
-from freezegun import freeze_time
-from pytz import UTC
 
+from django.core.cache import cache
 from django.test import TestCase
 from django.test.client import Client
 from django.test.utils import override_settings
 from django.utils.translation import ugettext as _
-from django.core.cache import cache
+from freezegun import freeze_time
+from mock import patch
+from pytz import UTC
 from student.models import UserProfile
 from student.tests.factories import UserFactory
 from util.password_policy_validators import create_validator_config
@@ -52,8 +52,8 @@ class SessionApiSecurityTest(TestCase):
         Try (and fail) logging in with fewer attempts than the limit of 10
         and verify that you can still successfully log in afterwards.
         """
-        for i in xrange(9):
-            password = u'test_password{0}'.format(i)
+        for i in range(9):
+            password = 'test_password{}'.format(i)
             response, mock_audit_log = self._do_request(self.session_url, 'test', password, secure=True)
             self.assertEqual(response.status_code, 401)
 
@@ -67,8 +67,8 @@ class SessionApiSecurityTest(TestCase):
         Try (and fail) logging in with 10 attempts
         and verify that user is blocked out.
         """
-        for i in xrange(10):
-            password = u'test_password{0}'.format(i)
+        for i in range(10):
+            password = 'test_password{}'.format(i)
             response, mock_audit_log = self._do_request(self.session_url, 'test', password, secure=True)
             self.assertEqual(response.status_code, 401)
 
@@ -85,13 +85,13 @@ class SessionApiSecurityTest(TestCase):
         credentials(after 30 minutes) to verify blocked out time expired and
         user can login successfully.
         """
-        for i in xrange(10):
-            password = u'test_password{0}'.format(i)
+        for i in range(10):
+            password = 'test_password{}'.format(i)
             response, mock_audit_log = self._do_request(self.session_url, 'test', password, secure=True)
             self.assertEqual(response.status_code, 401)
             self._assert_audit_log(mock_audit_log, 'warn',
-                                   [u"API::User authentication failed with user-id - {0}".format(self.user.id)])
-            self._assert_not_in_audit_log(mock_audit_log, 'warn', [u'test'])
+                                   ["API::User authentication failed with user-id - {}".format(self.user.id)])
+            self._assert_not_in_audit_log(mock_audit_log, 'warn', ['test'])
 
         # check to see if this response indicates blockout
         response, mock_audit_log = self._do_request(self.session_url, 'test', 'test_password', secure=True)
@@ -207,8 +207,8 @@ class SessionApiSecurityTest(TestCase):
                                                     last_name='Doe', secure=True,
                                                     patched_audit_log='edx_solutions_api_integration.users.views.AUDIT_LOG')  # pylint: disable=C0301
         self._assert_response(response, status=201)
-        self._assert_audit_log(mock_audit_log, 'info', [u'API::New account created with user-id'])
-        self._assert_not_in_audit_log(mock_audit_log, 'info', [u'test@edx.org'])
+        self._assert_audit_log(mock_audit_log, 'info', ['API::New account created with user-id'])
+        self._assert_not_in_audit_log(mock_audit_log, 'info', ['test@edx.org'])
 
     def test_user_with_invalid_email(self):
         """
@@ -234,7 +234,7 @@ class SessionApiSecurityTest(TestCase):
         """
         response, mock_audit_log = self._do_request(self.session_url, 'unknown', 'UnKnown.Pass', secure=True)
         self._assert_response(response, status=404)
-        self._assert_audit_log(mock_audit_log, 'warn', [u'API::Failed login attempt with unknown email/username'])
+        self._assert_audit_log(mock_audit_log, 'warn', ['API::Failed login attempt with unknown email/username'])
 
     def test_successful_logout(self):
         """
@@ -243,15 +243,15 @@ class SessionApiSecurityTest(TestCase):
         response, mock_audit_log = self._do_request(self.session_url, 'test', 'test_password', secure=True)
         self._assert_response(response, status=201)
         self._assert_audit_log(mock_audit_log, 'info',
-                               [u"API::User logged in successfully with user-id - {0}".format(self.user.id)])
-        self._assert_not_in_audit_log(mock_audit_log, 'info', [u'test'])
-        response_dict = json.loads(response.content)
+                               ["API::User logged in successfully with user-id - {}".format(self.user.id)])
+        self._assert_not_in_audit_log(mock_audit_log, 'info', ['test'])
+        response_dict = json.loads(response.content.decode("utf-8"))
 
         response, mock_audit_log = self._do_request(self.session_url + '/' + response_dict['token'], 'test',
                                                     'test_password', secure=True, request_method='DELETE')
         self._assert_response(response, status=204)
         self._assert_audit_log(mock_audit_log, 'info',
-                               [u'API::User session terminated for user-id - {0}'.format(self.user.id)])
+                               ['API::User session terminated for user-id - {}'.format(self.user.id)])
 
     def _do_request(self, url, username, password, **kwargs):
         """
@@ -297,7 +297,7 @@ class SessionApiSecurityTest(TestCase):
         if response.status_code == 204:
             return
 
-        response_dict = json.loads(response.content)
+        response_dict = json.loads(response.content.decode("utf-8"))
 
         if message is not None:
             msg = ("'%s' did not contain '%s'" %
@@ -310,8 +310,8 @@ class SessionApiSecurityTest(TestCase):
         """
         method_calls = mock_audit_log.method_calls
         name, args, _kwargs = method_calls[-1]
-        self.assertEquals(name, level)
-        self.assertEquals(len(args), 1)
+        self.assertEqual(name, level)
+        self.assertEqual(len(args), 1)
         format_string = args[0]
         for log_string in log_strings:
             self.assertIn(log_string, format_string)
@@ -322,8 +322,8 @@ class SessionApiSecurityTest(TestCase):
         """
         method_calls = mock_audit_log.method_calls
         name, args, _kwargs = method_calls[-1]
-        self.assertEquals(name, level)
-        self.assertEquals(len(args), 1)
+        self.assertEqual(name, level)
+        self.assertEqual(len(args), 1)
         format_string = args[0]
         for log_string in log_strings:
             self.assertNotIn(log_string, format_string)
