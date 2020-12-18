@@ -131,6 +131,7 @@ def _serialize_user(response_data, user):
     response_data['created'] = user.date_joined
     response_data['is_staff'] = user.is_staff
     response_data['last_login'] = user.last_login
+    response_data['is_superuser'] = user.is_superuser
     return response_data
 
 
