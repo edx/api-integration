@@ -313,7 +313,7 @@ def _get_course_progress_metrics(course_key, **kwargs):
     """
     course_avg = 0
     data = {'course_avg': course_avg}
-    total_actual_or_percent_completions, total_possible_completions = get_total_completions(course_key, **kwargs)
+    percent_completions, total_possible_completions = get_total_completions(course_key, **kwargs)
     if kwargs.get('user_id'):
         data.update(get_user_position(course_key, **kwargs))
     if not any([kwargs.get('org_ids'), kwargs.get('group_ids'), kwargs.get('cohort_user_ids')]):
@@ -328,10 +328,8 @@ def _get_course_progress_metrics(course_key, **kwargs):
         if kwargs.get('cohort_user_ids'):
             total_users_qs = total_users_qs.filter(id__in=kwargs.get('cohort_user_ids'))
         total_users = total_users_qs.count()
-    if total_users and total_actual_or_percent_completions and total_possible_completions:
-        course_avg = total_actual_or_percent_completions / float(total_users)
-        if not kwargs.get('percent_completion'):
-            course_avg = min(100 * (course_avg / total_possible_completions), 100)  # avg in percentage
+    if total_users and percent_completions and total_possible_completions:
+        course_avg = percent_completions / float(total_users)
     data['course_avg'] = course_avg
     data['total_users'] = total_users
     data['total_possible_completions'] = total_possible_completions
@@ -402,7 +400,7 @@ def _get_courses_metrics_completions_leaders_list(course_key, **kwargs):
                 data.update(cached_leader_board_data)
                 return data
 
-    data = _get_course_progress_metrics(course_key, **kwargs)
+    data = _get_course_progress_metrics(course_key, percent_completion=True, **kwargs)
     total_users = data['total_users']
 
     if not kwargs.get('skipleaders') and 'leaders' not in data:
