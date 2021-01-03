@@ -1,8 +1,8 @@
 from completion_aggregator.models import Aggregator
-from django.db.models import Avg, F, Q, Sum
+from django.db.models import Avg, Q, Sum
 from edx_solutions_api_integration.courseware_access import get_course_key
 from edx_solutions_api_integration.utils import (
-    Round, cache_course_data, get_aggregate_exclusion_user_ids,
+    cache_course_data, get_aggregate_exclusion_user_ids,
     get_cached_data, get_non_actual_company_users)
 from student.models import CourseEnrollment
 
@@ -84,12 +84,8 @@ def generate_leaderboard(course_key, **kwargs):
 
 def get_total_completions(course_key, **kwargs):
     queryset = get_filtered_aggregation_queryset(course_key, **kwargs)
-    if kwargs.get('percent_completion'):
-        aggregate = queryset.aggregate(percent=Sum(Round((F('earned')/F('possible'))*100)), possible=Avg('possible'))
-        return aggregate.get('percent'), aggregate.get('possible')
-    else:
-        aggregate = queryset.aggregate(earned=Sum('earned'), possible=Avg('possible'))
-        return aggregate.get('earned'), aggregate.get('possible')
+    aggregate = queryset.aggregate(earned=Sum('earned'), possible=Avg('possible'))
+    return aggregate.get('earned'), aggregate.get('possible')
 
 
 def get_num_users_started(course_key, **kwargs):
