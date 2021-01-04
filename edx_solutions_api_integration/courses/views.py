@@ -313,7 +313,7 @@ def _get_course_progress_metrics(course_key, **kwargs):
     """
     course_avg = 0
     data = {'course_avg': course_avg}
-    total_actual_or_percent_completions, total_possible_completions = get_total_completions(course_key, **kwargs)
+    total_actual_completions, total_possible_completions = get_total_completions(course_key, **kwargs)
     if kwargs.get('user_id'):
         data.update(get_user_position(course_key, **kwargs))
     if not any([kwargs.get('org_ids'), kwargs.get('group_ids'), kwargs.get('cohort_user_ids')]):
@@ -328,10 +328,11 @@ def _get_course_progress_metrics(course_key, **kwargs):
         if kwargs.get('cohort_user_ids'):
             total_users_qs = total_users_qs.filter(id__in=kwargs.get('cohort_user_ids'))
         total_users = total_users_qs.count()
-    if total_users and total_actual_or_percent_completions and total_possible_completions:
-        course_avg = total_actual_or_percent_completions / float(total_users)
-        if not kwargs.get('percent_completion'):
-            course_avg = min(100 * (course_avg / total_possible_completions), 100)  # avg in percentage
+
+    if total_users and total_actual_completions and total_possible_completions:
+        course_avg = total_actual_completions / float(total_users)
+        course_avg = min(100 * (course_avg / total_possible_completions), 100)  # avg in percentage
+
     data['course_avg'] = course_avg
     data['total_users'] = total_users
     data['total_possible_completions'] = total_possible_completions
@@ -1883,7 +1884,7 @@ class CoursesMetrics(SecureAPIView):
         return avg_grade
 
     @staticmethod
-    def get_course_avg_progress(course_id, org_id=None, percent_completion=True):
+    def get_course_avg_progress(course_id, org_id=None):
         """
         Get average progress score of a course
         If org_id is passed then score is limited to that org's users
@@ -1903,7 +1904,6 @@ class CoursesMetrics(SecureAPIView):
             course_key,
             exclude_users=exclude_user_ids,
             org_ids=[org_id] if org_id else None,
-            percent_completion=percent_completion,
         )
         cache_course_data(cache_category, course_id, data)
 
@@ -2064,8 +2064,7 @@ class CoursesMetrics(SecureAPIView):
             if not any([group_ids, cohort_user_ids]):
                 avg_progress = CoursesMetrics.get_course_avg_progress(
                     course_id=course_id,
-                    org_id=organization,
-                    percent_completion=True
+                    org_id=organization
                 )
             else:
                 progress_metrics = _get_course_progress_metrics(
@@ -2073,8 +2072,7 @@ class CoursesMetrics(SecureAPIView):
                     exclude_users=exclude_users,
                     org_ids=org_ids,
                     group_ids=group_ids,
-                    cohort_user_ids=cohort_user_ids,
-                    percent_completion=True,
+                    cohort_user_ids=cohort_user_ids
                 )
                 avg_progress = progress_metrics.get('course_avg')
 
