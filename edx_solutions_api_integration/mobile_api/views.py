@@ -1,41 +1,28 @@
 """
 Views for mobile APIs
 """
-from edx_solutions_api_integration.courses.views import (
-    CoursesOverview,
-    CoursesStaticTabsList,
-    CoursesStaticTabsDetail,
-)
-from edx_solutions_api_integration.mobile_api.serializers import MobileOrganizationSerializer
-from edx_solutions_api_integration.permissions import (
-    MobileListAPIView,
-    IsStaffOrEnrolled,
-    MobilePermissionMixin
-)
 from django.shortcuts import get_object_or_404
+from edx_solutions_api_integration.courses.views import (
+    CoursesOverview, CoursesStaticTabsDetail, CoursesStaticTabsList)
+from edx_solutions_api_integration.courseware_access import (course_exists,
+                                                             get_course_key)
+from edx_solutions_api_integration.mobile_api.serializers import MobileOrganizationSerializer
+from edx_solutions_api_integration.models import APIUser as User
+from edx_solutions_api_integration.permissions import (IsStaffOrEnrolled,
+                                                       MobileListAPIView,
+                                                       MobilePermissionMixin)
+from edx_solutions_api_integration.users.views import (UsersCourseProgressList,
+                                                       UsersCoursesDetail,
+                                                       UsersOrganizationsList,
+                                                       UsersSocialMetrics)
+from edx_solutions_api_integration.utils import (
+    cache_course_data, cache_course_user_data,
+    get_aggregate_exclusion_user_ids, get_cached_data)
+from gradebook.models import StudentGradebook
+from openedx.core.lib.api.permissions import IsStaffOrOwner
 from rest_framework import status
 from rest_framework.response import Response
-
-from edx_solutions_api_integration.courseware_access import (
-    course_exists,
-    get_course_key
-)
-from edx_solutions_api_integration.models import APIUser as User
-from edx_solutions_api_integration.users.views import (
-    UsersSocialMetrics,
-    UsersOrganizationsList,
-    UsersCourseProgressList,
-    UsersCoursesDetail,
-)
-from edx_solutions_api_integration.utils import (
-    get_cached_data,
-    cache_course_data,
-    cache_course_user_data,
-    get_aggregate_exclusion_user_ids,
-)
-from openedx.core.lib.api.permissions import IsStaffOrOwner
 from student.models import CourseEnrollment
-from gradebook.models import StudentGradebook
 
 
 class MobileUsersOrganizationsList(MobilePermissionMixin, UsersOrganizationsList):
@@ -48,7 +35,7 @@ class MobileUsersOrganizationsList(MobilePermissionMixin, UsersOrganizationsList
         self.permission_classes += (IsStaffOrOwner, )
 
     def get_queryset(self):
-        return super(MobileUsersOrganizationsList, self).get_queryset().prefetch_related('mobile_apps', 'theme')
+        return super().get_queryset().prefetch_related('mobile_apps', 'theme')
 
 
 class MobileUsersCourseProgressList(MobilePermissionMixin, UsersCourseProgressList):

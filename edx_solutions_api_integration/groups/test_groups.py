@@ -3,27 +3,25 @@
 """
 Tests for groups module
 """
-from dateutil.relativedelta import relativedelta
-from random import randint
 import uuid
-import mock
-from urllib import urlencode
+from random import randint
+from urllib.parse import urlencode
 
+import mock
+from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.core.cache import cache
 from django.test.utils import override_settings
 from django.utils import timezone
-from edx_solutions_api_integration.models import GroupRelationship, GroupProfile
+from edx_solutions_api_integration.models import (GroupProfile,
+                                                  GroupRelationship)
+from edx_solutions_api_integration.test_utils import APIClientMixin
 from edx_solutions_organizations.models import Organization
 from edx_solutions_projects.models import Project
-from edx_solutions_api_integration.test_utils import APIClientMixin
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
-from xmodule.modulestore.tests.django_utils import (
-    ModuleStoreTestCase,
-    TEST_DATA_SPLIT_MODULESTORE
-)
 from student.tests.factories import GroupFactory
-
+from xmodule.modulestore.tests.django_utils import (
+    TEST_DATA_SPLIT_MODULESTORE, ModuleStoreTestCase)
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
 
 @mock.patch.dict("django.conf.settings.FEATURES", {'ADVANCED_SECURITY': False,
@@ -34,7 +32,7 @@ class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
     MODULESTORE = TEST_DATA_SPLIT_MODULESTORE
 
     def setUp(self):
-        super(GroupsApiTests, self).setUp()
+        super().setUp()
         self.test_username = str(uuid.uuid4())
         self.test_password = str(uuid.uuid4())
         self.test_email = str(uuid.uuid4()) + '@test.org'
@@ -47,7 +45,7 @@ class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
 
         self.test_course_data = '<html>{}</html>'.format(str(uuid.uuid4()))
         self.course = CourseFactory.create()
-        self.test_course_id = unicode(self.course.id)
+        self.test_course_id = str(self.course.id)
         self.course_end_date = timezone.now() + relativedelta(days=60)
         self.course_content = ItemFactory.create(
             category="videosequence",
@@ -65,8 +63,8 @@ class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
         )
 
         self.test_project = Project.objects.create(
-            course_id=unicode(self.course.id),
-            content_id=unicode(self.course_content.scope_ids.usage_id)
+            course_id=str(self.course.id),
+            content_id=str(self.course_content.scope_ids.usage_id)
         )
         cache.clear()
 
@@ -317,7 +315,7 @@ class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
 
     def test_group_users_list_post_multiple(self):
         user_id = []
-        for i in xrange(2):
+        for i in range(2):
             local_username = self.test_username + str(i)
             data = {'email': self.test_email, 'username': local_username, 'password': self.test_password}
             response = self.do_post(self.base_users_uri, data)
@@ -824,7 +822,7 @@ class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
         data = {'course_id': self.test_course_id}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
-        confirm_uri = test_uri + '/' + unicode(self.course.id)
+        confirm_uri = test_uri + '/' + str(self.course.id)
         self.assertEqual(response.data['uri'], confirm_uri)
         self.assertEqual(response.data['group_id'], str(group_id))
         self.assertEqual(response.data['course_id'], self.test_course_id)
@@ -867,7 +865,7 @@ class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
         data = {'course_id': self.test_course_id}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
-        confirm_uri = test_uri + '/' + unicode(self.course.id)
+        confirm_uri = test_uri + '/' + str(self.course.id)
         self.assertEqual(response.data['uri'], confirm_uri)
         self.assertEqual(response.data['group_id'], str(group_id))
         self.assertEqual(response.data['course_id'], self.test_course_id)
@@ -936,7 +934,7 @@ class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
         data = {'name': self.test_group_name, 'type': 'test'}
         response = self.do_post(self.base_groups_uri, data)
         self.assertEqual(response.status_code, 201)
-        test_uri = '{}/courses/{}'.format(response.data['uri'], unicode(self.course.id))
+        test_uri = '{}/courses/{}'.format(response.data['uri'], str(self.course.id))
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
 
@@ -964,7 +962,7 @@ class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
         self.assertEqual(response.status_code, 201)
         group_id = response.data['id']
         test_workgroups_uri = self.base_workgroups_uri
-        for i in xrange(1, 12):
+        for i in range(1, 12):
             project_id = self.test_project.id
             data = {
                 'name': 'Workgroup ' + str(i),
@@ -986,7 +984,7 @@ class GroupsApiTests(ModuleStoreTestCase, APIClientMixin):
         self.assertEqual(response.data['num_pages'], 2)
 
         # test with course_id filter
-        course_id = {'course_id': unicode(self.course.id)}
+        course_id = {'course_id': str(self.course.id)}
         groups_uri = '{}/{}/workgroups/?{}'.format(self.base_groups_uri, group_id, urlencode(course_id))
         response = self.do_get(groups_uri)
         self.assertEqual(response.status_code, 200)

@@ -1,38 +1,32 @@
 """ API implementation for Secure api calls. """
 
-import socket
-import struct
+import ast
+import datetime
 import json
 import re
-import datetime
-import ast
+import socket
+import struct
+from urllib.request import urlopen
 
-from PIL import Image
-import urllib
-
-from django.core.cache import cache
-from django.utils.timezone import now
 from dateutil.parser import parse
-from dateutil.relativedelta import relativedelta, MO
+from dateutil.relativedelta import MO, relativedelta
 from django.conf import settings
+from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.db.models import Func
 from django.shortcuts import get_object_or_404
-from lms.djangoapps.notification_prefs.views import UsernameCipher
-from rest_framework.exceptions import ParseError
-
+from django.utils.timezone import now
 from edx_solutions_organizations.models import Organization
-from django.contrib.auth.models import User
-
+from lms.djangoapps.discussion.notification_prefs.views import UsernameCipher
+from opaque_keys.edx.keys import CourseKey
 from openedx.core.djangoapps.user_api.accounts.image_helpers import (
-    _get_profile_image_urls,
-    _make_profile_image_name,
-    get_profile_image_storage,
-    _get_default_profile_image_urls,
-)
+    _get_default_profile_image_urls, _get_profile_image_urls,
+    _make_profile_image_name, get_profile_image_storage)
 from openedx.core.djangoapps.user_api.accounts.serializers import PROFILE_IMAGE_KEY_PREFIX
 from openedx.core.djangoapps.waffle_utils import WaffleSwitchNamespace
-from student.roles import CourseRole, CourseObserverRole
-from opaque_keys.edx.keys import CourseKey
+from PIL import Image
+from rest_framework.exceptions import ParseError
+from student.roles import CourseObserverRole, CourseRole
 
 USER_METRICS_CACHE_TTL = 60 * 60
 COURSE_METRICS_CACHE_TTL = 30 * 60
@@ -50,7 +44,7 @@ def address_exists_in_network(ip_address, net_n_bits):
     ip_address = struct.unpack('<L', socket.inet_aton(ip_address))[0]
     net, bits = net_n_bits.split('/')
     net_address = struct.unpack('<L', socket.inet_aton(net))[0]
-    net_mask = ((1L << int(bits)) - 1)
+    net_mask = ((1 << int(bits)) - 1)
     return ip_address & net_mask == net_address & net_mask
 
 
@@ -104,10 +98,10 @@ def dict_has_items(obj, items):
     is list of dictionaries
     """
     has_items = False
-    if isinstance(obj, basestring):
+    if isinstance(obj, str):
         obj = json.loads(obj)
     for item in items:
-        for lookup_key, lookup_val in item.iteritems():
+        for lookup_key, lookup_val in item.items():
             if lookup_key in obj and obj[lookup_key] == lookup_val:
                 has_items = True
             else:
@@ -127,9 +121,9 @@ def get_cache_key(category, course_id, user_id=None):
     :return:
     """
 
-    return u"edx_solutions_api_integration.{category}.{course_id}.{user_id}".format(
+    return "edx_solutions_api_integration.{category}.{course_id}.{user_id}".format(
         category=category,
-        course_id=unicode(course_id),
+        course_id=str(course_id),
         user_id=user_id,
     )
 
@@ -190,7 +184,7 @@ def get_aggregate_exclusion_user_ids(course_key, roles=None):  # pylint: disable
     can either be passed in roles argument or defined in a AGGREGATION_EXCLUDE_ROLES settings variable.
     """
 
-    cache_key = get_cache_key('exclude_users', unicode(course_key) + '_'.join(roles or 'None'))
+    cache_key = get_cache_key('exclude_users', str(course_key) + '_'.join(roles or 'None'))
     cached_data = cache.get(cache_key)
     if cached_data is not None:
         return cached_data
@@ -214,7 +208,7 @@ def extract_data_params(request):
     extracts all query params which starts with data__
     """
     data_params = []
-    for key, val in request.query_params.iteritems():
+    for key, val in request.query_params.items():
         if key.startswith('data__'):
             data_params.append({key[6:]: val})
     return data_params
@@ -239,7 +233,7 @@ def parse_datetime(date_val, defaultdt=None):
     """
     Parses datetime value from string
     """
-    if isinstance(date_val, basestring):
+    if isinstance(date_val, str):
         return parse(date_val, yearfirst=True, default=defaultdt)
     return date_val
 
@@ -309,7 +303,7 @@ def get_time_series_data(queryset, start, end, interval='days', date_field='crea
         annotate(agg=aggregate)
 
     today = strip_time(now())
-    data = dict((strip_time(parse_datetime(item['d'], today)), item['agg']) for item in aggregate_data)
+    data = {strip_time(parse_datetime(item['d'], today)): item['agg'] for item in aggregate_data}
 
     series = []
     dt_key = start
@@ -349,7 +343,7 @@ def get_ids_from_list_param(request, param_name):
     if ids:
         upper_bound = getattr(settings, 'API_LOOKUP_UPPER_BOUND', 100)
         try:
-            ids = map(int, ids.split(','))[:upper_bound]
+            ids = list(map(int, ids.split(',')))[:upper_bound]
         except Exception:
             raise ParseError("Invalid {} parameter value".format(param_name))
 
@@ -364,9 +358,9 @@ def css_param_to_list(request, param_name):
     :return: list of values in param
     """
     values = request.query_params.get(param_name, [])
-    if isinstance(values, basestring):
+    if isinstance(values, str):
         upper_bound = getattr(settings, 'API_LOOKUP_UPPER_BOUND', 100)
-        values = [value.strip() for value in filter(None, values.split(',')[:upper_bound])]
+        values = [value.strip() for value in [_f for _f in values.split(',')[:upper_bound] if _f]]
     return values
 
 
@@ -378,7 +372,7 @@ def css_data_to_list(request, param_name):
     :return: list of values in param
     """
     values = request.data.get(param_name, [])
-    if isinstance(values, basestring):
+    if isinstance(values, str):
         upper_bound = getattr(settings, 'API_LOOKUP_UPPER_BOUND', 100)
         values = [value.strip() for value in values.split(',')[:upper_bound]]
     return values
@@ -481,7 +475,7 @@ def get_image_dimensions(image_url):
     Get dimensions of a remote image
     """
     try:
-        img = Image.open(urllib.urlopen(image_url))
+        img = Image.open(urlopen(image_url))
     except Exception as e:
         return None
     else:

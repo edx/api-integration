@@ -1,13 +1,11 @@
 """ Django REST Framework Serializers """
-from django.conf import settings
-from rest_framework import serializers
-from rest_framework.reverse import reverse
-
 from completion.models import BlockCompletion
+from django.conf import settings
+from edx_solutions_api_integration.utils import get_profile_image_urls_by_username
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.lib.courses import course_image_url
-
-from edx_solutions_api_integration.utils import get_profile_image_urls_by_username
+from rest_framework import serializers
+from rest_framework.reverse import reverse
 
 
 class GradeSerializer(serializers.Serializer):
@@ -35,11 +33,11 @@ class BaseCourseLeadersSerializer(serializers.Serializer):
     def get_name_initials(self, data):
         first = data['user__first_name'][0] if data['user__first_name'] else ''
         last = data['user__last_name'][0] if data['user__last_name'] else ''
-        return ('%s%s' % (first, last)).title()
+        return ('{}{}'.format(first, last)).title()
 
     def get_display_name(self, data):
         last = data['user__last_name'][0] if data['user__last_name'] else ''
-        return ('%s %s' % (data['user__first_name'], last)).strip()
+        return ('{} {}'.format(data['user__first_name'], last)).strip()
 
 
 class CourseProficiencyLeadersSerializer(BaseCourseLeadersSerializer):
@@ -110,12 +108,12 @@ class OrganizationCourseSerializer(CourseSerializer):
     name = serializers.CharField(source='display_name')
     enrolled_users = serializers.SerializerMethodField()
 
-    class Meta(object):
+    class Meta:
         """ Serializer/field specification """
         fields = ('id', 'name', 'number', 'org', 'start', 'end', 'due', 'enrolled_users', )
 
     def get_enrolled_users(self, obj):
-        return self.context['enrollments'][unicode(obj.id)] if unicode(obj.id) in self.context['enrollments'] else []
+        return self.context['enrollments'][str(obj.id)] if str(obj.id) in self.context['enrollments'] else []
 
 
 class UserGradebookSerializer(serializers.Serializer):
@@ -144,13 +142,13 @@ class BlockCompletionSerializer(serializers.ModelSerializer):
     Include extra fields for backwards compatibility with CourseModuleCompletions.
     """
 
-    class Meta(object):  # pylint: disable=missing-docstring,too-few-public-methods
+    class Meta:  # pylint: disable=missing-docstring,too-few-public-methods
         model = BlockCompletion
         fields = '__all__'
 
     user_id = serializers.IntegerField(source='user.id')
     content_id = serializers.CharField(source='block_key')
-    course_id = serializers.CharField(source='course_key')
+    course_id = serializers.CharField(source='context_key')
     stage = serializers.SerializerMethodField()
 
     def get_stage(self, _obj):  # pylint: disable=no-self-use

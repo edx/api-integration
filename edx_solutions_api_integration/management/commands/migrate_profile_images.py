@@ -3,22 +3,21 @@ Management command to migrate profile images from s3 bucket to open edx profile 
 ./manage.py lms migrate_profile_images  --settings=aws --aws-access-key="x" --aws-access-secret="x" --bucket-name="b"
 """
 
-import logging
 import datetime
-import urllib2 as urllib
-import io
-
-from optparse import make_option
+import logging
 from contextlib import closing
+from io import BytesIO
+from optparse import make_option
+from urllib.request import urlopen
+
+from boto.exception import S3ResponseError
+from boto.s3.connection import S3Connection
 from django.core.management.base import BaseCommand, CommandError
 from django.utils.timezone import utc
-from student.models import UserProfile
+from edx_solutions_api_integration.models import APIUser as User
 from openedx.core.djangoapps.profile_images.images import create_profile_images
 from openedx.core.djangoapps.user_api.accounts.image_helpers import get_profile_image_names
-
-from edx_solutions_api_integration.models import APIUser as User
-from boto.s3.connection import S3Connection
-from boto.exception import S3ResponseError
+from student.models import UserProfile
 
 log = logging.getLogger(__name__)
 
@@ -88,8 +87,8 @@ class Command(BaseCommand):
 
                 log.info("Get image_url %s of %s", image_url, user.username)
                 if image_url:
-                    with closing(urllib.urlopen(image_url)) as fd:
-                        image_file = io.BytesIO(fd.read())
+                    with closing(urlopen(image_url)) as fd:
+                        image_file = BytesIO(fd.read())
 
                     # generate profile pic and thumbnails and store them
                     profile_image_names = get_profile_image_names(user.username)
