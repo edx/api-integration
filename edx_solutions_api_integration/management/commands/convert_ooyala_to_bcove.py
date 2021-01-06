@@ -1,15 +1,13 @@
+import datetime
 import logging
 from optparse import make_option
-import datetime
-
-from pytz import UTC
 
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
-
-from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from edx_solutions_api_integration.tasks import convert_ooyala_to_bcove
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from pytz import UTC
 
 logger = logging.getLogger(__name__)  # pylint: disable=locally-disabled, invalid-name
 

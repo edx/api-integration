@@ -1,21 +1,22 @@
 """
 Tests test add company admin group management command
 """
-from opaque_keys.edx import locator
 import unittest
 import uuid
 
-from edx_solutions_api_integration.management.commands import add_new_permissions
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
 from django.contrib.auth.models import Group
+from edx_solutions_api_integration.management.commands import add_new_permissions
 from edx_solutions_organizations.models import Organization
+from opaque_keys.edx import locator
+from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase
+
 
 class TestAddNewPermissions(ModuleStoreTestCase):
     """Tests adding new company admin role."""
 
     ORGANIZATIONS_NUM = 10
     def setUp(self, **kwargs):
-        super(TestAddNewPermissions, self).setUp()
+        super().setUp()
         self.group_type = "permission"
         self.original_group_name = "mcka_role_company_admin"
         self.organizations = []

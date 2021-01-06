@@ -2,30 +2,26 @@
 
 """ API implementation for session-oriented interactions. """
 import logging
+from importlib import import_module
 
 from cryptography.fernet import Fernet
-
-from importlib import import_module
 from django.conf import settings
-from django.contrib.auth import authenticate
-from django.contrib.auth import SESSION_KEY, BACKEND_SESSION_KEY, HASH_SESSION_KEY, load_backend
+from django.contrib.auth import (BACKEND_SESSION_KEY, HASH_SESSION_KEY,
+                                 SESSION_KEY, authenticate, load_backend)
 from django.contrib.auth.models import AnonymousUser, User
-from django.template.context_processors import csrf
 from django.core.exceptions import ObjectDoesNotExist
+from django.template.context_processors import csrf
+from django.utils import timezone
 from django.utils.translation import ugettext as _
+from edx_solutions_api_integration.models import PasswordHistory
 from edx_solutions_api_integration.permissions import SecureAPIView
+from edx_solutions_api_integration.users.serializers import SimpleUserSerializer
+from edx_solutions_api_integration.utils import generate_base_uri
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.utils import timezone
-
-
-from util.request_rate_limiter import BadRequestRateLimiter
-from edx_solutions_api_integration.utils import generate_base_uri
-
-from edx_solutions_api_integration.users.serializers import SimpleUserSerializer
-from edx_solutions_api_integration.models import PasswordHistory
 from student.models import LoginFailures
+from util.request_rate_limiter import BadRequestRateLimiter
 
 AUDIT_LOG = logging.getLogger("audit")
 
@@ -162,14 +158,14 @@ class SessionsList(SecureAPIView):
 
                     # generate a CSRF tokens for any web clients that may need to
                     # call into the LMS via Ajax (for example Notifications)
-                    response_data['csrftoken'] = unicode(csrf(request)['csrf_token'])
+                    response_data['csrftoken'] = str(csrf(request)['csrf_token'])
 
                     # update the last_login fields in the auth_user table for this user
                     user.last_login = timezone.now()
                     user.save()
 
                     # add to audit log
-                    AUDIT_LOG.info(u"API::User logged in successfully with user-id - {0}".format(user.id))  # pylint: disable=W1202
+                    AUDIT_LOG.info("API::User logged in successfully with user-id - {}".format(user.id))  # pylint: disable=W1202
                 else:
                     response_status = status.HTTP_403_FORBIDDEN
             else:
@@ -180,9 +176,9 @@ class SessionsList(SecureAPIView):
                     LoginFailures.increment_lockout_counter(existing_user)
 
                 response_status = status.HTTP_401_UNAUTHORIZED
-                AUDIT_LOG.warn(u"API::User authentication failed with user-id - {0}".format(existing_user.id))  # pylint: disable=W1202
+                AUDIT_LOG.warn("API::User authentication failed with user-id - {}".format(existing_user.id))  # pylint: disable=W1202
         else:
-            AUDIT_LOG.warn(u"API::Failed login attempt with unknown email/username")
+            AUDIT_LOG.warn("API::Failed login attempt with unknown email/username")
             response_status = status.HTTP_404_NOT_FOUND
         return Response(response_data, status=response_status)
 
@@ -227,7 +223,7 @@ class SessionsDetail(SecureAPIView):
             user = backend.get_user(user_id) or AnonymousUser()
         except KeyError:
             user = AnonymousUser()
-        if user.is_authenticated():
+        if user.is_authenticated:
             response_data['token'] = session.session_key
             response_data['expires'] = session.get_expiry_age()
             response_data['uri'] = base_uri
@@ -251,7 +247,7 @@ class SessionsDetail(SecureAPIView):
         user_id = session[SESSION_KEY]
         session.delete()
 
-        AUDIT_LOG.info(u"API::User session terminated for user-id - {0}".format(user_id))  # pylint: disable=W1202
+        AUDIT_LOG.info("API::User session terminated for user-id - {}".format(user_id))  # pylint: disable=W1202
         return Response({}, status=status.HTTP_204_NO_CONTENT)
 
 
@@ -273,9 +269,9 @@ class AssetsToken(APIView):
             user = backend.get_user(user_id) or AnonymousUser()
         except KeyError:
             user = AnonymousUser()
-        if user.is_authenticated():
-            response_data['assets_token'] = Fernet(bytes(settings.ASSETS_TOKEN_ENCRYPTION_KEY))\
-                .encrypt(bytes(session.session_key))
+        if user.is_authenticated:
+            response_data['assets_token'] = Fernet(bytes(settings.ASSETS_TOKEN_ENCRYPTION_KEY, 'utf-8'))\
+                .encrypt(bytes(session.session_key, 'utf-8'))
             return Response(response_data, status=status.HTTP_200_OK)
         else:
             return Response(response_data, status=status.HTTP_404_NOT_FOUND)

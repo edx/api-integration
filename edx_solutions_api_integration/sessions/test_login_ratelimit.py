@@ -3,17 +3,17 @@
 Tests for rate limiting features
 """
 import json
-from mock import patch
 from datetime import datetime, timedelta
-from freezegun import freeze_time
-from pytz import UTC
 
-from django.utils.translation import ugettext as _
 from django.core.cache import cache
-from student.tests.factories import UserFactory
-from student.models import UserProfile
-from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
+from django.utils.translation import ugettext as _
 from edx_solutions_api_integration.test_utils import APIClientMixin
+from freezegun import freeze_time
+from mock import patch
+from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
+from pytz import UTC
+from student.models import UserProfile
+from student.tests.factories import UserFactory
 
 
 @patch.dict("django.conf.settings.FEATURES", {'ENABLE_MAX_FAILED_LOGIN_ATTEMPTS': False,
@@ -42,8 +42,8 @@ class SessionApiRateLimitingProtectionTest(CacheIsolationTestCase, APIClientMixi
     def test_login_ratelimiting_protection(self):
         """ Try (and fail) login user 30 times on invalid password """
 
-        for i in xrange(30):
-            password = u'test_password{0}'.format(i)
+        for i in range(30):
+            password = 'test_password{}'.format(i)
             data = {'username': 'test', 'password': password}
             response = self.do_post(self.session_url, data)
             self.assertEqual(response.status_code, 401)
@@ -56,8 +56,8 @@ class SessionApiRateLimitingProtectionTest(CacheIsolationTestCase, APIClientMixi
 
     def test_login_ratelimiting_unblock(self):
         """ Try (and fail) login user 30 times on invalid password """
-        for i in xrange(30):
-            password = u'test_password{0}'.format(i)
+        for i in range(30):
+            password = 'test_password{}'.format(i)
             data = {'username': 'test', 'password': password}
             response = self.do_post(self.session_url, data)
             self.assertEqual(response.status_code, 401)
@@ -68,8 +68,8 @@ class SessionApiRateLimitingProtectionTest(CacheIsolationTestCase, APIClientMixi
         message = _('Rate limit exceeded in api login.')
         self._assert_response(response, status=403, message=message)
 
-        # now reset the time to 5 mins from now in future in order to unblock
-        reset_time = datetime.now(UTC) + timedelta(seconds=300)
+        # now reset the time to 9 mins from now in future in order to unblock
+        reset_time = datetime.now(UTC) + timedelta(seconds=560)
         with freeze_time(reset_time):
             response = self.do_post(self.session_url, data)
             self._assert_response(response, status=201)
@@ -86,7 +86,7 @@ class SessionApiRateLimitingProtectionTest(CacheIsolationTestCase, APIClientMixi
         value for 'message' in the JSON dict.
         """
         self.assertEqual(response.status_code, status)
-        response_dict = json.loads(response.content)
+        response_dict = json.loads(response.content.decode("utf-8"))
 
         if message is not None:
             msg = ("'%s' did not contain '%s'" %

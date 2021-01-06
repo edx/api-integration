@@ -1,23 +1,24 @@
 """ API implementation for group-oriented interactions. """
-import uuid
 import json
+import uuid
 
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import Http404
 from django.utils.translation import ugettext_lazy as _
-
+from edx_solutions_api_integration.courseware_access import get_course
+from edx_solutions_api_integration.models import APIUser as User
+from edx_solutions_api_integration.models import (CourseGroupRelationship,
+                                                  GroupProfile,
+                                                  GroupRelationship)
+from edx_solutions_api_integration.permissions import (SecureAPIView,
+                                                       SecureListAPIView)
+from edx_solutions_api_integration.utils import generate_base_uri, str2bool
+from edx_solutions_organizations import serializers
+from edx_solutions_projects.serializers import (BasicWorkgroupSerializer,
+                                                GroupSerializer)
 from rest_framework import status
 from rest_framework.response import Response
-
-from edx_solutions_api_integration.courseware_access import get_course
-from edx_solutions_api_integration.models import GroupRelationship, CourseGroupRelationship, GroupProfile, \
-    APIUser as User
-from edx_solutions_api_integration.permissions import SecureAPIView, SecureListAPIView
-from edx_solutions_api_integration.utils import str2bool, generate_base_uri
-from edx_solutions_organizations import serializers
-from edx_solutions_projects.serializers import BasicWorkgroupSerializer, GroupSerializer
-
 
 RELATIONSHIP_TYPES = {'hierarchical': 'h', 'graph': 'g'}
 
@@ -250,7 +251,7 @@ class GroupsUsersList(SecureAPIView):
 
         user_id = request.data.get('user_id', None)
         if user_id:
-            user_id = map(int, str(user_id).split(','))
+            user_id = list(map(int, str(user_id).split(',')))
         else:
             return Response({'message': _('user_id is missing')}, status=status.HTTP_400_BAD_REQUEST)
 
