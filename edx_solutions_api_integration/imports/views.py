@@ -19,7 +19,8 @@ from edx_solutions_organizations.models import Organization
 from lms.djangoapps.discussion.notification_prefs.views import enable_notifications
 from opaque_keys.edx.keys import CourseKey
 from openedx.core.djangoapps.course_groups.cohorts import (add_cohort,
-                                                           get_cohort_by_name)
+                                                           get_cohort_by_name,
+                                                           add_user_to_cohort)
 from openedx.core.djangoapps.course_groups.models import (CohortMembership,
                                                           CourseCohort,
                                                           CourseUserGroup)
@@ -207,10 +208,9 @@ class ImportParticipantsViewSet(SecureViewSet):
         cohort = get_cohort_by_name(course_key, CourseUserGroup.default_cohort_name)
 
         try:
-            CohortMembership.objects.create(course_user_group=cohort, user=user)
-        except IntegrityError:
-            # This situation can occur if user is already present in the course or if his enrollment was removed
-            # manually from Django Admin. We can ignore this error.
+            add_user_to_cohort(cohort, user.username)
+        except ValueError:
+            # This situation can occur if user is already present in the cohort for the course.
             pass
 
         # Assign role and permission in course.
