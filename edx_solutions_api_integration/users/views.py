@@ -1266,6 +1266,12 @@ class UsersCoursesDetail(SecureAPIView):
         if not course_exists(course_id):
             return Response({}, status=status.HTTP_204_NO_CONTENT)
         course_key = get_course_key(course_id)
+        if not CourseEnrollment.is_enrolled(user, course_key):
+            return Response(
+                {
+                    'message': _("Student not enrolled in given course")
+                }, status=status.HTTP_404_NOT_FOUND
+            )
         try:
             cohort = CourseUserGroup.objects.get(
                 course_id=course_key,
