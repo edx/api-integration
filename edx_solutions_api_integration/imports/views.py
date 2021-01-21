@@ -209,9 +209,7 @@ class ImportParticipantsViewSet(SecureViewSet):
         try:
             add_user_to_cohort(cohort, user.username)
         except ValueError:
-            # This situation can occur if user is already present in the cohort probably because they were un-enrolled
-            # and re-enrolled or if his enrollment was removed
-            # manually from Django Admin. We can ignore this error.
+            # This situation can occur if user is already present in the cohort for the course.
             pass
 
         # Assign role and permission in course.
