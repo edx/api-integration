@@ -39,7 +39,7 @@ class Command(BaseCommand):
             "--num-responses",
             dest="num_responses",
             default=10000,
-            type="int",
+            type=int,
             help="Limit generation of responses to this number. Defaults to "
                  "generating 10k responses. Setting this to 0 will generate"
                  "a dummy response for every user in every poll.",
@@ -48,7 +48,7 @@ class Command(BaseCommand):
             "--batch-size",
             dest="batch_size",
             default=500,
-            type="int",
+            type=int,
             help="Batch size to use when adding responses to the database.",
         ),
     state_summary = {}
@@ -104,7 +104,7 @@ class Command(BaseCommand):
         count = 0
         # Returns generator of combinations that aren't already stored
         for student, block in combinations:
-            if count >= limit:
+            if limit and count >= limit:
                 break
             if (student, str(block.location)) not in skip_combinations:
                 count += 1
