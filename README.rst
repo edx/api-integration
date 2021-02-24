@@ -1,6 +1,9 @@
 api-integration
 ===============
 
+Notice: This repo will be archived in April 2021.
+#######
+
 api-integration (``edx_solutions_api_integration``) is a Django application that provides a RESTful interface to the edx-platform.
 
 
