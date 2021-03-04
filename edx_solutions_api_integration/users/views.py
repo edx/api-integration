@@ -7,96 +7,80 @@ import os
 from datetime import datetime
 from functools import reduce
 
+from completion_aggregator.models import Aggregator
+from lms.djangoapps.courseware import module_render
+from lms.djangoapps.courseware.model_data import FieldDataCache
+from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from django.core.validators import validate_email, validate_slug
 from django.core.files.base import ContentFile
+from django.core.validators import validate_email, validate_slug
 from django.db import IntegrityError
-from django.db.models import Count, Q, Case, When, Value, BooleanField
-from django.conf import settings
+from django.db.models import BooleanField, Case, Count, Q, Value, When
 from django.http import Http404
-from django.utils.translation import get_language, ugettext_lazy as _
+from django.utils.translation import get_language
+from django.utils.translation import ugettext_lazy as _
+from openedx.core.djangoapps.django_comment_common.models import FORUM_ROLE_MODERATOR, Role
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters
-from rest_framework.response import Response
-from rest_framework import status
-
-from courseware import module_render
-from courseware.model_data import FieldDataCache
-from django_comment_common.models import Role, FORUM_ROLE_MODERATOR
+from edx_notifications.lib.consumer import mark_notification_read
+from edx_solutions_api_integration.courseware_access import (course_exists,
+                                                             get_course,
+                                                             get_course_child,
+                                                             get_course_key)
+from edx_solutions_api_integration.models import APIUser as User
+from edx_solutions_api_integration.models import (CourseGroupRelationship,
+                                                  GroupProfile,
+                                                  PasswordHistory)
+from edx_solutions_api_integration.permissions import (HasOrgsFilterBackend,
+                                                       IdsInFilterBackend,
+                                                       MobileAPIView,
+                                                       SecureAPIView,
+                                                       SecureListAPIView,
+                                                       TokenBasedAPIView)
+from edx_solutions_api_integration.users.serializers import (
+    CourseProgressSerializer, MassUsersDetailsSerializer,
+    UserCountByCitySerializer, UserRolesSerializer, UserSerializer)
+from edx_solutions_api_integration.utils import (
+    cache_course_data, cache_course_user_data, css_data_to_list,
+    css_param_to_list, dict_has_items, extract_data_params, generate_base_uri,
+    get_aggregate_exclusion_user_ids, get_cached_data,
+    get_non_actual_company_users, get_profile_image_urls_by_username,
+    get_user_from_request_params, str2bool)
+from edx_solutions_organizations.models import (Organization,
+                                                OrganizationUsersAttributes)
+from edx_solutions_organizations.serializers import BasicOrganizationSerializer
+from edx_solutions_projects.serializers import BasicWorkgroupSerializer
 from gradebook.models import StudentGradebook
 from gradebook.utils import generate_user_gradebook
-from social_engagement.models import StudentSocialEngagementScore
 from instructor.access import revoke_access, update_forum_role
-
-from student.models import anonymous_id_for_user
-from openedx.core.djangoapps.lang_pref import LANGUAGE_KEY
-from lms.djangoapps.notification_prefs.views import enable_notifications
+from lms.djangoapps.discussion.notification_prefs.views import enable_notifications
 from opaque_keys import InvalidKeyError
-from opaque_keys.edx.keys import UsageKey, CourseKey
-from opaque_keys.edx.locations import Location, SlashSeparatedCourseKey
+from opaque_keys.edx.keys import CourseKey, UsageKey
+from opaque_keys.edx.locations import Location
+from opaque_keys.edx.locator import CourseLocator
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from openedx.core.djangoapps.course_groups.models import CourseUserGroup, CourseCohort
 from openedx.core.djangoapps.course_groups.cohorts import (
-    get_cohort_by_name,
-    add_cohort,
-    add_user_to_cohort,
-    remove_user_from_cohort,
-)
-from openedx.core.djangoapps.user_api.models import UserPreference
+    add_cohort, add_user_to_cohort, get_cohort_by_name,
+    remove_user_from_cohort)
+from openedx.core.djangoapps.course_groups.models import (CourseCohort,
+                                                          CourseUserGroup)
+from openedx.core.djangoapps.lang_pref import LANGUAGE_KEY
 from openedx.core.djangoapps.user_api.accounts.api import delete_users
+from openedx.core.djangoapps.user_api.accounts.image_helpers import (
+    get_profile_image_names, get_profile_image_storage)
+from openedx.core.djangoapps.user_api.models import UserPreference
 from openedx.core.djangoapps.user_api.preferences.api import set_user_preference
-from openedx.core.djangoapps.user_api.accounts.image_helpers import get_profile_image_names, get_profile_image_storage
-from edx_notifications.lib.consumer import mark_notification_read
-from completion_aggregator.models import Aggregator
-from student.models import CourseEnrollment, CourseEnrollmentException, UserProfile, LoginFailures
-from student.roles import (
-    CourseAccessRole,
-    CourseInstructorRole,
-    CourseObserverRole,
-    CourseStaffRole,
-    CourseAssistantRole,
-    UserBasedRole,
-)
-from util.request_rate_limiter import BadRequestRateLimiter
+from rest_framework import filters, status
+from rest_framework.response import Response
+from social_engagement.models import StudentSocialEngagementScore
+from student.models import (CourseEnrollment, CourseEnrollmentException,
+                            LoginFailures, UserProfile, anonymous_id_for_user)
+from student.roles import (CourseAccessRole, CourseAssistantRole,
+                           CourseInstructorRole, CourseObserverRole,
+                           CourseStaffRole, UserBasedRole)
 from util.password_policy_validators import validate_password
+from util.request_rate_limiter import BadRequestRateLimiter
 from xmodule.modulestore import InvalidLocationError
-
-from edx_solutions_api_integration.courseware_access import get_course, get_course_child, get_course_key, course_exists
-from edx_solutions_organizations.models import Organization, OrganizationUsersAttributes
-from edx_solutions_api_integration.permissions import (
-    TokenBasedAPIView,
-    SecureAPIView,
-    SecureListAPIView,
-    IdsInFilterBackend,
-    HasOrgsFilterBackend,
-    MobileAPIView,
-)
-from edx_solutions_api_integration.models import CourseGroupRelationship, PasswordHistory, GroupProfile, APIUser as User
-from edx_solutions_organizations.serializers import BasicOrganizationSerializer
-from edx_solutions_api_integration.utils import (
-    generate_base_uri,
-    dict_has_items,
-    extract_data_params,
-    get_user_from_request_params,
-    get_profile_image_urls_by_username,
-    str2bool,
-    css_param_to_list,
-    css_data_to_list,
-    get_aggregate_exclusion_user_ids,
-    cache_course_data,
-    cache_course_user_data,
-    get_cached_data,
-    get_non_actual_company_users,
-)
-from edx_solutions_projects.serializers import BasicWorkgroupSerializer
-from edx_solutions_api_integration.users.serializers import (
-    UserSerializer,
-    MassUsersDetailsSerializer,
-    UserCountByCitySerializer,
-    UserRolesSerializer,
-    CourseProgressSerializer,
-)
 
 log = logging.getLogger(__name__)
 AUDIT_LOG = logging.getLogger("audit")
@@ -142,7 +126,7 @@ def _save_content_position(request, user, course_key, position):
     """
     parent_content_id = position.get('parent_content_id')
     child_content_id = position.get('child_content_id')
-    if unicode(course_key) == parent_content_id:
+    if str(course_key) == parent_content_id:
         parent_descriptor, parent_key, parent_content = get_course(request, user, parent_content_id, load_content=True)  # pylint: disable=W0612,C0301
     else:
         parent_descriptor, parent_key, parent_content = get_course_child(request, user, course_key, parent_content_id, load_content=True)  # pylint: disable=W0612,C0301
@@ -156,7 +140,7 @@ def _save_content_position(request, user, course_key, position):
         child_key = UsageKey.from_string(child_content_id)
     except InvalidKeyError:
         try:
-            child_key = Location.from_deprecated_string(child_content_id)
+            child_key = Location.from_string(child_content_id)
         except (InvalidLocationError, InvalidKeyError):
             pass
     if not child_key:
@@ -174,7 +158,7 @@ def _save_child_position(parent_descriptor, target_child_location):
     we just compare id's from the array of children
     """
     for position, child_location in enumerate(getattr(parent_descriptor, 'children', []), start=1):
-        if unicode(child_location) == unicode(target_child_location):
+        if str(child_location) == str(target_child_location):
             # Only save if position changed
             if position != parent_descriptor.position:
                 parent_descriptor.position = position
@@ -189,7 +173,7 @@ def _manage_role(course_descriptor, user, role, action):
     forum_moderator_roles = ('instructor', 'staff', 'assistant')
     if role not in supported_roles:
         raise ValueError
-    if action is 'allow':
+    if action == 'allow':
         existing_role = CourseAccessRole.objects.filter(
             user=user,
             role=role,
@@ -201,8 +185,8 @@ def _manage_role(course_descriptor, user, role, action):
             new_role.save()
         if role in forum_moderator_roles:
             try:
-                dep_string = course_descriptor.id.to_deprecated_string()
-                ssck = SlashSeparatedCourseKey.from_deprecated_string(dep_string)
+                dep_string = str(course_descriptor.id)
+                ssck = CourseLocator.from_string(dep_string)
                 update_forum_role(ssck, user, FORUM_ROLE_MODERATOR, 'allow')
             except Role.DoesNotExist:
                 try:
@@ -210,7 +194,7 @@ def _manage_role(course_descriptor, user, role, action):
                 except Role.DoesNotExist:
                     pass
 
-    elif action is 'revoke':
+    elif action == 'revoke':
         revoke_access(course_descriptor, user, role)
         if role in forum_moderator_roles:
             # There's a possibilty that the user may play more than one role in a course
@@ -224,8 +208,8 @@ def _manage_role(course_descriptor, user, role, action):
             queryset = queryset.filter(course_id=course_descriptor.id)
             if len(queryset) == 0:
                 try:
-                    dep_string = course_descriptor.id.to_deprecated_string()
-                    ssck = SlashSeparatedCourseKey.from_deprecated_string(dep_string)
+                    dep_string = str(course_descriptor.id)
+                    ssck = CourseLocator.from_string(dep_string)
                     update_forum_role(ssck, user, FORUM_ROLE_MODERATOR, 'revoke')
                 except Role.DoesNotExist:
                     try:
@@ -368,7 +352,7 @@ class UsersList(SecureListAPIView):
                 return queryset.none()
 
         if org_ids:
-            org_ids = map(int, org_ids.split(','))
+            org_ids = list(map(int, org_ids.split(',')))
             queryset = queryset.filter(organizations__id__in=org_ids).distinct()
 
         if exclude_type and org_ids:
@@ -399,7 +383,7 @@ class UsersList(SecureListAPIView):
             if courses:
                 if search_query_string or internal_admin_flag:
                     # filter courses by exact course_id
-                    courses = map(CourseKey.from_string, courses)
+                    courses = list(map(CourseKey.from_string, courses))
                     queryset = queryset.filter(courseenrollment__course_id__in=courses, courseenrollment__is_active=True).distinct()
                 else:
                     courses_filter_list = [
@@ -418,7 +402,7 @@ class UsersList(SecureListAPIView):
                 queryset = queryset.filter(email__in=emails)
 
             if courses:
-                courses = map(CourseKey.from_string, courses)
+                courses = list(map(CourseKey.from_string, courses))
                 queryset = queryset.filter(courseenrollment__course_id__in=courses).distinct()
 
         queryset = queryset.prefetch_related(
@@ -443,7 +427,7 @@ class UsersList(SecureListAPIView):
         DELETE /api/users?username=user
         """
         # require at least either ids or username filters
-        if set(self.request.query_params.keys()) & set(['username', 'ids']):
+        if set(self.request.query_params.keys()) & {'username', 'ids'}:
             qs = self.filter_queryset(self.get_queryset())
             results = delete_users(qs)
             if results:
@@ -486,7 +470,7 @@ class UsersList(SecureListAPIView):
         # enforce password complexity as an optional feature
         try:
             validate_password(password)
-        except ValidationError, err:
+        except ValidationError as err:
             response_data['message'] = _('Password: ') + '; '.join(err.messages)
             return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -523,7 +507,7 @@ class UsersList(SecureListAPIView):
         # Be sure to always create a UserProfile record when adding users
         # Bad things happen with the UserSerializer if one does not exist
         profile = UserProfile(user=user)
-        profile.name = u'{} {}'.format(first_name, last_name)
+        profile.name = '{} {}'.format(first_name, last_name)
         profile.city = city
         profile.country = country
         profile.level_of_education = level_of_education
@@ -569,7 +553,7 @@ class UsersList(SecureListAPIView):
         password_history_entry.create(user)
 
         # add to audit log
-        AUDIT_LOG.info(u"API::New account created with user-id - {0}".format(user.id))  # pylint: disable=W1202
+        AUDIT_LOG.info("API::New account created with user-id - {}".format(user.id))  # pylint: disable=W1202
 
         # CDODGE:  @TODO: We will have to extend this to look in the CourseEnrollmentAllowed table and
         # auto-enroll students when they create a new account. Also be sure to remove from
@@ -582,7 +566,7 @@ class UsersList(SecureListAPIView):
         """
         Extra context provided to the serializer class.
         """
-        serializer_context = super(UsersList, self).get_serializer_context()
+        serializer_context = super().get_serializer_context()
         if self.course_key:
             serializer_context.update({
                 'course_id': self.course_key
@@ -598,7 +582,7 @@ class MassUsersDetailsList(SecureListAPIView):
     def get_queryset(self):
         emails = css_data_to_list(self.request, 'email')
         courses = css_data_to_list(self.request, 'courses')
-        courses = map(CourseKey.from_string, courses)
+        courses = list(map(CourseKey.from_string, courses))
 
         return self.queryset.filter(email__in=emails).annotate(
             is_enrolled=Count(Case(
@@ -789,7 +773,7 @@ class UsersDetail(SecureAPIView):
                         try:
                             image_file = storage.open(old_image_name)
                             storage.save(new_profile_image_names[old_image_size], ContentFile(image_file.read()))
-                        except IOError:
+                        except OSError:
                             response_data['message'] = _('Could not update profile image')
                             return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
                         else:
@@ -801,7 +785,7 @@ class UsersDetail(SecureAPIView):
             _serialize_user(response_data, existing_user)
             try:
                 validate_password(password)
-            except ValidationError, err:
+            except ValidationError as err:
                 # bad user? tick the rate limiter counter
                 AUDIT_LOG.warning("API::Bad password in password_reset.")
                 response_data['message'] = _('Password: ') + '; '.join(err.messages)
@@ -851,7 +835,7 @@ class UsersDetail(SecureAPIView):
         existing_user_profile = UserProfile.objects.get(user_id=user_id)
         if existing_user_profile:
             if first_name and last_name:
-                existing_user_profile.name = u'{} {}'.format(first_name, last_name)
+                existing_user_profile.name = '{} {}'.format(first_name, last_name)
 
             # nullable attributes
             existing_user_profile.title = request.data.get('title', existing_user_profile.title)
@@ -1084,12 +1068,12 @@ class UsersCoursesList(SecureAPIView):
             }
             return Response(response_data, status=status.HTTP_409_CONFLICT)
 
-        log.debug(u'User "{}" has been automatically added in cohort "{}" for course "{}"'.format(
+        log.debug('User "{}" has been automatically added in cohort "{}" for course "{}"'.format(
             # pylint: disable=W1202
             user.username, default_cohort.name, course_descriptor.display_name)
         )  # pylint: disable=C0330
         response_data['uri'] = '{}/{}'.format(base_uri, course_key)
-        response_data['id'] = unicode(course_key)
+        response_data['id'] = str(course_key)
         response_data['name'] = course_descriptor.display_name
         response_data['is_active'] = course_enrollment.is_active
         return Response(response_data, status=status.HTTP_201_CREATED)
@@ -1108,8 +1092,8 @@ class UsersCoursesList(SecureAPIView):
         for enrollment in enrollments:
             if enrollment.course_overview:
                 course_data = {
-                    "id": unicode(enrollment.course_overview.id),
-                    "uri": '{}/{}'.format(base_uri, unicode(enrollment.course_overview.id)),
+                    "id": str(enrollment.course_overview.id),
+                    "uri": '{}/{}'.format(base_uri, str(enrollment.course_overview.id)),
                     "is_active": enrollment.is_active,
                     "name": enrollment.course_overview.display_name,
                     "start": enrollment.course_overview.start,
@@ -1248,9 +1232,9 @@ class UsersCoursesDetail(SecureAPIView):
             current_child_loc = _get_current_position_loc(parent_module)
             if current_child_loc:
                 response_data['position_tree'][current_child_loc.category] = {}
-                response_data['position_tree'][current_child_loc.category]['id'] = unicode(current_child_loc)
+                response_data['position_tree'][current_child_loc.category]['id'] = str(current_child_loc)
                 _, _, parent_module = get_course_child(
-                    request, user, course_key, unicode(current_child_loc), load_content=True
+                    request, user, course_key, str(current_child_loc), load_content=True
                 )
             else:
                 parent_module = None
@@ -1303,7 +1287,7 @@ class UsersCoursesGradesList(SecureAPIView):
                 complete_status = True
             response_data.append(
                 {
-                    'course_id': unicode(record.course_id),
+                    'course_id': str(record.course_id),
                     'current_grade': record.grade,
                     'proforma_grade': record.proforma_grade,
                     'complete_status': complete_status
@@ -1364,7 +1348,7 @@ class UsersCoursesGradesDetail(SecureAPIView):
         except (ValueError, TypeError):
             # add to audit log
             AUDIT_LOG.info(
-                u"API:: unable to parse gradebook entry for user-id - %s and course-id - '%s'",
+                "API:: unable to parse gradebook entry for user-id - %s and course-id - '%s'",
                 user_id,
                 course_key
             )
@@ -1429,7 +1413,7 @@ class UsersPreferences(SecureAPIView):
         # do a quick inspection to make sure we're only getting strings as values
         for key in request.data.keys():
             value = request.data[key]
-            if not isinstance(value, basestring):
+            if not isinstance(value, str):
                 return Response({}, status=status.HTTP_400_BAD_REQUEST)
 
         status_code = status.HTTP_200_OK
@@ -1680,7 +1664,7 @@ class UsersRolesList(SecureListAPIView):
         ignore_roles = request.data.get('ignore_roles', [])
         current_roles = self.get_queryset().exclude(role__in=ignore_roles)
         for current_role in current_roles:
-            course_descriptor, course_key, course_content = get_course(request, user, unicode(current_role.course_id))  # pylint: disable=W0612,C0301
+            course_descriptor, course_key, course_content = get_course(request, user, str(current_role.course_id))  # pylint: disable=W0612,C0301
             if course_descriptor:
                 _manage_role(course_descriptor, user, current_role.role, 'revoke')
 
@@ -1700,7 +1684,7 @@ class UsersRolesList(SecureListAPIView):
                     # Restore the current roleset to the User
                     for current_role in current_roles:
                         course_descriptor, course_key, course_content = get_course(
-                            request, user, unicode(current_role.course_id))  # pylint: disable=W0612
+                            request, user, str(current_role.course_id))  # pylint: disable=W0612
                         _manage_role(course_descriptor, user, current_role.role, 'allow')
                     return Response({}, status=status.HTTP_400_BAD_REQUEST)
         return Response(request.data, status=status.HTTP_200_OK)
@@ -1880,7 +1864,7 @@ class UsersListWithEnrollment(UsersList):  # pylint: disable=too-many-ancestors
             "API::Creating and enrolling user with UsersListWithEnrollment. "
             "This should not be used in production"
         )
-        response = super(UsersListWithEnrollment, self).post(request)
+        response = super().post(request)
         if response.status_code == status.HTTP_201_CREATED:
             user = User.objects.get(username=request.data['username'])
             response.data['courses'] = []

@@ -11,14 +11,11 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from edx_notifications.data import NotificationMessage
-from edx_notifications.lib.publisher import (
-    publish_notification_to_user,
-    get_notification_type
-)
-
-from ...models import LeaderBoard
+from edx_notifications.lib.publisher import (get_notification_type,
+                                             publish_notification_to_user)
 from edx_solutions_api_integration.models import APIUser as User
 
+from ...models import LeaderBoard
 
 log = logging.getLogger(__name__)
 
@@ -66,7 +63,7 @@ class Command(BaseCommand):
                     leader = LeaderBoard(course_key=course_key, position=position)
 
                 old_leader = leader.user_id
-                old_position = positions.get(progress.user_id, sys.maxint)
+                old_position = positions.get(progress.user_id, sys.maxsize)
                 leader.user_id = progress.user_id
                 leader.save()
                 is_new = progress.modified >= time_range
@@ -74,8 +71,8 @@ class Command(BaseCommand):
                 if old_leader != progress.user_id and position < old_position and is_new:
                     try:
                         notification_msg = NotificationMessage(
-                            msg_type=get_notification_type(u'open-edx.lms.leaderboard.progress.rank-changed'),
-                            namespace=unicode(course_key),
+                            msg_type=get_notification_type('open-edx.lms.leaderboard.progress.rank-changed'),
+                            namespace=str(course_key),
                             payload={
                                 '_schema_version': '1',
                                 'rank': position,
@@ -94,11 +91,11 @@ class Command(BaseCommand):
                         # so we need to resolve these links at dispatch time
                         #
                         notification_msg.add_click_link_params({
-                            'course_id': unicode(course_key),
+                            'course_id': str(course_key),
                         })
 
                         publish_notification_to_user(int(leader.user_id), notification_msg)
-                    except Exception, ex:  # pylint: disable=broad-except
+                    except Exception as ex:  # pylint: disable=broad-except
                         # Notifications are never critical, so we don't want to disrupt any
                         # other logic processing. So log and continue.
                         log.exception(ex)

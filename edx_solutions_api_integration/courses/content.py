@@ -166,4 +166,3 @@ TEST_COURSE_OVERVIEW_CONTENT = dedent(
     </section>
     """
 )
-
