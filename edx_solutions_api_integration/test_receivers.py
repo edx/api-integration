@@ -3,19 +3,19 @@
 Run these tests @ Devstack:
     paver test_system -s lms --test_id=lms/djangoapps/gradebook/tests.py
 """
-from datetime import datetime
 import uuid
+from datetime import datetime
 
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.test.utils import override_settings
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_store_config
-
+from edx_solutions_api_integration.models import (
+    CourseContentGroupRelationship, CourseGroupRelationship, GroupProfile)
+from xmodule.modulestore.django import SignalHandler
+from xmodule.modulestore.tests.django_utils import (ModuleStoreTestCase,
+                                                    mixed_store_config)
 from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
-from xmodule.modulestore.django import SignalHandler
-
-from edx_solutions_api_integration.models import GroupProfile, CourseGroupRelationship, CourseContentGroupRelationship
 MODULESTORE_CONFIG = mixed_store_config(settings.COMMON_TEST_DATA_ROOT, {})
 
 
@@ -25,7 +25,7 @@ class ApiManagerReceiversTests(ModuleStoreTestCase):
     ENABLED_SIGNALS = ['course_deleted']
 
     def setUp(self):
-        super(ApiManagerReceiversTests, self).setUp()
+        super().setUp()
         # Create a course to work with
         self.course = CourseFactory.create(
             start=datetime(2014, 6, 16, 14, 30),
@@ -57,21 +57,21 @@ class ApiManagerReceiversTests(ModuleStoreTestCase):
         group_profile = GroupProfile.objects.create(group=group)
 
         CourseGroupRelationship.objects.create(
-            course_id=unicode(self.course.id),
+            course_id=str(self.course.id),
             group=group
         )
         CourseContentGroupRelationship.objects.create(
-            course_id=unicode(self.course.id),
-            content_id=unicode(self.chapter.location),
+            course_id=str(self.course.id),
+            content_id=str(self.chapter.location),
             group_profile=group_profile
         )
 
-        self.assertEqual(CourseGroupRelationship.objects.filter(course_id=unicode(self.course.id)).count(), 1)
-        self.assertEqual(CourseContentGroupRelationship.objects.filter(course_id=self.course.id, content_id=unicode(self.chapter.location)).count(), 1)  # pylint: disable=C0301
+        self.assertEqual(CourseGroupRelationship.objects.filter(course_id=str(self.course.id)).count(), 1)
+        self.assertEqual(CourseContentGroupRelationship.objects.filter(course_id=self.course.id, content_id=str(self.chapter.location)).count(), 1)  # pylint: disable=C0301
 
         # Emit the signal
         SignalHandler.course_deleted.send(sender=None, course_key=self.course.id)
 
         # Validate that the course references were removed
-        self.assertEqual(CourseGroupRelationship.objects.filter(course_id=unicode(self.course.id)).count(), 0)
-        self.assertEqual(CourseContentGroupRelationship.objects.filter(course_id=self.course.id, content_id=unicode(self.chapter.location)).count(), 0)  # pylint: disable=C0301
+        self.assertEqual(CourseGroupRelationship.objects.filter(course_id=str(self.course.id)).count(), 0)
+        self.assertEqual(CourseContentGroupRelationship.objects.filter(course_id=self.course.id, content_id=str(self.chapter.location)).count(), 0)  # pylint: disable=C0301

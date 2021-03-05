@@ -1,4 +1,3 @@
-# coding: utf-8
 # pylint: disable=E1101
 # pylint: disable=E1103
 
@@ -7,71 +6,59 @@ Run these tests @ Devstack:
     paver test_system -s lms --fasttest
         --fail_fast --verbose --test_id=lms/djangoapps/edx_solutions_api_integration/users
 """
-import ddt
-import uuid
-import mock
-import before_after
-import six
 import json
-
+import uuid
 from datetime import datetime
-from mock import patch
-
-from completion.models import BlockCompletion
-from completion.waffle import WAFFLE_NAMESPACE, ENABLE_COMPLETION_TRACKING
-from dateutil.relativedelta import relativedelta
 from random import randint
-from urllib import urlencode
+from urllib.parse import urlencode
 
-from requests.exceptions import ConnectionError
+import ddt
+import mock
+from completion.models import BlockCompletion
+from completion.waffle import ENABLE_COMPLETION_TRACKING, WAFFLE_NAMESPACE
+from lms.djangoapps.courseware import module_render
+from lms.djangoapps.courseware.model_data import FieldDataCache
+from dateutil.relativedelta import relativedelta
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
-from django.test.utils import override_settings
-from django.test.client import Client
-from django.utils import timezone
 from django.db import transaction
+from django.test.client import Client
+from django.test.utils import override_settings
+from django.utils import timezone
 from django.utils.translation import ugettext as _
-
-from courseware import module_render
-from courseware.model_data import FieldDataCache
-from django_comment_common.models import Role, FORUM_ROLE_MODERATOR, ForumsConfig
-from waffle.testutils import override_switch
-
-from edx_notifications.data import NotificationType, NotificationMessage
+from openedx.core.djangoapps.django_comment_common.models import (FORUM_ROLE_MODERATOR, ForumsConfig,
+                                          Role)
+from edx_notifications.data import NotificationMessage, NotificationType
 from edx_notifications.lib.consumer import get_notifications_count_for_user
-from edx_notifications.lib.publisher import register_notification_type, publish_notification_to_user
-from edx_solutions_organizations.models import Organization
-from edx_solutions_projects.models import Project, Workgroup
-from instructor.access import allow_access
-from social_engagement.models import StudentSocialEngagementScore
-from student.tests.factories import UserFactory, CourseEnrollmentFactory, GroupFactory
-from student.models import anonymous_id_for_user, CourseEnrollment
-from gradebook.models import StudentGradebook
-
-from openedx.core.djangoapps.user_api.models import UserPreference
-from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
-from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
-from xmodule.modulestore.tests.django_utils import ModuleStoreTestCase, mixed_store_config, SharedModuleStoreTestCase
-
-from xmodule.modulestore import ModuleStoreEnum
-from xmodule.modulestore.django import modulestore
-from xmodule.modulestore.tests.django_utils import (
-    ModuleStoreTestCase,
-    TEST_DATA_SPLIT_MODULESTORE
-)
-from django.contrib.auth.models import User
+from edx_notifications.lib.publisher import (publish_notification_to_user,
+                                             register_notification_type)
 from edx_solutions_api_integration.courseware_access import get_course_key
 from edx_solutions_api_integration.models import APIUser
 from edx_solutions_api_integration.test_utils import (
-    get_non_atomic_database_settings,
-    CourseGradingMixin,
-    APIClientMixin,
-    SignalDisconnectTestMixin,
-    OAuth2TokenMixin,
-)
-
-from notification_prefs import NOTIFICATION_PREF_KEY
+    APIClientMixin, CourseGradingMixin, OAuth2TokenMixin,
+    SignalDisconnectTestMixin, get_non_atomic_database_settings)
+from edx_solutions_organizations.models import Organization
+from edx_solutions_projects.models import Project, Workgroup
+from gradebook.models import StudentGradebook
+from instructor.access import allow_access
+from mock import patch
+from lms.djangoapps.discussion.notification_prefs import NOTIFICATION_PREF_KEY
+from openedx.core.djangoapps.user_api.models import UserPreference
+from openedx.core.djangolib.testing.utils import CacheIsolationTestCase
+from requests.exceptions import ConnectionError
+from social_engagement.models import StudentSocialEngagementScore
+from student.models import CourseEnrollment, anonymous_id_for_user
+from student.tests.factories import (CourseEnrollmentFactory, GroupFactory,
+                                     UserFactory)
+from waffle.testutils import override_switch
+from xmodule.modulestore import ModuleStoreEnum
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.tests.django_utils import (
+    TEST_DATA_SPLIT_MODULESTORE, ModuleStoreTestCase,
+    SharedModuleStoreTestCase, mixed_store_config)
+from xmodule.modulestore.tests.factories import CourseFactory, ItemFactory
 
 
 def _fake_get_user_social_stats(user_id, course_id, end_date=None):  # pylint: disable=W0613
@@ -132,7 +119,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         return module
 
     def setUp(self):
-        super(UsersApiTests, self).setUp()
+        super().setUp()
         self.test_username = str(uuid.uuid4())
         self.test_password = 'Test.Me64!'
         self.test_email = str(uuid.uuid4()) + '@test.org'
@@ -204,7 +191,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         """
         created_user_ids = {'staff': [], 'non_staff': []}
         test_uri = self.users_base_uri
-        for i in xrange(1, 4):
+        for i in range(1, 4):
             is_staff = True if i % 2 == 0 else False
             data = {
                 'email': 'test{}@example.com'.format(i),
@@ -243,7 +230,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         test_uri = self.users_base_uri
         users = []
         # create a 25 new users
-        for i in xrange(1, 26):
+        for i in range(1, 26):
             data = {
                 'email': 'test{}@example.com'.format(i),
                 'username': 'test_user{}'.format(i),
@@ -260,7 +247,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         # create organizations and add users to them
         total_orgs = 30
-        for i in xrange(total_orgs):
+        for i in range(total_orgs):
             data = {
                 'name': '{} {}'.format('Org', i),
                 'display_name': '{} {}'.format('Org display name', i),
@@ -403,7 +390,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['results'][1]['full_name'], 'Micheal Mcdonald')
 
         # fetch user data by exact course id match
-        course2_id = {'courses': '{}'.format(unicode(course2.id))}
+        course2_id = {'courses': '{}'.format(str(course2.id))}
         course2_filter_uri = '{}?{}'.format(test_uri, urlencode(course2_id))
         response = self.do_get(course2_filter_uri)
         self.assertEqual(response.status_code, 200)
@@ -437,7 +424,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         resp = self.do_post(self.groups_base_uri, data)
 
         uri = resp.data['uri'] + '/courses'
-        data = {'course_id': unicode(course1.id)}
+        data = {'course_id': str(course1.id)}
         self.do_post(uri, data)
 
         # fetch user data by partial name match for internal admin
@@ -507,7 +494,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['results'][0]['organizations'][0]['display_name'], 'ABC Organization')
 
         # fetch user data by partial name, email or organization display_name and exact course id match
-        course1_id = {'courses': '{}'.format(unicode(course1.id))}
+        course1_id = {'courses': '{}'.format(str(course1.id))}
         response = self.do_get(
             '{}?search_query_string={}&{}&match=partial'.format(
                 test_uri, 'mic.mcdonald@example.com', urlencode(course1_id)
@@ -519,7 +506,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['results'][0]['email'], 'mic.mcdonald@example.com')
         self.assertEqual(len(response.data['results'][0]['organizations']), 1)
         self.assertEqual(response.data['results'][0]['organizations'][0]['display_name'], 'ABC Organization')
-        self.assertEqual(response.data['results'][0]['courses_enrolled'][0], unicode(course1.id))
+        self.assertEqual(response.data['results'][0]['courses_enrolled'][0], str(course1.id))
         enrollment = CourseEnrollment.objects.get(user=users[1],
                                                   course_id=get_course_key(response.data['results'][0]['courses_enrolled'][0]))
         self.assertTrue(enrollment.is_active)
@@ -559,11 +546,11 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['results'][0]['email'], 'mic.mcdonald@example.com')
         self.assertEqual(len(response.data['results'][0]['organizations']), 1)
         self.assertEqual(response.data['results'][0]['organizations'][0]['display_name'], 'ABC Organization')
-        self.assertEqual(response.data['results'][0]['courses_enrolled'][0], unicode(course1.id))
+        self.assertEqual(response.data['results'][0]['courses_enrolled'][0], str(course1.id))
 
         response = self.do_get('{}/{}/courses'.format(test_uri, response.data['results'][0]['id']))
         self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['id'], unicode(course1.id))
+        self.assertEqual(response.data[0]['id'], str(course1.id))
 
     def test_user_list_get_courses_enrolled_per_course(self):
         test_uri = self.users_base_uri
@@ -576,23 +563,23 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         CourseEnrollmentFactory.create(user=users[1], course_id=self.course2.id)
 
         # fetch enrollments for first course
-        course_id = {'courses': '{}'.format(unicode(self.course.id))}
+        course_id = {'courses': '{}'.format(str(self.course.id))}
         course_filter_uri = '{}?{}'.format(test_uri, urlencode(course_id))
         response = self.do_get(course_filter_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 2)
-        self.assertEqual(response.data['results'][0]['courses_enrolled'][0], unicode(self.course.id))
-        self.assertEqual(response.data['results'][1]['courses_enrolled'][0], unicode(self.course2.id))
-        self.assertEqual(response.data['results'][1]['courses_enrolled'][1], unicode(self.course.id))
+        self.assertEqual(response.data['results'][0]['courses_enrolled'][0], str(self.course.id))
+        self.assertEqual(response.data['results'][1]['courses_enrolled'][0], str(self.course2.id))
+        self.assertEqual(response.data['results'][1]['courses_enrolled'][1], str(self.course.id))
 
         # fetch enrollments for second course
-        course2_id = {'courses': '{}'.format(unicode(self.course2.id))}
+        course2_id = {'courses': '{}'.format(str(self.course2.id))}
         course2_filter_uri = '{}?{}'.format(test_uri, urlencode(course2_id))
         response = self.do_get(course2_filter_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 1)
-        self.assertEqual(response.data['results'][0]['courses_enrolled'][0], unicode(self.course2.id))
-        self.assertEqual(response.data['results'][0]['courses_enrolled'][1], unicode(self.course.id))
+        self.assertEqual(response.data['results'][0]['courses_enrolled'][0], str(self.course2.id))
+        self.assertEqual(response.data['results'][0]['courses_enrolled'][1], str(self.course.id))
 
     def test_user_list_get_courses_enrolled(self):
         test_uri = self.users_base_uri
@@ -613,8 +600,8 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_get('{}?ids={}'.format(test_uri, users[1].id))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 1)
-        self.assertEqual(response.data['results'][0]['courses_enrolled'][0], unicode(self.course2.id))
-        self.assertEqual(response.data['results'][0]['courses_enrolled'][1], unicode(self.course.id))
+        self.assertEqual(response.data['results'][0]['courses_enrolled'][0], str(self.course2.id))
+        self.assertEqual(response.data['results'][0]['courses_enrolled'][1], str(self.course.id))
 
     def test_user_list_get_roles(self):
         test_uri = self.users_base_uri
@@ -633,15 +620,15 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 2)
         self.assertEqual(len(response.data['results'][0]['roles']), 2)
-        self.assertItemsEqual(response.data['results'][0]['roles'], [u'instructor', u'observer'])
+        self.assertCountEqual(response.data['results'][0]['roles'], ['instructor', 'observer'])
         self.assertEqual(len(response.data['results'][1]['roles']), 1)
-        self.assertItemsEqual(response.data['results'][1]['roles'], [u'staff'])
+        self.assertCountEqual(response.data['results'][1]['roles'], ['staff'])
 
     def test_user_list_get_with_has_organization_filter(self):
         test_uri = self.users_base_uri
         users = []
         # create a 7 new users
-        for i in xrange(1, 8):
+        for i in range(1, 8):
             data = {
                 'email': 'test_orgfilter{}@example.com'.format(i),
                 'username': 'test_user_orgfilter{}'.format(i),
@@ -656,7 +643,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         # create organizations and add users to them
         total_orgs = 4
-        for i in xrange(1, total_orgs):
+        for i in range(1, total_orgs):
             data = {
                 'name': '{} {}'.format('Org', i),
                 'display_name': '{} {}'.format('Org display name', i),
@@ -682,7 +669,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         # create organization and add 4 users to it
         organizations = []
-        for i in xrange(2):
+        for i in range(2):
             organization = Organization.objects.create(
                 name='Test Organization{}'.format(i),
                 display_name='Test Org Display Name{}'.format(i),
@@ -718,7 +705,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             CourseEnrollmentFactory.create(user=user, course_id=self.course2.id)
 
         # fetch users enrolled in course 1
-        course_id = {'courses': '{}'.format(unicode(self.course.id))}
+        course_id = {'courses': '{}'.format(str(self.course.id))}
         course_filter_uri = '{}?{}'.format(test_uri, urlencode(course_id))
         response = self.do_get(course_filter_uri)
         self.assertEqual(response.status_code, 200)
@@ -726,7 +713,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertIsNotNone(response.data['results'][0]['is_active'])
 
         # fetch users enrolled in course 1 and 2
-        course_id = {'courses': '{},{}'.format(unicode(self.course.id), unicode(self.course2.id))}
+        course_id = {'courses': '{},{}'.format(str(self.course.id), str(self.course2.id))}
         course_filter_uri = '{}?{}'.format(test_uri, urlencode(course_id))
         response = self.do_get(course_filter_uri)
         self.assertEqual(response.status_code, 200)
@@ -878,7 +865,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 201)
         test_uri = test_uri + '/' + str(response.data['id'])
         auth_data = {'username': local_username, 'password': 'x'}
-        for i in xrange(3):
+        for i in range(3):
             response = self.do_post(self.sessions_base_uri, auth_data)
             self.assertEqual(response.status_code, 401)
 
@@ -902,7 +889,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         }
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 400)
-        self.assertIn('Invalid email address', response.content)
+        self.assertIn('Invalid email address', response.content.decode('utf-8'))
 
     def test_user_detail_duplicate_email(self):
         user2 = UserFactory()
@@ -915,7 +902,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 200)
         response = self.do_post(test_uri2, data)
         self.assertEqual(response.status_code, 400)
-        self.assertIn('A user with that email address already exists.', response.content)
+        self.assertIn('A user with that email address already exists.', response.content.decode('utf-8'))
 
     def test_user_detail_email_updated(self):
         test_uri = '{}/{}'.format(self.users_base_uri, self.user.id)
@@ -985,7 +972,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         """
         lst_username = []
         test_uri = self.users_base_uri
-        for i in xrange(2):
+        for i in range(2):
             local_username = self.test_username + str(i)
             lst_username.append(local_username)
             data = {
@@ -1202,7 +1189,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_post(user_groups_uri, data)
         self.assertEqual(response.status_code, 201)
 
-        course_id = unicode(self.course.id)
+        course_id = str(self.course.id)
         response = self.do_post('{}/{}/courses/'.format(group_url, group_id), {'course_id': course_id})
         self.assertEqual(response.status_code, 201)
 
@@ -1334,12 +1321,12 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_post(test_uri, data)
         user_id = response.data['id']
         test_uri = '{}/{}/courses'.format(test_uri, str(user_id))
-        data = {'course_id': unicode(self.course.id)}
+        data = {'course_id': str(self.course.id)}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
-        confirm_uri = test_uri + '/' + unicode(self.course.id)
+        confirm_uri = test_uri + '/' + str(self.course.id)
         self.assertIn(confirm_uri, response.data['uri'])
-        self.assertEqual(response.data['id'], unicode(self.course.id))
+        self.assertEqual(response.data['id'], str(self.course.id))
         self.assertTrue(response.data['is_active'])
 
     def test_user_courses_list_post_duplicate(self):
@@ -1353,7 +1340,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         # adding it to a cohort
         test_uri = '{}/{}/courses'.format(test_uri, str(user_id))
-        data = {'course_id': unicode(self.course.id)}
+        data = {'course_id': str(self.course.id)}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
 
@@ -1368,7 +1355,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         test_uri = self.users_base_uri
         user_id = '234234'
         test_uri = '{}/{}/courses'.format(test_uri, str(user_id))
-        data = {'course_id': unicode(course.id)}
+        data = {'course_id': str(course.id)}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 404)
 
@@ -1398,20 +1385,20 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         user_id = response.data['id']
         test_uri = '{}/{}/courses'.format(test_uri, str(user_id))
 
-        data = {'course_id': unicode(self.course.id)}
+        data = {'course_id': str(self.course.id)}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
 
         course_with_out_date_values = CourseFactory.create(org='TUCLG', run='TUCLG1', default_store=store)
-        data = {'course_id': unicode(course_with_out_date_values.id)}
+        data = {'course_id': str(course_with_out_date_values.id)}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
 
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
-        confirm_uri = test_uri + '/' + unicode(course_with_out_date_values.id)
+        confirm_uri = test_uri + '/' + str(course_with_out_date_values.id)
         self.assertIn(confirm_uri, response.data[0]['uri'])
-        self.assertEqual(response.data[0]['id'], unicode(course_with_out_date_values.id))
+        self.assertEqual(response.data[0]['id'], str(course_with_out_date_values.id))
         self.assertTrue(response.data[0]['is_active'])
         self.assertEqual(response.data[0]['name'], course_with_out_date_values.display_name)
         self.assertEqual(response.data[0]['start'], course_with_out_date_values.start)
@@ -1482,36 +1469,36 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_post(test_uri, data)
         user_id = response.data['id']
         test_uri = test_uri + '/' + str(user_id) + '/courses'
-        data = {'course_id': unicode(course.id)}
+        data = {'course_id': str(course.id)}
         response = self.do_post(test_uri, data)
-        test_uri = test_uri + '/' + unicode(course.id)
+        test_uri = test_uri + '/' + str(course.id)
         self.assertEqual(response.status_code, 201)
 
         position_data = {
             'positions': [
                 {
-                    'parent_content_id': unicode(course.id),
+                    'parent_content_id': str(course.id),
                     'child_content_id': str(chapter3.location)
                 },
                 {
-                    'parent_content_id': unicode(chapter3.scope_ids.usage_id),
+                    'parent_content_id': str(chapter3.scope_ids.usage_id),
                     'child_content_id': str(sequential2.location)
                 },
                 {
-                    'parent_content_id': unicode(sequential2.scope_ids.usage_id),
+                    'parent_content_id': str(sequential2.scope_ids.usage_id),
                     'child_content_id': str(vertical3.location)
                 }
             ]
         }
         response = self.do_post(test_uri, data=position_data)
-        self.assertEqual(response.data['positions'][0], unicode(chapter3.scope_ids.usage_id))
-        self.assertEqual(response.data['positions'][1], unicode(sequential2.scope_ids.usage_id))
-        self.assertEqual(response.data['positions'][2], unicode(vertical3.scope_ids.usage_id))
+        self.assertEqual(response.data['positions'][0], str(chapter3.scope_ids.usage_id))
+        self.assertEqual(response.data['positions'][1], str(sequential2.scope_ids.usage_id))
+        self.assertEqual(response.data['positions'][2], str(vertical3.scope_ids.usage_id))
 
         response = self.do_get(response.data['uri'])
-        self.assertEqual(response.data['position_tree']['chapter']['id'], unicode(chapter3.scope_ids.usage_id))
-        self.assertEqual(response.data['position_tree']['sequential']['id'], unicode(sequential2.scope_ids.usage_id))
-        self.assertEqual(response.data['position_tree']['vertical']['id'], unicode(vertical3.scope_ids.usage_id))
+        self.assertEqual(response.data['position_tree']['chapter']['id'], str(chapter3.scope_ids.usage_id))
+        self.assertEqual(response.data['position_tree']['sequential']['id'], str(sequential2.scope_ids.usage_id))
+        self.assertEqual(response.data['position_tree']['vertical']['id'], str(vertical3.scope_ids.usage_id))
 
     def test_user_courses_detail_post_invalid_course(self):
         test_uri = '{}/{}/courses/{}'.format(self.users_base_uri, self.user.id, self.test_bogus_course_id)
@@ -1558,7 +1545,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_post(test_uri, data)
         user_id = response.data['id']
         test_uri = test_uri + '/' + str(user_id) + '/courses'
-        data = {'course_id': unicode(course.id)}
+        data = {'course_id': str(course.id)}
         response = self.do_post(test_uri, data)
         test_uri = test_uri + '/' + str(course.id)
         self.assertEqual(response.status_code, 201)
@@ -1572,13 +1559,13 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             ]
         }
         response = self.do_post(test_uri, data=position_data)
-        self.assertEqual(response.data['positions'][0], unicode(chapter1.scope_ids.usage_id))
+        self.assertEqual(response.data['positions'][0], str(chapter1.scope_ids.usage_id))
 
     def test_user_courses_detail_post_position_invalid_course(self):
         test_uri = '{}/{}/courses'.format(self.users_base_uri, self.user.id)
-        data = {'course_id': unicode(self.course.id)}
+        data = {'course_id': str(self.course.id)}
         response = self.do_post(test_uri, data)
-        test_uri = test_uri + '/' + unicode(self.course.id)
+        test_uri = test_uri + '/' + str(self.course.id)
         self.assertEqual(response.status_code, 201)
         position_data = {
             'positions': [
@@ -1613,31 +1600,31 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_post(test_uri, data)
         user_id = response.data['id']
         test_uri = test_uri + '/' + str(user_id) + '/courses'
-        data = {'course_id': unicode(course.id)}
+        data = {'course_id': str(course.id)}
         response = self.do_post(test_uri, data)
-        test_uri = test_uri + '/' + unicode(course.id)
+        test_uri = test_uri + '/' + str(course.id)
         self.assertEqual(response.status_code, 201)
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertIn(test_uri, response.data['uri'])
-        self.assertEqual(response.data['course_id'], unicode(course.id))
+        self.assertEqual(response.data['course_id'], str(course.id))
         self.assertEqual(response.data['user_id'], user_id)
 
         # Now add the user's position in the course
         position_data = {
             'positions': [
                 {
-                    'parent_content_id': unicode(course.id),
-                    'child_content_id': unicode(chapter1.scope_ids.usage_id)
+                    'parent_content_id': str(course.id),
+                    'child_content_id': str(chapter1.scope_ids.usage_id)
 
                 }
             ]
         }
         response = self.do_post(test_uri, data=position_data)
-        self.assertEqual(response.data['positions'][0], unicode(chapter1.scope_ids.usage_id))
+        self.assertEqual(response.data['positions'][0], str(chapter1.scope_ids.usage_id))
         response = self.do_get(test_uri)
         self.assertGreater(response.data['position'], 0)  # Position in the GET response is an integer!
-        self.assertEqual(response.data['position_tree']['chapter']['id'], unicode(chapter1.scope_ids.usage_id))
+        self.assertEqual(response.data['position_tree']['chapter']['id'], str(chapter1.scope_ids.usage_id))
 
     def test_user_courses_detail_get_invalid_course(self):
         test_uri = '{}/{}/courses/{}'.format(self.users_base_uri, self.user.id, self.test_bogus_course_id)
@@ -1672,7 +1659,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_post(test_uri, data)
         user_id = response.data['id']
         post_uri = test_uri + '/' + str(user_id) + '/courses'
-        data = {'course_id': unicode(course.id)}
+        data = {'course_id': str(course.id)}
         response = self.do_post(post_uri, data)
         self.assertEqual(response.status_code, 201)
         test_uri = post_uri + '/' + str(course.id)
@@ -1727,7 +1714,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         # now enroll user
         post_uri = '{}/{}/courses'.format(self.users_base_uri, self.user.id)
-        data = {'course_id': unicode(course.id)}
+        data = {'course_id': str(course.id)}
         response = self.do_post(post_uri, data)
         self.assertEqual(response.status_code, 201)
 
@@ -1851,7 +1838,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
     def test_user_organizations_list(self):
         user_id = self.user.id
         anonymous_id = anonymous_id_for_user(self.user, self.course.id)
-        for i in xrange(1, 7):
+        for i in range(1, 7):
             data = {
                 'name': 'Org ' + str(i),
                 'display_name': 'Org display name' + str(i),
@@ -1878,8 +1865,8 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
     def test_user_workgroups_list(self):
         test_workgroups_uri = self.workgroups_base_uri  # pylint: disable=W0612
         project_1 = Project.objects.create(
-            course_id=unicode(self.course.id),
-            content_id=unicode(self.course_content.scope_ids.usage_id),
+            course_id=str(self.course.id),
+            content_id=str(self.course_content.scope_ids.usage_id),
         )
         p1_workgroup_1 = Workgroup.objects.create(  # pylint: disable=W0612
             name='Workgroup 1',
@@ -1887,14 +1874,14 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         )
 
         project_2 = Project.objects.create(
-            course_id=unicode(self.course2.id),
-            content_id=unicode(self.course2_content.scope_ids.usage_id),
+            course_id=str(self.course2.id),
+            content_id=str(self.course2_content.scope_ids.usage_id),
         )
         p2_workgroup_1 = Workgroup.objects.create(  # pylint: disable=W0612
             name='Workgroup 2',
             project=project_2
         )
-        for __ in xrange(1, 12):
+        for __ in range(1, 12):
             test_user = UserFactory()
             users_uri = '{}{}/users/'.format(self.workgroups_base_uri, 1)
             data = {"id": test_user.id}
@@ -1915,7 +1902,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['num_pages'], 2)
 
         # test with course_id filter and integer user id
-        course_id = {'course_id': unicode(self.course.id)}
+        course_id = {'course_id': str(self.course.id)}
         response = self.do_get('{}/{}/workgroups/?{}'.format(self.users_base_uri, test_user.id, urlencode(course_id)))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['count'], 1)
@@ -1938,7 +1925,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         test_uri = self.users_base_uri
 
         # create a 25 new users
-        for i in xrange(1, 26):
+        for i in range(1, 26):
             if i < 10:
                 city = 'San Francisco'
             elif i < 15:
@@ -2057,7 +2044,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['count'], 3)
 
         # filter roleset by course
-        course_id = {'course_id': '{}'.format(unicode(course3.id))}
+        course_id = {'course_id': '{}'.format(str(course3.id))}
         course_filter_uri = '{}?{}'.format(test_uri, urlencode(course_id))
         response = self.do_get(course_filter_uri)
         self.assertEqual(response.status_code, 200)
@@ -2082,7 +2069,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
     def test_users_roles_list_get_invalid_course(self):
         test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
-        course_id = {'course_id': '{}'.format(unicode(self.test_bogus_course_id))}
+        course_id = {'course_id': '{}'.format(str(self.test_bogus_course_id))}
         test_uri = '{}?{}'.format(test_uri, urlencode(course_id))
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
@@ -2093,7 +2080,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['count'], 0)
 
-        data = {'course_id': unicode(self.course.id), 'role': 'instructor'}
+        data = {'course_id': str(self.course.id), 'role': 'instructor'}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
         response = self.do_get(test_uri)
@@ -2107,7 +2094,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
     def test_users_roles_list_post_invalid_user(self):
         test_uri = '{}/2131/roles/'.format(self.users_base_uri)
-        data = {'course_id': unicode(self.course.id), 'role': 'instructor'}
+        data = {'course_id': str(self.course.id), 'role': 'instructor'}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 404)
 
@@ -2119,7 +2106,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
     def test_users_roles_list_post_invalid_role(self):
         test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
-        data = {'course_id': unicode(self.course.id), 'role': 'invalid_role'}
+        data = {'course_id': str(self.course.id), 'role': 'invalid_role'}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 400)
 
@@ -2164,10 +2151,10 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.data['count'], 0)
 
         data = {'ignore_roles': ['staff'], 'roles': [
-            {'course_id': unicode(self.course.id), 'role': 'instructor'},
-            {'course_id': unicode(course2.id), 'role': 'instructor'},
-            {'course_id': unicode(course3.id), 'role': 'instructor'},
-            {'course_id': unicode(course3.id), 'role': 'staff'},
+            {'course_id': str(self.course.id), 'role': 'instructor'},
+            {'course_id': str(course2.id), 'role': 'instructor'},
+            {'course_id': str(course3.id), 'role': 'instructor'},
+            {'course_id': str(course3.id), 'role': 'staff'},
         ]}
 
         response = self.do_put(test_uri, data)
@@ -2179,8 +2166,8 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             self.assertEqual(role['role'], 'instructor')
 
         data = {'roles': [
-            {'course_id': unicode(self.course.id), 'role': 'staff'},
-            {'course_id': unicode(course2.id), 'role': 'staff'},
+            {'course_id': str(self.course.id), 'role': 'staff'},
+            {'course_id': str(course2.id), 'role': 'staff'},
         ]}
         response = self.do_put(test_uri, data)
         self.assertEqual(response.status_code, 200)
@@ -2193,10 +2180,10 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         # Add a role that does not have a corresponding moderator role configured
         allow_access(course4, self.user, 'staff')
         # Now modify the existing no-moderator role using the API, which tries to set the moderator role
-        # Also change one of the existing moderator roles, but call it using the deprecated string version
+        # Also change one of the existing moderator roles
         data = {'roles': [
-            {'course_id': course4.id.to_deprecated_string(), 'role': 'instructor'},
-            {'course_id': course2.id.to_deprecated_string(), 'role': 'instructor'},
+            {'course_id': str(course4.id), 'role': 'instructor'},
+            {'course_id': str(course2.id), 'role': 'instructor'},
         ]}
         response = self.do_put(test_uri, data)
         self.assertEqual(response.status_code, 200)
@@ -2206,13 +2193,13 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
     def test_users_roles_list_put_invalid_user(self):
         test_uri = '{}/2131/roles/'.format(self.users_base_uri)
-        data = {'roles': [{'course_id': unicode(self.course.id), 'role': 'instructor'}]}
+        data = {'roles': [{'course_id': str(self.course.id), 'role': 'instructor'}]}
         response = self.do_put(test_uri, data)
         self.assertEqual(response.status_code, 404)
 
     def test_users_roles_list_put_invalid_course(self):
         test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
-        data = {'course_id': unicode(self.course.id), 'role': 'instructor'}
+        data = {'course_id': str(self.course.id), 'role': 'instructor'}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
 
@@ -2223,27 +2210,27 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['count'], 1)
-        self.assertEqual(response.data['results'][0]['course_id'], unicode(self.course.id))
+        self.assertEqual(response.data['results'][0]['course_id'], str(self.course.id))
 
     def test_users_roles_list_put_invalid_roles(self):
         test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
         data = {'roles': []}
         response = self.do_put(test_uri, data)
         self.assertEqual(response.status_code, 400)
-        data = {'roles': [{'course_id': unicode(self.course.id), 'role': 'invalid-role'}]}
+        data = {'roles': [{'course_id': str(self.course.id), 'role': 'invalid-role'}]}
         response = self.do_put(test_uri, data)
         self.assertEqual(response.status_code, 400)
 
     def test_users_roles_courses_detail_delete(self):
         test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
-        data = {'course_id': unicode(self.course.id), 'role': 'instructor'}
+        data = {'course_id': str(self.course.id), 'role': 'instructor'}
         response = self.do_post(test_uri, data)
         self.assertEqual(response.status_code, 201)
 
         response = self.do_get(test_uri)
         self.assertEqual(response.data['count'], 1)
 
-        delete_uri = '{}instructor/courses/{}'.format(test_uri, unicode(self.course.id))
+        delete_uri = '{}instructor/courses/{}'.format(test_uri, str(self.course.id))
         response = self.do_delete(delete_uri)
         self.assertEqual(response.status_code, 204)
 
@@ -2266,13 +2253,13 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
     def test_users_roles_courses_detail_delete_invalid_user(self):
         test_uri = '{}/124134/roles/'.format(self.users_base_uri)
-        delete_uri = '{}instructor/courses/{}'.format(test_uri, unicode(self.course.id))
+        delete_uri = '{}instructor/courses/{}'.format(test_uri, str(self.course.id))
         response = self.do_delete(delete_uri)
         self.assertEqual(response.status_code, 404)
 
     def test_users_roles_courses_detail_delete_invalid_role(self):
         test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
-        delete_uri = '{}invalid_role/courses/{}'.format(test_uri, unicode(self.course.id))
+        delete_uri = '{}invalid_role/courses/{}'.format(test_uri, str(self.course.id))
         response = self.do_delete(delete_uri)
         self.assertEqual(response.status_code, 404)
 
@@ -2362,7 +2349,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
             'username': self.test_username,
             'password': self.test_password,
             'courses': [
-                six.text_type(self.course.id),
+                str(self.course.id),
                 'course-v1:non+existent+course',
                 'course-v2:doesnt+exist',
             ],
@@ -2370,7 +2357,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         response = self.do_post('{}/integration-test-users/'.format(self.users_base_uri), data)
         self.assertEqual(response.status_code, 201)
         self.assertTrue(User.objects.filter(username=self.test_username).exists())
-        self.assertEqual(response.data['courses'], [six.text_type(self.course.id)])
+        self.assertEqual(response.data['courses'], [str(self.course.id)])
         enrollment = CourseEnrollment.objects.get(
             user__username=self.test_username,
             course_id=self.course.id
@@ -2430,7 +2417,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
     def test_users_roles_list_put_missing_role_value(self):
         test_uri = '{}/{}/roles/'.format(self.users_base_uri, self.user.id)
-        data = {'roles': [{'course_id': unicode(self.course.id)}]}
+        data = {'roles': [{'course_id': str(self.course.id)}]}
         response = self.do_put(test_uri, data)
         self.assertEqual(response.status_code, 400)
 
@@ -2453,16 +2440,18 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         CourseEnrollmentFactory.create(user=self.user, course_id=self.course.id)
 
         def get_users_courses_grades_detail(*args):
-            test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, unicode(self.course.id))
+            test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, str(self.course.id))
             response = self.do_get(test_uri)
             self.assertEqual(response.status_code, 200)
 
-        with before_after.before('gradebook.utils.generate_user_gradebook', get_users_courses_grades_detail):
-            get_users_courses_grades_detail()
+        # juniper-rebase
+        # before_after only used in one test case, not python 3 compatible.
+        # with before_after.before('gradebook.utils.generate_user_gradebook', get_users_courses_grades_detail):
+        #     get_users_courses_grades_detail()
 
     def test_user_detail_post_unicode_data(self):
-        test_first_name = u'Miké'
-        test_last_name = u'Meÿers'
+        test_first_name = 'Miké'
+        test_last_name = 'Meÿers'
 
         test_uri = '{}/{}'.format(self.users_base_uri, self.user.id)
         data = {
@@ -2476,7 +2465,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['first_name'], test_first_name)
         self.assertEqual(response.data['last_name'], test_last_name)
-        self.assertEqual(response.data['full_name'], u'{} {}'.format(test_first_name, test_last_name))
+        self.assertEqual(response.data['full_name'], '{} {}'.format(test_first_name, test_last_name))
 
     @patch('edx_solutions_api_integration.users.views.delete_users')
     @ddt.data(ModuleStoreEnum.Type.split, ModuleStoreEnum.Type.mongo)
@@ -2492,7 +2481,7 @@ class UsersApiTests(SignalDisconnectTestMixin, ModuleStoreTestCase, CacheIsolati
 
         user_ids = []
         # create 30 new users
-        for i in xrange(1, 31):
+        for i in range(1, 31):
             data = {
                 'email': 'test{}@example.com'.format(i),
                 'username': 'test_user{}'.format(i),
@@ -2561,7 +2550,7 @@ class TokenBasedUsersApiTests(CacheIsolationTestCase, APIClientMixin, OAuth2Toke
     """ Test suite for Token Based Users API views """
 
     def setUp(self):
-        super(TokenBasedUsersApiTests, self).setUp()
+        super().setUp()
 
         self.token_based_user_uri = '/api/server/users/validate-token/'
 
@@ -2572,7 +2561,7 @@ class TokenBasedUsersApiTests(CacheIsolationTestCase, APIClientMixin, OAuth2Toke
     def test_token_based_user_details_get(self):
 
         response = self.client.get(self.token_based_user_uri,
-                                   HTTP_AUTHORIZATION="Bearer {0}".format(self.bearer_token))
+                                   HTTP_AUTHORIZATION="Bearer {}".format(self.bearer_token))
 
         self.assertEqual(response.status_code, 200)
         self.assertGreater(response.data['id'], 0)
@@ -2582,7 +2571,7 @@ class TokenBasedUsersApiTests(CacheIsolationTestCase, APIClientMixin, OAuth2Toke
 
     def test_fake_token_user_details_get(self):
         response = self.client.get(self.token_based_user_uri,
-                                   HTTP_AUTHORIZATION="Bearer {0}".format('fake-bearer-token'))
+                                   HTTP_AUTHORIZATION="Bearer {}".format('fake-bearer-token'))
 
         self.assertEqual(response.status_code, 401)
 
@@ -2599,7 +2588,7 @@ class UsersGradesApiTests(
     MODULESTORE = TEST_DATA_SPLIT_MODULESTORE
 
     def setUp(self):
-        super(UsersGradesApiTests, self).setUp()
+        super().setUp()
         self.user = UserFactory()
         self.users_base_uri = '/api/server/users'
 
@@ -2610,7 +2599,7 @@ class UsersGradesApiTests(
         grade_dict = {'value': 1, 'max_value': 1, 'user_id': self.user.id}
         module.system.publish(module, 'grade', grade_dict)
 
-        test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, unicode(grading_course.id))
+        test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, str(grading_course.id))
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
 
@@ -2640,7 +2629,7 @@ class UsersGradesApiTests(
 
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data[0]['course_id'], unicode(grading_course.id))
+        self.assertEqual(response.data[0]['course_id'], str(grading_course.id))
         self.assertEqual(response.data[0]['current_grade'], 0.5, 1)
         self.assertEqual(response.data[0]['proforma_grade'], 1, 1)
         self.assertEqual(response.data[0]['complete_status'], False)
@@ -2649,17 +2638,17 @@ class UsersGradesApiTests(
         grading_course = self.setup_course_with_grading()
 
         # getting grades without user being enrolled in the course should raise 404
-        test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, unicode(grading_course.id))
+        test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, str(grading_course.id))
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 404)
 
         # enroll user in the course
         test_uri = '{}/{}/courses'.format(self.users_base_uri, self.user.id)
-        response = self.do_post(test_uri, {'course_id': unicode(grading_course.id)})
+        response = self.do_post(test_uri, {'course_id': str(grading_course.id)})
         self.assertEqual(response.status_code, 201)
 
         # now we should be able to fetch grades of user
-        test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, unicode(grading_course.id))
+        test_uri = '{}/{}/courses/{}/grades'.format(self.users_base_uri, self.user.id, str(grading_course.id))
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
 
@@ -2689,7 +2678,7 @@ class UsersGradesApiTests(
 
         response = self.do_get(test_uri)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data[0]['course_id'], unicode(grading_course.id))
+        self.assertEqual(response.data[0]['course_id'], str(grading_course.id))
         self.assertEqual(response.data[0]['current_grade'], 0, 0)
         self.assertEqual(response.data[0]['proforma_grade'], 0, 0)
         self.assertEqual(response.data[0]['complete_status'], False)
@@ -2710,7 +2699,7 @@ class UsersProgressApiTests(
 
     @classmethod
     def setUpClass(cls):
-        super(UsersProgressApiTests, cls).setUpClass()
+        super().setUpClass()
         cls.base_courses_uri = '/api/server/courses'
         cls.base_users_uri = '/api/server/users'
         cls.language = "en-us"
@@ -2782,7 +2771,6 @@ class UsersProgressApiTests(
 
         BlockCompletion.objects.submit_completion(
             user=self.user,
-            course_key=self.course.id,
             block_key=self.content_child.scope_ids.usage_id,
             completion=1.0,
         )
@@ -2879,14 +2867,12 @@ class UsersProgressApiTests(
 
         BlockCompletion.objects.submit_completion(
             user=self.user,
-            course_key=self.course.id,
             block_key=self.content_child.scope_ids.usage_id,
             completion=1.0,
         )
 
         BlockCompletion.objects.submit_completion(
             user=self.user,
-            course_key=self.course.id,
             block_key=mobile_course_content.scope_ids.usage_id,
             completion=1.0,
         )
@@ -2911,7 +2897,7 @@ class UserAttributesApiTests(ModuleStoreTestCase, APIClientMixin):
     MODULESTORE = TEST_DATA_SPLIT_MODULESTORE
 
     def setUp(self):
-        super(UserAttributesApiTests, self).setUp()
+        super().setUp()
         self.test_server_prefix = 'https://testserver'
         self.test_username = str(uuid.uuid4())
         self.test_password = 'Test.Me64!'

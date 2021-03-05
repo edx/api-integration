@@ -1,12 +1,11 @@
 """ Django REST Framework Serializers """
 import json
 
-from rest_framework import serializers
 from django.core.exceptions import ObjectDoesNotExist
-
 from edx_solutions_api_integration.models import APIUser
-from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from edx_solutions_api_integration.utils import get_profile_image_urls_by_username
+from edx_solutions_organizations.serializers import BasicOrganizationSerializer
+from rest_framework import serializers
 
 
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
@@ -16,7 +15,7 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
     """
 
     def __init__(self, *args, **kwargs):
-        super(DynamicFieldsModelSerializer, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         request = self.context.get('request')
         if request:
             default_fields = set(self.context.get('default_fields', []))
@@ -88,7 +87,7 @@ class UserSerializer(DynamicFieldsModelSerializer):
     def get_courses_enrolled(self, user):
         """ Serialize user enrolled courses """
         courses = user.courseenrollment_set.filter(is_active=True).values_list('course_id', flat=True)
-        return [unicode(course_id) for course_id in courses]
+        return [str(course_id) for course_id in courses]
 
     def get_user_roles(self, user):
         """ returns list of user roles """
@@ -126,7 +125,7 @@ class UserSerializer(DynamicFieldsModelSerializer):
 
         return {'grade': grade, 'proforma_grade': proforma_grade, 'section_breakdown': section_breakdown}
 
-    class Meta(object):
+    class Meta:
         """ Serializer/field specification """
         model = APIUser
         fields = (
@@ -158,7 +157,7 @@ class SimpleUserSerializer(DynamicFieldsModelSerializer):
     """ Serializer for user model """
     created = serializers.DateTimeField(source='date_joined', required=False)
 
-    class Meta(object):
+    class Meta:
         """ Serializer/field specification """
         model = APIUser
         fields = ("id", "email", "username", "first_name", "last_name", "created", "is_active", "last_login")
@@ -169,7 +168,7 @@ class MassUsersDetailsSerializer(DynamicFieldsModelSerializer):
     """ Serializer for user model """
     is_enrolled = serializers.BooleanField()
 
-    class Meta(object):
+    class Meta:
         """ Serializer/field specification """
         model = APIUser
         fields = ("email", "is_active", "last_login", 'is_enrolled')
@@ -207,7 +206,7 @@ class CourseProgressSerializer(serializers.Serializer):
                 if course_overview['id'] == enrollment['course_id']
             ), None
         )
-        course_overview['id'] = unicode(course_overview['id'])
+        course_overview['id'] = str(course_overview['id'])
         return course_overview
 
     def get_proficiency(self, enrollment):
@@ -218,4 +217,4 @@ class CourseProgressSerializer(serializers.Serializer):
                 if user_grade['course_id'] == enrollment['course_id']
             ), 0
         )
-        return int(round((proficiency * 100)))
+        return int(round(proficiency * 100))

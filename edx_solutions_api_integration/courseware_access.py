@@ -1,11 +1,11 @@
 """ Centralized access to LMS courseware app """
+from lms.djangoapps.courseware import courses, module_render
+from lms.djangoapps.courseware.model_data import FieldDataCache
 from django.contrib.auth.models import AnonymousUser
-
-from courseware import courses, module_render
-from courseware.model_data import FieldDataCache
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey, UsageKey
-from opaque_keys.edx.locations import SlashSeparatedCourseKey, Location
+from opaque_keys.edx.locations import Location
+from opaque_keys.edx.locator import CourseLocator
 from xmodule.modulestore import InvalidLocationError
 from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.exceptions import ItemNotFoundError
@@ -76,12 +76,12 @@ def get_course_key(course_id, slashseparated=False):
         course_key = CourseKey.from_string(course_id)
     except InvalidKeyError:
         try:
-            course_key = SlashSeparatedCourseKey.from_deprecated_string(course_id)
+            course_key = CourseLocator.from_string(course_id)
         except InvalidKeyError:
             course_key = None
     if slashseparated:
         try:
-            course_key = course_key.to_deprecated_string()
+            course_key = course_key.to_string()
         except:  # pylint: disable=W0702
             course_key = course_id
     return course_key
@@ -126,7 +126,7 @@ def get_course_child_key(content_id):
         content_id = UsageKey.from_string(content_id)
     except InvalidKeyError:
         try:
-            content_id = Location.from_deprecated_string(content_id)
+            content_id = Location.from_string(content_id)
         except (InvalidLocationError, InvalidKeyError):
             content_id = None
     return content_id

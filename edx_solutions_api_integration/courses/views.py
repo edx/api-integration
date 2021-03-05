@@ -2,14 +2,16 @@
 
 import itertools
 import logging
-
 import re
-import warnings
 import sys
-from StringIO import StringIO
+import warnings
 from collections import OrderedDict
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
+from functools import reduce
+from io import StringIO
 
+from completion.models import BlockCompletion
+from completion_aggregator.models import Aggregator
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.cache import cache
@@ -18,122 +20,75 @@ from django.db.models import Count, F, Max, Min, Prefetch, Q, Sum
 from django.http import Http404
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
-
-from pytz import UTC
+from openedx.core.djangoapps.django_comment_common.models import FORUM_ROLE_MODERATOR
+from edx_solutions_api_integration.courses.serializers import (
+    BlockCompletionSerializer, CourseCompletionsLeadersSerializer,
+    CourseProficiencyLeadersSerializer, CourseSerializer,
+    CourseSocialLeadersSerializer, GradeSerializer, UserGradebookSerializer)
+from edx_solutions_api_integration.courses.utils import (
+    generate_leaderboard, get_course_enrollment_count,
+    get_filtered_aggregation_queryset, get_num_users_started,
+    get_total_completions, get_user_position)
+from edx_solutions_api_integration.courseware_access import (
+    course_exists, get_course, get_course_child, get_course_child_key,
+    get_course_key)
+from edx_solutions_api_integration.models import (
+    CourseContentGroupRelationship, CourseGroupRelationship, GroupProfile)
+from edx_solutions_api_integration.permissions import (IsStaffView,
+                                                       MobileAPIView,
+                                                       MobileListAPIView,
+                                                       SecureAPIView,
+                                                       SecureCreateAPIView,
+                                                       SecureListAPIView)
+from edx_solutions_api_integration.tasks import (
+    convert_ooyala_to_bcove, get_assets_with_incorrect_urls,
+    get_modules_with_video_embeds)
+from edx_solutions_api_integration.users.serializers import (
+    UserCountByCitySerializer, UserSerializer)
+from edx_solutions_api_integration.utils import (
+    Round, cache_course_data, cache_course_user_data, css_data_to_list,
+    css_param_to_list, generate_base_uri, get_aggregate_exclusion_user_ids,
+    get_cached_data, get_ids_from_list_param, get_non_actual_company_users,
+    get_time_series_data, get_user_from_request_params, is_cohort_available,
+    parse_datetime, str2bool, strip_xblock_wrapper_div)
+from edx_solutions_organizations.models import Organization
+from edx_solutions_projects.models import Project, Workgroup
+from edx_solutions_projects.serializers import (BasicWorkgroupSerializer,
+                                                ProjectSerializer)
+from gradebook.models import StudentGradebook
+from instructor.access import revoke_access, update_forum_role
+from lms.djangoapps.course_api.blocks.api import get_blocks
+from lms.djangoapps.courseware.courses import (get_course_about_section,
+                                               get_course_info_section,
+                                               get_course_info_section_module)
+from lms.djangoapps.courseware.models import StudentModule
+from lms.djangoapps.courseware.views.views import get_static_tab_fragment
 from lxml import etree
-from six import text_type
+from mobile_api.course_info.views import apply_wrappers_to_content
+from opaque_keys.edx.keys import CourseKey, UsageKey
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+from openedx.core.djangoapps.content.course_structures.errors import CourseStructureNotAvailableError
+from openedx.core.djangoapps.content.course_structures.models import CourseStructure
+from openedx.core.djangoapps.course_groups.cohorts import get_cohort_user_ids
+from openedx.core.djangoapps.course_groups.models import CourseUserGroup
+from openedx.core.djangoapps.django_comment_common.comment_client.thread import get_course_thread_stats
+from openedx.core.djangoapps.django_comment_common.comment_client.utils import (
+    CommentClientMaintenanceError, CommentClientRequestError)
+from openedx.core.lib.courses import course_image_url
+from openedx.core.lib.xblock_utils import get_course_update_items
+from pytz import UTC
 from requests.exceptions import ConnectionError
 from rest_framework import status
 from rest_framework.response import Response
-
-from completion.models import BlockCompletion
-from completion_aggregator.models import Aggregator
-from courseware.courses import (
-    get_course_about_section,
-    get_course_info_section,
-    get_course_info_section_module,
-)
-from courseware.models import StudentModule
-from courseware.views.views import get_static_tab_fragment
-from django_comment_common.models import FORUM_ROLE_MODERATOR
-from gradebook.models import StudentGradebook
-from instructor.access import revoke_access, update_forum_role
-from xmodule.modulestore import ModuleStoreEnum
-
-from lms.djangoapps.course_api.blocks.api import get_blocks
-from lms.lib.comment_client.thread import get_course_thread_stats
-from lms.lib.comment_client.utils import CommentClientMaintenanceError, CommentClientRequestError
-from mobile_api.course_info.views import apply_wrappers_to_content
-from opaque_keys.edx.keys import UsageKey
-from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from openedx.core.djangoapps.content.course_structures.models import CourseStructure
-from openedx.core.djangoapps.content.course_structures.errors import CourseStructureNotAvailableError
-from openedx.core.djangoapps.course_groups.cohorts import get_cohort_user_ids
-from openedx.core.djangoapps.course_groups.models import CourseUserGroup
-from openedx.core.lib.courses import course_image_url
-from opaque_keys.edx.keys import CourseKey
-from openedx.core.lib.xblock_utils import get_course_update_items
 from social_engagement.models import StudentSocialEngagementScore
 from student.models import CourseEnrollment, CourseEnrollmentAllowed
-from student.roles import (
-    CourseAccessRole,
-    CourseAssistantRole,
-    CourseInstructorRole,
-    CourseObserverRole,
-    CourseStaffRole,
-    UserBasedRole,
-)
+from student.roles import (CourseAccessRole, CourseAssistantRole,
+                           CourseInstructorRole, CourseObserverRole,
+                           CourseStaffRole, UserBasedRole)
+from xmodule.modulestore import ModuleStoreEnum
 from xmodule.modulestore.django import modulestore
 from xmodule.modulestore.exceptions import ItemNotFoundError
 from xmodule.modulestore.search import path_to_location
-
-from edx_solutions_api_integration.courses.serializers import (
-    BlockCompletionSerializer,
-    CourseCompletionsLeadersSerializer,
-    CourseProficiencyLeadersSerializer,
-    CourseSerializer,
-    CourseSocialLeadersSerializer,
-    GradeSerializer,
-    UserGradebookSerializer,
-)
-from edx_solutions_api_integration.courses.utils import (
-    generate_leaderboard,
-    get_num_users_started,
-    get_total_completions,
-    get_user_position,
-    get_filtered_aggregation_queryset,
-    get_course_enrollment_count,
-)
-from edx_solutions_api_integration.courseware_access import (
-    course_exists,
-    get_course,
-    get_course_child,
-    get_course_child_key,
-    get_course_key,
-)
-from edx_solutions_api_integration.models import (
-    CourseContentGroupRelationship,
-    CourseGroupRelationship,
-    GroupProfile,
-)
-from edx_solutions_api_integration.permissions import (
-    IsStaffView,
-    MobileAPIView,
-    MobileListAPIView,
-    SecureAPIView,
-    SecureListAPIView,
-    SecureCreateAPIView)
-from edx_solutions_api_integration.users.serializers import UserSerializer, UserCountByCitySerializer
-from edx_solutions_api_integration.utils import (
-    cache_course_data,
-    cache_course_user_data,
-    css_param_to_list,
-    css_data_to_list,
-    generate_base_uri,
-    get_aggregate_exclusion_user_ids,
-    get_cached_data,
-    get_ids_from_list_param,
-    get_time_series_data,
-    get_user_from_request_params,
-    parse_datetime,
-    is_cohort_available,
-    str2bool,
-    strip_xblock_wrapper_div,
-    get_non_actual_company_users,
-    Round,
-)
-from edx_solutions_organizations.models import Organization
-from edx_solutions_projects.models import Project, Workgroup
-from edx_solutions_projects.serializers import (
-    BasicWorkgroupSerializer,
-    ProjectSerializer,
-)
-from edx_solutions_api_integration.tasks import (
-    convert_ooyala_to_bcove,
-    get_modules_with_video_embeds,
-    get_assets_with_incorrect_urls,
-)
-
 
 BLOCK_DATA_FIELDS = ['children', 'display_name', 'type', 'due', 'start']
 log = logging.getLogger(__name__)
@@ -145,9 +100,9 @@ def _inner_content(tag):
     """
     inner_content = None
     if tag is not None:
-        inner_content = tag.text if tag.text else u''
-        inner_content += u''.join(etree.tostring(e) for e in tag)  # pylint: disable=E1101
-        inner_content += tag.tail if tag.tail else u''
+        inner_content = tag.text if tag.text else ''
+        inner_content += ''.join(etree.tostring(e, encoding="unicode") for e in tag)  # pylint: disable=E1101
+        inner_content += tag.tail if tag.tail else ''
 
     return inner_content
 
@@ -207,7 +162,7 @@ def _parse_overview_html(html):
                             bios = article.findall('p')
                             bio_html = ''
                             for bio in bios:
-                                bio_html += etree.tostring(bio)  # pylint: disable=E1101
+                                bio_html += etree.tostring(bio, encoding="unicode")  # pylint: disable=E1101
 
                             if bio_html:
                                 article_data['bio'] = bio_html
@@ -231,7 +186,7 @@ def _manage_role(course_descriptor, user, role, action):
     forum_moderator_roles = ('instructor', 'staff', 'assistant')
     if role not in supported_roles:
         raise ValueError
-    if action is 'allow':
+    if action == 'allow':
         existing_role = CourseAccessRole.objects.filter(
             user=user,
             role=role,
@@ -243,7 +198,7 @@ def _manage_role(course_descriptor, user, role, action):
             new_role.save()
         if role in forum_moderator_roles:
             update_forum_role(course_descriptor.id, user, FORUM_ROLE_MODERATOR, 'allow')
-    elif action is 'revoke':
+    elif action == 'revoke':
         revoke_access(course_descriptor, user, role)
         if role in forum_moderator_roles:
             # There's a possibilty that the user may play more than one role in a course
@@ -288,16 +243,16 @@ def _make_block_tree(request, blocks_data, course_key, course_block, block=None,
                 children.append(child_content)
 
         if data['category'] and data['category'] == 'course':
-            content_id = unicode(course_block.id)
+            content_id = str(course_block.id)
             content_uri = '{}/{}'.format(base_content_uri, content_id)
             data['content'] = children
             data['end'] = getattr(course_block, 'end', None)
             data['number'] = course_block.location.course
             data['org'] = course_block.location.org
-            data['id'] = unicode(course_block.id)
+            data['id'] = str(course_block.id)
         else:
             data['children'] = children
-            content_uri = '{}/{}/content/{}'.format(base_content_uri, unicode(course_key), data['id'])
+            content_uri = '{}/{}/content/{}'.format(base_content_uri, str(course_key), data['id'])
 
         data['uri'] = content_uri
 
@@ -314,7 +269,7 @@ def _make_block_tree(request, blocks_data, course_key, course_block, block=None,
             raise KeyError("Usage key must be provided")
 
         for block_key, block_value in blocks_data.items():
-            if block_key != unicode(usage_key):
+            if block_key != str(usage_key):
                 children.append(
                     _make_block_tree(request, blocks_data, course_key, course_block, block_value, depth - 1)
                 )
@@ -325,7 +280,7 @@ def _get_static_tab_contents(request, course, tab, strip_wrapper_div=True):
     """
     Wrapper around get_static_tab_contents to cache contents for the given static tab
     """
-    cache_key = u'course.{course_id}.static.tab.{url_slug}.contents'.format(course_id=course.id, url_slug=tab.url_slug)
+    cache_key = 'course.{course_id}.static.tab.{url_slug}.contents'.format(course_id=course.id, url_slug=tab.url_slug)
     contents = cache.get(cache_key)
     if contents is None:
         contents = get_static_tab_fragment(request, course, tab).content
@@ -358,11 +313,11 @@ def _get_course_progress_metrics(course_key, **kwargs):
     """
     course_avg = 0
     data = {'course_avg': course_avg}
-    total_actual_or_percent_completions, total_possible_completions = get_total_completions(course_key, **kwargs)
+    total_actual_completions, total_possible_completions = get_total_completions(course_key, **kwargs)
     if kwargs.get('user_id'):
         data.update(get_user_position(course_key, **kwargs))
     if not any([kwargs.get('org_ids'), kwargs.get('group_ids'), kwargs.get('cohort_user_ids')]):
-        course_id = course_key.to_deprecated_string()
+        course_id = str(course_key)
         total_users = get_course_enrollment_count(course_id)
     else:
         total_users_qs = CourseEnrollment.objects.users_enrolled_in(course_key).exclude(id__in=kwargs.get('exclude_users'))
@@ -373,10 +328,11 @@ def _get_course_progress_metrics(course_key, **kwargs):
         if kwargs.get('cohort_user_ids'):
             total_users_qs = total_users_qs.filter(id__in=kwargs.get('cohort_user_ids'))
         total_users = total_users_qs.count()
-    if total_users and total_actual_or_percent_completions and total_possible_completions:
-        course_avg = total_actual_or_percent_completions / float(total_users)
-        if not kwargs.get('percent_completion'):
-            course_avg = min(100 * (course_avg / total_possible_completions), 100)  # avg in percentage
+
+    if total_users and total_actual_completions and total_possible_completions:
+        course_avg = total_actual_completions / float(total_users)
+        course_avg = min(100 * (course_avg / total_possible_completions), 100)  # avg in percentage
+
     data['course_avg'] = course_avg
     data['total_users'] = total_users
     data['total_possible_completions'] = total_possible_completions
@@ -384,7 +340,7 @@ def _get_course_progress_metrics(course_key, **kwargs):
 
 
 def _get_courses_metrics_grades_leaders_list(course_key, **kwargs):
-    course_id = course_key.to_deprecated_string()
+    course_id = str(course_key)
     user_id = kwargs.get('user_id')
     data = {}
 
@@ -430,7 +386,7 @@ def _get_courses_metrics_grades_leaders_list(course_key, **kwargs):
 
 
 def _get_courses_metrics_completions_leaders_list(course_key, **kwargs):
-    course_id = course_key.to_deprecated_string()
+    course_id = str(course_key)
     user_id = kwargs.get('user_id')
     data = {}
 
@@ -472,7 +428,7 @@ def _get_courses_metrics_completions_leaders_list(course_key, **kwargs):
 
 
 def _get_courses_metrics_social_leaders_list(course_key, **kwargs):
-    course_id = course_key.to_deprecated_string()
+    course_id = str(course_key)
     user_id = kwargs.get('user_id')
     data = {}
 
@@ -648,7 +604,7 @@ class CourseContentDetail(SecureAPIView):
             response_data['uri'] = '{}://{}/api/server/courses/{}'.format(
                 protocol,
                 request.get_host(),
-                unicode(course_key)
+                str(course_key)
             )
         usage_key = usage_key.replace(course_key=modulestore().fill_in_run(usage_key.course_key))
         data_blocks = get_blocks(
@@ -734,8 +690,8 @@ class CoursesList(SecureListAPIView):
             except Exception as ex:  # pylint: disable=broad-except
                 log.exception(
                     'An error occurred while generating course overview for %s: %s',
-                    unicode(course_key),
-                    text_type(ex),
+                    str(course_key),
+                    str(ex),
                 )
 
         log.info('Finished generating course overviews.')
@@ -824,7 +780,7 @@ class CoursesDetail(MobileAPIView):
             root_block = data_blocks.get('blocks', {}).get(
                 data_blocks['root'],
                 {
-                    'id': unicode(course_descriptor.id),
+                    'id': str(course_descriptor.id),
                     'display_name': course_descriptor.display_name,
                     'type': course_descriptor.category
                 }
@@ -839,8 +795,8 @@ class CoursesDetail(MobileAPIView):
                 content_block=course_descriptor
             )
             base_uri_without_qs = generate_base_uri(request, True)
-            if unicode(course_descriptor.id) not in base_uri_without_qs:
-                base_uri_without_qs = '{}/{}'.format(base_uri_without_qs, unicode(course_descriptor.id))
+            if str(course_descriptor.id) not in base_uri_without_qs:
+                base_uri_without_qs = '{}/{}'.format(base_uri_without_qs, str(course_descriptor.id))
             image_url = ''
             if hasattr(course_descriptor, 'course_image') and course_descriptor.course_image:
                 image_url = course_image_url(course_descriptor)
@@ -927,7 +883,7 @@ class CoursesGroupsList(SecureAPIView):
                 existing_relationship = None
             if existing_relationship is None:
                 CourseGroupRelationship.objects.create(course_id=course_key, group=existing_group)
-                response_data['course_id'] = unicode(course_key)
+                response_data['course_id'] = str(course_key)
                 response_data['group_id'] = str(existing_group.id)
                 response_data['uri'] = '{}/{}'.format(base_uri, existing_group.id)
                 response_status = status.HTTP_201_CREATED
@@ -1338,13 +1294,13 @@ class CoursesUsersList(MobileListAPIView):
         if not course_exists(course_id):
             return Response({}, status=status.HTTP_404_NOT_FOUND)
         self.course_key = get_course_key(course_id)
-        return super(CoursesUsersList, self).list(request)
+        return super().list(request)
 
     def get_serializer_context(self):
         """
         Extra context provided to the serializer class.
         """
-        serializer_context = super(CoursesUsersList, self).get_serializer_context()
+        serializer_context = super().get_serializer_context()
         default_fields = [
             "id",
             "email",
@@ -1672,8 +1628,8 @@ class CourseContentGroupsList(SecureAPIView):
         response_data = {}
         base_uri = generate_base_uri(request)
         response_data['uri'] = '{}/{}'.format(base_uri, existing_profile.group_id)
-        response_data['course_id'] = unicode(course_key)
-        response_data['content_id'] = unicode(content_key)
+        response_data['course_id'] = str(course_key)
+        response_data['content_id'] = str(content_key)
         response_data['group_id'] = str(existing_profile.group_id)
         try:
             CourseContentGroupRelationship.objects.get(
@@ -1796,7 +1752,7 @@ class CourseContentUsersList(SecureAPIView):
         if enrolled in ['True', 'true']:
             queryset = enrolled_users
         else:
-            queryset = list(itertools.ifilterfalse(lambda x: x in enrolled_users, users))
+            queryset = list(itertools.filterfalse(lambda x: x in enrolled_users, users))
 
         serializer = UserSerializer(queryset, many=True)
         return Response(serializer.data)  # pylint: disable=E1101
@@ -1928,7 +1884,7 @@ class CoursesMetrics(SecureAPIView):
         return avg_grade
 
     @staticmethod
-    def get_course_avg_progress(course_id, org_id=None, percent_completion=True):
+    def get_course_avg_progress(course_id, org_id=None):
         """
         Get average progress score of a course
         If org_id is passed then score is limited to that org's users
@@ -1948,7 +1904,6 @@ class CoursesMetrics(SecureAPIView):
             course_key,
             exclude_users=exclude_user_ids,
             org_ids=[org_id] if org_id else None,
-            percent_completion=percent_completion,
         )
         cache_course_data(cache_category, course_id, data)
 
@@ -2109,8 +2064,7 @@ class CoursesMetrics(SecureAPIView):
             if not any([group_ids, cohort_user_ids]):
                 avg_progress = CoursesMetrics.get_course_avg_progress(
                     course_id=course_id,
-                    org_id=organization,
-                    percent_completion=True
+                    org_id=organization
                 )
             else:
                 progress_metrics = _get_course_progress_metrics(
@@ -2118,8 +2072,7 @@ class CoursesMetrics(SecureAPIView):
                     exclude_users=exclude_users,
                     org_ids=org_ids,
                     group_ids=group_ids,
-                    cohort_user_ids=cohort_user_ids,
-                    percent_completion=True,
+                    cohort_user_ids=cohort_user_ids
                 )
                 avg_progress = progress_metrics.get('course_avg')
 
@@ -2145,7 +2098,7 @@ class CoursesMetrics(SecureAPIView):
         if 'thread_stats' in metrics_required:
             try:
                 data['thread_stats'] = get_course_thread_stats(slash_course_id)
-            except (CommentClientMaintenanceError, CommentClientRequestError, ConnectionError), e:
+            except (CommentClientMaintenanceError, CommentClientRequestError, ConnectionError) as e:
                 logging.error("Forum service returned an error: %s", str(e))
 
                 data = {
@@ -2220,7 +2173,7 @@ class CoursesTimeSeriesMetrics(SecureAPIView):
             earned__gt=0.0,
         ).exclude(user_id__in=exclude_users)
         modules_completed_qs = BlockCompletion.objects.filter(
-            course_key__exact=course_key,
+            context_key__exact=course_key,
             user__courseenrollment__is_active=True,
             user__courseenrollment__course_id__exact=course_key,
             user__is_active=True,
@@ -2400,7 +2353,7 @@ class CompletionList(SecureListAPIView):  # pylint: disable=too-many-ancestors
         if not course_exists(course_id):
             raise Http404
         course_key = get_course_key(course_id)
-        queryset = BlockCompletion.objects.filter(course_key=course_key).select_related('user')
+        queryset = BlockCompletion.objects.filter(context_key=course_key).select_related('user')
         user_ids = get_ids_from_list_param(self.request, 'user_id')
         if user_ids:
             queryset = queryset.filter(user__in=user_ids)
@@ -2445,7 +2398,6 @@ class CompletionList(SecureListAPIView):  # pylint: disable=too-many-ancestors
             return Response({'message': _('user_id is invalid')}, status.HTTP_400_BAD_REQUEST)
         completion, created = BlockCompletion.objects.submit_completion(
             user=user,
-            course_key=course_key,
             block_key=content_key,
             completion=1.0,
         )
@@ -2842,7 +2794,7 @@ class CourseNavView(SecureAPIView):
             _, course_key, __ = get_course(request, request.user, course_id)
             usage_key = self._get_full_location_key_by_module_id(request, course_key, usage_key_string)
         except InvalidKeyError:
-            raise Http404(u"Invalid course_key or usage_key")
+            raise Http404("Invalid course_key or usage_key")
 
         (course_key, chapter, section, vertical, position, final_target_id) = path_to_location(modulestore(), usage_key)
         chapter_key = course_key.make_usage_key('chapter', chapter)
@@ -2850,12 +2802,12 @@ class CourseNavView(SecureAPIView):
         vertical_key = course_key.make_usage_key('vertical', vertical)
 
         result = {
-            'course_key': unicode(course_key),
-            'chapter': unicode(chapter_key),
-            'section': unicode(section_key),
-            'vertical': unicode(vertical_key),
-            'position': unicode(position),
-            'final_target_id': unicode(final_target_id)
+            'course_key': str(course_key),
+            'chapter': str(chapter_key),
+            'section': str(section_key),
+            'vertical': str(vertical_key),
+            'position': str(position),
+            'final_target_id': str(final_target_id)
         }
 
         return Response(result, status=status.HTTP_200_OK)

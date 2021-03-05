@@ -1,9 +1,7 @@
 """
 Tests for course related use cases in mobile APIs
 """
-from mobile_api.testutils import (
-    MobileAPITestCase,
-)
+from mobile_api.testutils import MobileAPITestCase
 
 
 class TestCourseOverviewApi(MobileAPITestCase):

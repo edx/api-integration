@@ -1,12 +1,14 @@
-from django.core.management.base import BaseCommand
-
-import uuid
 import json
-from django.core.exceptions import ObjectDoesNotExist
+import uuid
 
-from edx_solutions_api_integration.models import GroupRelationship, GroupProfile
-from django.contrib.auth.models import User, Group
-from edx_solutions_organizations.models import Organization, OrganizationGroupUser
+from django.contrib.auth.models import Group, User
+from django.core.exceptions import ObjectDoesNotExist
+from django.core.management.base import BaseCommand
+from edx_solutions_api_integration.models import (GroupProfile,
+                                                  GroupRelationship)
+from edx_solutions_organizations.models import (Organization,
+                                                OrganizationGroupUser)
+
 
 class Command(BaseCommand):
     help = """Repair users that are assistants and observers on every course
@@ -21,15 +23,15 @@ example:
         
         try:
             mcka_company_admin = Group.objects.get(name__icontains=original_group_name)
-            print "Found company admin group ("+original_group_name+"), id: " + str(mcka_company_admin.id)
+            print("Found company admin group ("+original_group_name+"), id: " + str(mcka_company_admin.id))
         
         except ObjectDoesNotExist:
-            print "Creating new company admin group (mcka_role_company_admin)..."
+            print("Creating new company admin group (mcka_role_company_admin)...")
             mcka_company_admin = Group.objects.create(name=str(uuid.uuid4()))
             mcka_company_admin.name = '{:04d}: {}'.format(mcka_company_admin.id, original_group_name)
             mcka_company_admin.record_active = True
             mcka_company_admin.save()
-            print "Created successfuly company admin group (mcka_role_company_admin), id: " + str(mcka_company_admin.id)
+            print("Created successfuly company admin group (mcka_role_company_admin), id: " + str(mcka_company_admin.id))
         
         try:
             group_relationship = GroupRelationship.objects.get(group_id=mcka_company_admin.id)
@@ -48,7 +50,7 @@ example:
 
         all_organizations = Organization.objects.all()
         counter_of_old_orgs = 0
-        print "Fetched " + str(len(all_organizations)) + " organizations!"
+        print("Fetched " + str(len(all_organizations)) + " organizations!")
         for organization in all_organizations:
             try:
                 group = Group.objects.get(id=mcka_company_admin.id, organizations=organization.id)
@@ -57,5 +59,5 @@ example:
                 organization.save() 
                 counter_of_old_orgs += 1
 
-        print "Number of organizations to update: " + str(counter_of_old_orgs)
-        print "All organizations are updated!"
+        print("Number of organizations to update: " + str(counter_of_old_orgs))
+        print("All organizations are updated!")

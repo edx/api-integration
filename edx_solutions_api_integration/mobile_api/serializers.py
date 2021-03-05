@@ -1,7 +1,8 @@
 from edx_solutions_organizations.models import Organization
-from mobileapps.serializers import BasicMobileAppSerializer, BasicThemeSerializer
-from rest_framework import serializers
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
+from mobileapps.serializers import (BasicMobileAppSerializer,
+                                    BasicThemeSerializer)
+from rest_framework import serializers
 
 
 class MobileOrganizationSerializer(BasicOrganizationSerializer):

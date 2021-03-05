@@ -6,18 +6,16 @@ Command to generate dummy problem responses xblock poll in a course
 import json
 import logging
 import random
-
-from django.contrib.auth.models import User
-from django.core.management.base import BaseCommand, CommandError
 from itertools import product
 from optparse import make_option
 
-from courseware.models import StudentModule  # pylint: disable=import-error
+from lms.djangoapps.courseware.models import StudentModule  # pylint: disable=import-error
+from django.contrib.auth.models import User
+from django.core.management.base import BaseCommand, CommandError
 from edx_solutions_api_integration.models import APIUser as User
 from opaque_keys.edx.keys import CourseKey
 from xmodule.modulestore import ModuleStoreEnum
 from xmodule.modulestore.django import modulestore
-
 
 # Variables
 
@@ -41,7 +39,7 @@ class Command(BaseCommand):
             "--num-responses",
             dest="num_responses",
             default=10000,
-            type="int",
+            type=int,
             help="Limit generation of responses to this number. Defaults to "
                  "generating 10k responses. Setting this to 0 will generate"
                  "a dummy response for every user in every poll.",
@@ -50,7 +48,7 @@ class Command(BaseCommand):
             "--batch-size",
             dest="batch_size",
             default=500,
-            type="int",
+            type=int,
             help="Batch size to use when adding responses to the database.",
         ),
     state_summary = {}
@@ -106,7 +104,7 @@ class Command(BaseCommand):
         count = 0
         # Returns generator of combinations that aren't already stored
         for student, block in combinations:
-            if count >= limit:
+            if limit and count >= limit:
                 break
             if (student, str(block.location)) not in skip_combinations:
                 count += 1
