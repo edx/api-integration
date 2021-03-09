@@ -847,6 +847,10 @@ class UsersDetail(SecureAPIView):
                 password_history_entry = PasswordHistory()
                 password_history_entry.create(existing_user)
 
+        # Sync user info in cs-comment-service if username, first_name or last_name are updated.
+        if username or first_name or last_name:
+            create_comments_service_user(existing_user)
+
         # Also update the UserProfile record for this User
         existing_user_profile = UserProfile.objects.get(user_id=user_id)
         if existing_user_profile:
