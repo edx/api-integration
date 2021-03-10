@@ -29,7 +29,7 @@ from gradebook.utils import generate_user_gradebook
 from social_engagement.models import StudentSocialEngagementScore
 from instructor.access import revoke_access, update_forum_role
 
-from student.models import anonymous_id_for_user
+from student.models import anonymous_id_for_user, create_comments_service_user
 from openedx.core.djangoapps.lang_pref import LANGUAGE_KEY
 from lms.djangoapps.notification_prefs.views import enable_notifications
 from opaque_keys import InvalidKeyError
@@ -846,6 +846,10 @@ class UsersDetail(SecureAPIView):
                 # NOTE, this will be a NOP unless the feature has been turned on in configuration
                 password_history_entry = PasswordHistory()
                 password_history_entry.create(existing_user)
+
+        # Sync user info to cs-comment-service.
+        if username or first_name or last_name:
+            create_comments_service_user(existing_user)
 
         # Also update the UserProfile record for this User
         existing_user_profile = UserProfile.objects.get(user_id=user_id)
