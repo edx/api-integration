@@ -74,7 +74,7 @@ from rest_framework import filters, status
 from rest_framework.response import Response
 from social_engagement.models import StudentSocialEngagementScore
 from student.models import (CourseEnrollment, CourseEnrollmentException,
-                            LoginFailures, UserProfile, anonymous_id_for_user)
+                            LoginFailures, UserProfile, anonymous_id_for_user, create_comments_service_user)
 from student.roles import (CourseAccessRole, CourseAssistantRole,
                            CourseInstructorRole, CourseObserverRole,
                            CourseStaffRole, UserBasedRole)
@@ -830,6 +830,10 @@ class UsersDetail(SecureAPIView):
                 # NOTE, this will be a NOP unless the feature has been turned on in configuration
                 password_history_entry = PasswordHistory()
                 password_history_entry.create(existing_user)
+
+        # Sync user info to cs-comment-service.
+        if username or first_name or last_name:
+            create_comments_service_user(existing_user)
 
         # Also update the UserProfile record for this User
         existing_user_profile = UserProfile.objects.get(user_id=user_id)
