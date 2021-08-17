@@ -1317,6 +1317,7 @@ class CoursesUsersList(MobileListAPIView):
             "is_staff",
             "last_login",
             "attributes",
+            "organization_groups",
         ]
 
         active_attributes = []
