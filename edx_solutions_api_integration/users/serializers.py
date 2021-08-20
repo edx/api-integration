@@ -47,6 +47,20 @@ class UserSerializer(DynamicFieldsModelSerializer):
     grades = serializers.SerializerMethodField('get_user_grades')
     attributes = serializers.SerializerMethodField('get_organization_attributes')
     course_groups = serializers.SerializerMethodField('get_user_course_groups')
+    organization_groups = serializers.SerializerMethodField('get_user_organization_groups')
+
+    def get_user_organization_groups(self, user):
+        """
+        Return a list of user organization groups.
+        """
+        organization_groups = [
+            {
+                'organization_id': group.organization_id,
+                'group_id': group.group_id,
+
+            } for group in user.organizationgroupuser_set.all()
+        ]
+        return organization_groups
 
     def get_user_course_groups(self, user):
         """Return a list of course groups of the users, optionally filtered by course id."""
@@ -149,6 +163,7 @@ class UserSerializer(DynamicFieldsModelSerializer):
             "grades",
             "attributes",
             "course_groups",
+            "organization_groups",
         )
         read_only_fields = ("id", "email", "username")
 
