@@ -4,6 +4,7 @@ import json
 from django.core.exceptions import ObjectDoesNotExist
 from edx_solutions_api_integration.models import APIUser
 from edx_solutions_api_integration.utils import get_profile_image_urls_by_username
+from edx_solutions_organizations.models import Organization
 from edx_solutions_organizations.serializers import BasicOrganizationSerializer
 from rest_framework import serializers
 
@@ -48,6 +49,18 @@ class UserSerializer(DynamicFieldsModelSerializer):
     attributes = serializers.SerializerMethodField('get_organization_attributes')
     course_groups = serializers.SerializerMethodField('get_user_course_groups')
     organization_groups = serializers.SerializerMethodField('get_user_organization_groups')
+    main_organization = serializers.SerializerMethodField('get_user_main_organization')
+
+    def get_user_main_organization(self, user):
+        main_user_organization = None
+        mapped_user_organization =  user.user_organizations.all().filter(is_main_company=True).first()
+        if mapped_user_organization:
+            try:
+                main_user_organization = Organization.objects.get(id=mapped_user_organization.organization_id)
+            except ObjectDoesNotExist:
+                main_user_organization = None
+        main_user_organization = [main_user_organization] if main_user_organization else []
+        return BasicOrganizationSerializer(main_user_organization, many=True, context=self.context).data
 
     def get_user_organization_groups(self, user):
         """
@@ -164,6 +177,7 @@ class UserSerializer(DynamicFieldsModelSerializer):
             "attributes",
             "course_groups",
             "organization_groups",
+            "main_organization",
         )
         read_only_fields = ("id", "email", "username")
 

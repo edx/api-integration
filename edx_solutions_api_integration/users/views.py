@@ -1493,8 +1493,18 @@ class UsersOrganizationsList(SecureListAPIView):
         user = get_user_from_request_params(self.request, self.kwargs)
         if not user:
             return []
-
-        return user.organizations.all()
+        main_user_organization = None
+        mapped_user_organization =  user.user_organizations.all().filter(is_main_company=True).first()
+        if mapped_user_organization:
+            try:
+                main_user_organization = Organization.objects.get(id=mapped_user_organization.organization_id)
+            except ObjectDoesNotExist:
+                main_user_organization = None
+        user_organizations_set = user.organizations.all()
+        if main_user_organization:
+            user_organizations_set = user_organizations_set.exclude(id=main_user_organization.id)
+            user_organizations_set = [main_user_organization] + list(user_organizations_set)
+        return user_organizations_set
 
 
 class UsersWorkgroupsList(SecureListAPIView):

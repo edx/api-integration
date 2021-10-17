@@ -16,6 +16,7 @@ from edx_solutions_api_integration.models import (CourseGroupRelationship,
 from edx_solutions_api_integration.permissions import SecureViewSet
 from edx_solutions_api_integration.users.views import _manage_role
 from edx_solutions_organizations.models import Organization
+from edx_solutions_organizations.receivers import user_organization_updated
 from lms.djangoapps.discussion.notification_prefs.views import enable_notifications
 from opaque_keys.edx.keys import CourseKey
 from openedx.core.djangoapps.course_groups.cohorts import (add_cohort,
@@ -185,6 +186,11 @@ class ImportParticipantsViewSet(SecureViewSet):
             company.users.add(user)
         except Exception as exc:
             self._add_error(errors, str(exc.message), _('Enrolling Participant in Company'), email)
+
+        user_organization_updated.send(
+            sender=__name__, user_id=user.id,
+            organization_id=company.id
+        )
 
     def _enroll_user(self, data, errors, response={}):
         """Enroll user in a course and add him to a cohort."""
