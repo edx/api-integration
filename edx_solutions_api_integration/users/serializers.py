@@ -58,7 +58,7 @@ class UserSerializer(DynamicFieldsModelSerializer):
             try:
                 main_user_organization = Organization.objects.get(id=mapped_user_organization.organization_id)
             except ObjectDoesNotExist:
-                main_user_organization = None
+                pass
         main_user_organization = [main_user_organization] if main_user_organization else []
         return BasicOrganizationSerializer(main_user_organization, many=True, context=self.context).data
 
