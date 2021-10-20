@@ -16,7 +16,7 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.files.base import ContentFile
 from django.core.validators import validate_email, validate_slug
 from django.db import IntegrityError
-from django.db.models import BooleanField, Case, Count, Q, Value, When
+from django.db.models import BooleanField, Case, Count, F, Q, Value, When
 from django.http import Http404
 from django.utils.translation import get_language
 from django.utils.translation import ugettext_lazy as _
@@ -1493,8 +1493,16 @@ class UsersOrganizationsList(SecureListAPIView):
         user = get_user_from_request_params(self.request, self.kwargs)
         if not user:
             return []
-
-        return user.organizations.all()
+        user_organizations_set = user.organizations.all()
+        if len(user_organizations_set) > 1:
+            q_object = Q()
+            q_object.add(Q(user_organizations__user_id=user.id), Q.AND)
+            q_object.add(Q(user_organizations__organization_id=F('id')), Q.AND)
+            q_object.add(Q(user_organizations__is_main_company=True), Q.AND)
+            user_organizations_set = user_organizations_set.annotate(
+                is_main_company_flag=Case(When(q_object, then=True), default=False, output_field=BooleanField())
+            ).distinct().order_by('-is_main_company_flag')
+        return user_organizations_set
 
 
 class UsersWorkgroupsList(SecureListAPIView):
